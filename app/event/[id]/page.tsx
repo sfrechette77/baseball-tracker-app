@@ -14,6 +14,15 @@ function createClient() {
 
 const APP_TIME_ZONE = 'America/Chicago'
 
+type FieldRow = {
+  id?: string
+  name: string | null
+  address_line: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+}
+
 type EventRow = {
   id: string
   title: string
@@ -23,13 +32,7 @@ type EventRow = {
   notes: string | null
   snack_family: string | null
   gear_notes: string | null
-  fields: {
-    name: string | null
-    address_line: string | null
-    city: string | null
-    state: string | null
-    postal_code: string | null
-  } | null
+  fields: FieldRow[] | null
 }
 
 function formatChicagoDateTime(date: Date) {
@@ -44,12 +47,14 @@ function formatChicagoDateTime(date: Date) {
   }).format(date)
 }
 
-function formatAddress(event: EventRow) {
+function formatAddress(field: FieldRow | null | undefined) {
+  if (!field) return ''
+
   return [
-    event.fields?.address_line,
-    event.fields?.city,
-    event.fields?.state,
-    event.fields?.postal_code
+    field.address_line,
+    field.city,
+    field.state,
+    field.postal_code
   ]
     .filter(Boolean)
     .join(', ')
@@ -110,7 +115,7 @@ export default function EventPage() {
     const loadEvent = async () => {
       const supabase = createClient()
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('events')
         .select(`
           id,
@@ -122,6 +127,7 @@ export default function EventPage() {
           snack_family,
           gear_notes,
           fields (
+            id,
             name,
             address_line,
             city,
@@ -132,7 +138,13 @@ export default function EventPage() {
         .eq('id', eventId)
         .single()
 
-      setEvent(data)
+      if (error || !data) {
+        setEvent(null)
+        setLoading(false)
+        return
+      }
+
+      setEvent(data as EventRow)
       setLoading(false)
     }
 
@@ -146,9 +158,14 @@ export default function EventPage() {
     [event]
   )
 
-  const address = useMemo(
-    () => (event ? formatAddress(event) : ''),
+  const field = useMemo(
+    () => event?.fields?.[0] ?? null,
     [event]
+  )
+
+  const address = useMemo(
+    () => formatAddress(field),
+    [field]
   )
 
   const directionsUrl = address
@@ -283,7 +300,7 @@ export default function EventPage() {
 
             <DetailCard label="Field">
               <p className="text-base font-semibold text-slate-900">
-                {event.fields?.name || 'Field TBD'}
+                {field?.name || 'Field TBD'}
               </p>
 
               <p className="mt-1 text-sm text-slate-600">
