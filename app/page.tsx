@@ -20,7 +20,6 @@ type EventRow = {
   starts_at: string
   status: string
   notes: string | null
-  snack_family: string | null
   gear_notes: string | null
   travel_minutes: number | null
   travel_miles: number | null
@@ -326,16 +325,6 @@ function EventCard({
 
       <div className="mt-4 rounded-2xl border border-slate-200 p-4">
         <p className="text-[11px] uppercase tracking-wide text-slate-500">
-          Snack Duty
-        </p>
-
-        <p className="mt-2 text-sm text-slate-700">
-          {event.snack_family ?? 'Not assigned'}
-        </p>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-slate-200 p-4">
-        <p className="text-[11px] uppercase tracking-wide text-slate-500">
           Gear Checklist
         </p>
 
@@ -385,7 +374,6 @@ export default function HomePage() {
           starts_at,
           status,
           notes,
-          snack_family,
           gear_notes,
           travel_minutes,
           travel_miles,

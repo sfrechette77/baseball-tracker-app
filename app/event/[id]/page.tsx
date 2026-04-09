@@ -6,10 +6,16 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 
 function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    )
+  }
+
+  return createBrowserClient(url, key)
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
@@ -30,9 +36,8 @@ type EventRow = {
   starts_at: string
   status: string
   notes: string | null
-  snack_family: string | null
   gear_notes: string | null
-  fields: FieldRow[] | null
+  fields: FieldRow | null
 }
 
 function formatChicagoDateTime(date: Date) {
@@ -113,39 +118,45 @@ export default function EventPage() {
 
   useEffect(() => {
     const loadEvent = async () => {
-      const supabase = createClient()
+      try {
+        const supabase = createClient()
 
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          id,
-          title,
-          opponent,
-          starts_at,
-          status,
-          notes,
-          snack_family,
-          gear_notes,
-          fields (
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
             id,
-            name,
-            address_line,
-            city,
-            state,
-            postal_code
-          )
-        `)
-        .eq('id', eventId)
-        .single()
+            title,
+            opponent,
+            starts_at,
+            status,
+            notes,
+            gear_notes,
+            fields (
+              id,
+              name,
+              address_line,
+              city,
+              state,
+              postal_code
+            )
+          `)
+          .eq('id', eventId)
+          .single()
 
-      if (error || !data) {
+        if (error || !data) {
+          console.error('Error loading event:', error)
+          setEvent(null)
+          setLoading(false)
+          return
+        }
+
+        setEvent(data as EventRow)
+      } catch (err) {
+        console.error('Unexpected error loading event:', err)
         setEvent(null)
+      } finally {
         setLoading(false)
-        return
       }
-
-      setEvent(data as EventRow)
-      setLoading(false)
     }
 
     if (eventId) {
@@ -159,7 +170,7 @@ export default function EventPage() {
   )
 
   const field = useMemo(
-    () => event?.fields?.[0] ?? null,
+    () => event?.fields ?? null,
     [event]
   )
 
@@ -322,12 +333,6 @@ export default function EventPage() {
             <DetailCard label="Notes">
               <p className="text-sm text-slate-700">
                 {event.notes?.trim() || 'No notes added'}
-              </p>
-            </DetailCard>
-
-            <DetailCard label="Snack Duty">
-              <p className="text-sm text-slate-700">
-                {event.snack_family?.trim() || 'Not assigned'}
               </p>
             </DetailCard>
 
