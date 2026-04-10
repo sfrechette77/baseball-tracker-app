@@ -159,7 +159,7 @@ export default function SchedulePage() {
         <div className="mx-auto max-w-md space-y-4">
           <Link
             href="/"
-            className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+            className="inline-flex items-center rounded-2xl border border-slate-900 bg-white px-4 py-3 text-sm font-semibold text-white shadow-sm"
           >
             ← Back to Home
           </Link>

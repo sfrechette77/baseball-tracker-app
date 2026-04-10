@@ -580,7 +580,7 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-sm grid-cols-2 gap-2 p-3">
           <Link
             href="/schedule"
-            className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-700"
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white"
           >
             Schedule
           </Link>

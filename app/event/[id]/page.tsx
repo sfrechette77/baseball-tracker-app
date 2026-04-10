@@ -284,7 +284,7 @@ export default function EventPage() {
                   href={directionsUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-900 bg-white px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
                 >
                   Open Directions
                 </a>
