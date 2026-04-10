@@ -280,11 +280,6 @@ export default function EventPage() {
           <div className="space-y-4 p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Link
-                href={`/edit-event/${event.id}`}
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-              >
-                Edit Event
-              </Link>
 
               {directionsUrl ? (
                 <a

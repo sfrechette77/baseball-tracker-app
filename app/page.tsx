@@ -584,13 +584,6 @@ export default function HomePage() {
           >
             Schedule
           </Link>
-
-          <Link
-            href="/add-event"
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white"
-          >
-            Add Event
-          </Link>
         </div>
       </nav>
     </main>
