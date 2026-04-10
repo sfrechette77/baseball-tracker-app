@@ -68,10 +68,10 @@ async function getDriveStats(
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": googleMapsKey,
-        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters"
-      },
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": googleMapsKey || "",
+      "X-Goog-FieldMask": "routes.duration,routes.distanceMeters"
+    },
       body: JSON.stringify({
         origin: {
           location: {
