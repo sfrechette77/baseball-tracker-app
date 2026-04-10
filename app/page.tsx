@@ -504,7 +504,7 @@ export default function HomePage() {
             </p>
 
             <h1 className="mt-2 text-2xl font-bold">
-              Parent Sports Dashboard
+              Chicago Elite 11U - Moore
             </h1>
 
             <p className="mt-3 text-sm text-slate-200">
