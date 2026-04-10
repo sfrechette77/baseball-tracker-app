@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -37,7 +38,18 @@ type EventRow = {
   status: string
   notes: string | null
   gear_notes: string | null
-  fields: FieldRow | null
+  fields: FieldRow[] | null
+}
+
+type RawEventRow = Omit<EventRow, 'fields'> & {
+  fields: FieldRow | FieldRow[] | null
+}
+
+function normalizeEvent(event: RawEventRow): EventRow {
+  return {
+    ...event,
+    fields: normalizeFieldRelation(event.fields)
+  }
 }
 
 function formatChicagoDateTime(date: Date) {
@@ -150,7 +162,7 @@ export default function EventPage() {
           return
         }
 
-        setEvent(data as EventRow)
+        setEvent(normalizeEvent(data as RawEventRow))
       } catch (err) {
         console.error('Unexpected error loading event:', err)
         setEvent(null)
@@ -170,7 +182,7 @@ export default function EventPage() {
   )
 
   const field = useMemo(
-    () => event?.fields ?? null,
+    () => getPrimaryField(event?.fields),
     [event]
   )
 

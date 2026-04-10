@@ -3,15 +3,31 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 
 function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    )
+  }
+
+  return createBrowserClient(url, key)
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
+
+type FieldRow = {
+  id: string
+  name: string | null
+  address_line: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+}
 
 type EventRow = {
   id: string
@@ -23,14 +39,11 @@ type EventRow = {
   gear_notes: string | null
   travel_minutes: number | null
   travel_miles: number | null
-  fields: {
-    id: string
-    name: string | null
-    address_line: string | null
-    city: string | null
-    state: string | null
-    postal_code: string | null
-  } | null
+  fields: FieldRow[] | null
+}
+
+type RawEventRow = Omit<EventRow, 'fields'> & {
+  fields: FieldRow | FieldRow[] | null
 }
 
 type WeatherByField = Record<
@@ -41,12 +54,19 @@ type WeatherByField = Record<
   }
 >
 
-function formatAddress(event: EventRow) {
+function normalizeEvent(event: RawEventRow): EventRow {
+  return {
+    ...event,
+    fields: normalizeFieldRelation(event.fields)
+  }
+}
+
+function formatAddress(field: FieldRow | null) {
   return [
-    event.fields?.address_line,
-    event.fields?.city,
-    event.fields?.state,
-    event.fields?.postal_code
+    field?.address_line,
+    field?.city,
+    field?.state,
+    field?.postal_code
   ]
     .filter(Boolean)
     .join(', ')
@@ -166,8 +186,11 @@ function EventCard({
   featured?: boolean
 }) {
   const eventTime = new Date(event.starts_at)
-  const address = formatAddress(event)
-  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+  const field = getPrimaryField(event.fields)
+  const address = formatAddress(field)
+  const directionsUrl = address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    : ''
   const gearList = event.gear_notes
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
@@ -247,29 +270,27 @@ function EventCard({
         </div>
       </div>
 
-      {weather?.rainChance !== null && weather?.rainChance !== undefined && (
-        <div className="mt-4 rounded-2xl border border-slate-200 p-4">
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">
-            Weather Forecast
+      <div className="mt-4 rounded-2xl border border-slate-200 p-4">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+          Weather Forecast
+        </p>
+
+        {(weather?.rainChance ?? 0) > 40 ? (
+          <p className="mt-2 text-amber-700">
+            ⚠ Rain Risk – {weather?.rainChance ?? 0}%
           </p>
+        ) : (
+          <p className="mt-2 text-green-700">
+            ☀ Weather Looks Good – {weather?.rainChance ?? 0}%
+          </p>
+        )}
 
-          {weather.rainChance > 40 ? (
-            <p className="mt-2 text-amber-700">
-              ⚠ Rain Risk – {weather.rainChance}%
-            </p>
-          ) : (
-            <p className="mt-2 text-green-700">
-              ☀ Weather Looks Good – {weather.rainChance}%
-            </p>
-          )}
-
-          {weather.temperature !== null && (
-            <p className="mt-1 text-sm text-slate-700">
-              Expected temperature: {weather.temperature}°F
-            </p>
-          )}
-        </div>
-      )}
+        {weather?.temperature !== null && weather?.temperature !== undefined && (
+          <p className="mt-1 text-sm text-slate-700">
+            Expected temperature: {weather.temperature}°F
+          </p>
+        )}
+      </div>
 
       {event.travel_minutes !== null && (
         <div className="mt-4 rounded-2xl border border-slate-200 p-4">
@@ -304,7 +325,7 @@ function EventCard({
         </p>
 
         <p className="mt-2 text-sm font-semibold text-slate-900">
-          {event.fields?.name ?? 'Field TBD'}
+          {field?.name ?? 'Field TBD'}
         </p>
 
         <p className="text-sm text-slate-600">
@@ -362,84 +383,92 @@ export default function HomePage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const supabase = createClient()
-      const nowIso = new Date().toISOString()
+      try {
+        const supabase = createClient()
+        const nowIso = new Date().toISOString()
 
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          id,
-          title,
-          opponent,
-          starts_at,
-          status,
-          notes,
-          gear_notes,
-          travel_minutes,
-          travel_miles,
-          fields (
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
             id,
-            name,
-            address_line,
-            city,
-            state,
-            postal_code
-          )
-        `)
-        .gte('starts_at', nowIso)
-        .order('starts_at', { ascending: true })
-        .limit(3)
+            title,
+            opponent,
+            starts_at,
+            status,
+            notes,
+            gear_notes,
+            travel_minutes,
+            travel_miles,
+            fields (
+              id,
+              name,
+              address_line,
+              city,
+              state,
+              postal_code
+            )
+          `)
+          .gte('starts_at', nowIso)
+          .order('starts_at', { ascending: true })
+          .limit(3)
 
-      if (error || !data) {
+        if (error || !data) {
+          console.error('Error loading events:', error)
+          setLoading(false)
+          return
+        }
+
+        const normalizedEvents = (data as RawEventRow[]).map(normalizeEvent)
+        setEvents(normalizedEvents)
+
+        const weatherMap: WeatherByField = {}
+
+        for (const event of normalizedEvents) {
+          const field = getPrimaryField(event.fields)
+          const fieldId = field?.id
+
+          if (!fieldId || weatherMap[fieldId]) {
+            continue
+          }
+
+          const eventTime = new Date(event.starts_at)
+
+          const { data: forecast } = await supabase
+            .from('weather_forecasts')
+            .select('*')
+            .eq('field_id', fieldId)
+
+          if (forecast && forecast.length > 0) {
+            const closest = forecast.reduce((prev, curr) => {
+              const prevDiff = Math.abs(
+                new Date(prev.forecast_time).getTime() - eventTime.getTime()
+              )
+
+              const currDiff = Math.abs(
+                new Date(curr.forecast_time).getTime() - eventTime.getTime()
+              )
+
+              return currDiff < prevDiff ? curr : prev
+            })
+
+            weatherMap[fieldId] = {
+              rainChance: Math.round(closest.rain_probability * 100),
+              temperature: Math.round(closest.temperature)
+            }
+          } else {
+            weatherMap[fieldId] = {
+              rainChance: 0,
+              temperature: null
+            }
+          }
+        }
+
+        setWeatherByField(weatherMap)
+      } catch (err) {
+        console.error('Unexpected error loading homepage data:', err)
+      } finally {
         setLoading(false)
-        return
       }
-
-      setEvents(data)
-
-      const weatherMap: WeatherByField = {}
-
-      for (const event of data) {
-        const fieldId = event.fields?.id
-
-        if (!fieldId || weatherMap[fieldId]) {
-          continue
-        }
-
-        const eventTime = new Date(event.starts_at)
-
-        const { data: forecast } = await supabase
-          .from('weather_forecasts')
-          .select('*')
-          .eq('field_id', fieldId)
-
-        if (forecast && forecast.length > 0) {
-          const closest = forecast.reduce((prev, curr) => {
-            const prevDiff = Math.abs(
-              new Date(prev.forecast_time).getTime() - eventTime.getTime()
-            )
-
-            const currDiff = Math.abs(
-              new Date(curr.forecast_time).getTime() - eventTime.getTime()
-            )
-
-            return currDiff < prevDiff ? curr : prev
-          })
-
-          weatherMap[fieldId] = {
-            rainChance: Math.round(closest.rain_probability * 100),
-            temperature: Math.round(closest.temperature)
-          }
-        } else {
-          weatherMap[fieldId] = {
-            rainChance: null,
-            temperature: null
-          }
-        }
-      }
-
-      setWeatherByField(weatherMap)
-      setLoading(false)
     }
 
     loadData()
@@ -447,6 +476,7 @@ export default function HomePage() {
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
+  const featuredField = featuredEvent ? getPrimaryField(featuredEvent.fields) : null
 
   if (loading) {
     return (
@@ -486,11 +516,7 @@ export default function HomePage() {
             {featuredEvent && (
               <EventCard
                 event={featuredEvent}
-                weather={
-                  featuredEvent.fields?.id
-                    ? weatherByField[featuredEvent.fields.id]
-                    : undefined
-                }
+                weather={featuredField?.id ? weatherByField[featuredField.id] : undefined}
                 now={now}
                 featured
               />
@@ -505,6 +531,7 @@ export default function HomePage() {
                 <div className="mt-3 space-y-3">
                   {otherEvents.map(event => {
                     const eventTime = new Date(event.starts_at)
+                    const field = getPrimaryField(event.fields)
 
                     return (
                       <div
@@ -525,9 +552,9 @@ export default function HomePage() {
                           </p>
                         )}
 
-                        {event.fields?.name && (
+                        {field?.name && (
                           <p className="mt-1 text-sm text-slate-600">
-                            📍 {event.fields.name}
+                            📍 {field.name}
                           </p>
                         )}
 
