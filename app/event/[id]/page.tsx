@@ -11,9 +11,7 @@ function createClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!url || !key) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY'
-    )
+    throw new Error('Missing Supabase env vars')
   }
 
   return createBrowserClient(url, key)
@@ -66,51 +64,32 @@ function formatChicagoDateTime(date: Date) {
 
 function formatAddress(field: FieldRow | null | undefined) {
   if (!field) return ''
-
   return [
     field.address_line,
     field.city,
     field.state,
     field.postal_code
-  ]
-    .filter(Boolean)
-    .join(', ')
+  ].filter(Boolean).join(', ')
 }
 
 function formatStatus(status: string) {
   if (!status) return 'Unknown'
-
   return status
     .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
 }
 
 function getStatusBadgeClasses(status: string) {
-  const normalized = status.toLowerCase()
-
-  if (normalized.includes('cancel')) {
-    return 'bg-red-100 text-red-700 border border-red-200'
-  }
-
-  if (normalized.includes('postpon')) {
-    return 'bg-amber-100 text-amber-700 border border-amber-200'
-  }
-
-  if (normalized.includes('complete') || normalized.includes('final')) {
+  const s = status.toLowerCase()
+  if (s.includes('cancel')) return 'bg-red-100 text-red-700 border border-red-200'
+  if (s.includes('postpon')) return 'bg-amber-100 text-amber-700 border border-amber-200'
+  if (s.includes('complete') || s.includes('final'))
     return 'bg-green-100 text-green-700 border border-green-200'
-  }
-
   return 'bg-slate-100 text-slate-700 border border-slate-200'
 }
 
-function DetailCard({
-  label,
-  children
-}: {
-  label: string
-  children: React.ReactNode
-}) {
+function DetailCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
@@ -130,50 +109,38 @@ export default function EventPage() {
 
   useEffect(() => {
     const loadEvent = async () => {
-      try {
-        const supabase = createClient()
+      const supabase = createClient()
 
-        const { data, error } = await supabase
-          .from('events')
-          .select(`
+      const { data } = await supabase
+        .from('events')
+        .select(`
+          id,
+          title,
+          opponent,
+          starts_at,
+          status,
+          notes,
+          gear_notes,
+          fields (
             id,
-            title,
-            opponent,
-            starts_at,
-            status,
-            notes,
-            gear_notes,
-            fields (
-              id,
-              name,
-              address_line,
-              city,
-              state,
-              postal_code
-            )
-          `)
-          .eq('id', eventId)
-          .single()
+            name,
+            address_line,
+            city,
+            state,
+            postal_code
+          )
+        `)
+        .eq('id', eventId)
+        .single()
 
-        if (error || !data) {
-          console.error('Error loading event:', error)
-          setEvent(null)
-          setLoading(false)
-          return
-        }
-
+      if (data) {
         setEvent(normalizeEvent(data as RawEventRow))
-      } catch (err) {
-        console.error('Unexpected error loading event:', err)
-        setEvent(null)
-      } finally {
-        setLoading(false)
       }
+
+      setLoading(false)
     }
 
-    if (eventId) {
-      loadEvent()
-    }
+    if (eventId) loadEvent()
   }, [eventId])
 
   const eventTime = useMemo(
@@ -196,169 +163,53 @@ export default function EventPage() {
     : ''
 
   const gearList = event?.gear_notes
-    ? event.gear_notes
-        .split(',')
-        .map(item => item.trim())
-        .filter(Boolean)
+    ? event.gear_notes.split(',').map(i => i.trim()).filter(Boolean)
     : []
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
-        <div className="mx-auto max-w-md">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm text-slate-600">Loading event...</p>
-          </div>
-        </div>
-      </main>
-    )
+    return <main className="p-4">Loading...</main>
   }
 
   if (!event || !eventTime) {
-    return (
-      <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
-        <div className="mx-auto max-w-md space-y-4">
-          <Link
-            href="/schedule"
-            className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-          >
-            ← Back to Schedule
-          </Link>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h1 className="text-xl font-bold text-slate-900">
-              Event not found
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              This event may have been removed or the link may be incorrect.
-            </p>
-          </div>
-        </div>
-      </main>
-    )
+    return <main className="p-4">Event not found</main>
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 pb-24 text-slate-900">
+    <main className="min-h-screen bg-slate-100 p-4 pb-24">
       <div className="mx-auto max-w-md space-y-4">
-        <Link
-          href="/schedule"
-          className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-        >
+
+        <Link href="/schedule" className="text-sm">
           ← Back to Schedule
         </Link>
 
-        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-700 p-5 text-white">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-300">
-              Event Details
-            </p>
+        <div className="bg-white rounded-3xl shadow p-4 space-y-4">
 
-            <h1 className="mt-2 text-2xl font-bold">
-              {event.title}
-            </h1>
-
-            <p className="mt-3 text-sm text-slate-200">
-              {formatChicagoDateTime(eventTime)}
-            </p>
-
-            {event.opponent && (
-              <p className="mt-1 text-sm text-slate-200">
-                vs {event.opponent}
-              </p>
-            )}
-
-            <div className="mt-4">
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(event.status)}`}
-              >
-                {formatStatus(event.status)}
-              </span>
-            </div>
+          <div>
+            <h1 className="text-xl font-bold">{event.title}</h1>
+            <p>{formatChicagoDateTime(eventTime)}</p>
           </div>
 
-          <div className="space-y-4 p-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Link
+          {/* NO EDIT BUTTON */}
 
-              {directionsUrl ? (
-                <a
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                >
-                  Open Directions
-                </a>
-              ) : (
-                <div className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-400">
-                  Directions Unavailable
-                </div>
-              )}
-            </div>
+          {directionsUrl && (
+            <a href={directionsUrl} target="_blank">
+              Open Directions
+            </a>
+          )}
 
-            <DetailCard label="Game Info">
-              <div className="space-y-2">
-                <p className="text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Date & Time:</span>{' '}
-                  {formatChicagoDateTime(eventTime)}
-                </p>
+          <DetailCard label="Field">
+            <p>{field?.name}</p>
+            <p>{address}</p>
+          </DetailCard>
 
-                <p className="text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Opponent:</span>{' '}
-                  {event.opponent || 'Not listed'}
-                </p>
+          <DetailCard label="Notes">
+            <p>{event.notes || 'None'}</p>
+          </DetailCard>
 
-                <p className="text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Status:</span>{' '}
-                  {formatStatus(event.status)}
-                </p>
-              </div>
-            </DetailCard>
+          <DetailCard label="Gear">
+            {gearList.map(g => <p key={g}>{g}</p>)}
+          </DetailCard>
 
-            <DetailCard label="Field">
-              <p className="text-base font-semibold text-slate-900">
-                {field?.name || 'Field TBD'}
-              </p>
-
-              <p className="mt-1 text-sm text-slate-600">
-                {address || 'Address not available'}
-              </p>
-
-              {directionsUrl && (
-                <a
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-                >
-                  Open in Maps
-                </a>
-              )}
-            </DetailCard>
-
-            <DetailCard label="Notes">
-              <p className="text-sm text-slate-700">
-                {event.notes?.trim() || 'No notes added'}
-              </p>
-            </DetailCard>
-
-            <DetailCard label="Gear Checklist">
-              {gearList.length > 0 ? (
-                <div className="space-y-2">
-                  {gearList.map(item => (
-                    <p key={item} className="text-sm text-slate-700">
-                      ⚾ {item}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No gear notes added
-                </p>
-              )}
-            </DetailCard>
-          </div>
         </div>
       </div>
     </main>
