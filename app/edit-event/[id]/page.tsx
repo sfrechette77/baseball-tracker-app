@@ -73,9 +73,7 @@ function chicagoInputToIso(value: string) {
 
     const diff = desiredWallTime - actualWallTime
 
-    if (diff === 0) {
-      break
-    }
+    if (diff === 0) break
 
     guess += diff
   }
@@ -83,13 +81,7 @@ function chicagoInputToIso(value: string) {
   return new Date(guess).toISOString()
 }
 
-function Field({
-  label,
-  children
-}: {
-  label: string
-  children: React.ReactNode
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
       <label className="block text-sm font-semibold text-slate-800">
@@ -109,6 +101,8 @@ export default function EditEventPage() {
   const [opponent, setOpponent] = useState('')
   const [notes, setNotes] = useState('')
   const [startsAt, setStartsAt] = useState('')
+  const [teamScore, setTeamScore] = useState('')
+  const [opponentScore, setOpponentScore] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -127,14 +121,14 @@ export default function EditEventPage() {
         setOpponent(data.opponent || '')
         setNotes(data.notes || '')
         setStartsAt(data.starts_at ? formatForDateTimeLocal(data.starts_at) : '')
+        setTeamScore(data.team_score?.toString() || '')
+        setOpponentScore(data.opponent_score?.toString() || '')
       }
 
       setLoading(false)
     }
 
-    if (eventId) {
-      loadEvent()
-    }
+    if (eventId) loadEvent()
   }, [eventId])
 
   const handleSubmit = async (e: FormEvent) => {
@@ -143,133 +137,76 @@ export default function EditEventPage() {
 
     const supabase = createClient()
 
+    const team = teamScore ? Number(teamScore) : null
+    const opp = opponentScore ? Number(opponentScore) : null
+
+    let result = null
+    if (team !== null && opp !== null) {
+      if (team > opp) result = 'win'
+      else if (team < opp) result = 'loss'
+      else result = 'tie'
+    }
+
     await supabase
       .from('events')
       .update({
         title,
         opponent: opponent || null,
         notes: notes || null,
-        starts_at: chicagoInputToIso(startsAt)
+        starts_at: chicagoInputToIso(startsAt),
+        team_score: team,
+        opponent_score: opp,
+        result
       })
       .eq('id', eventId)
 
     router.push(`/event/${eventId}`)
   }
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
-        <div className="mx-auto max-w-md">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            Loading...
-          </div>
-        </div>
-      </main>
-    )
-  }
+  if (loading) return <div>Loading...</div>
 
   return (
     <main className="min-h-screen bg-slate-100 p-4 pb-24 text-slate-900">
       <div className="mx-auto max-w-md space-y-4">
-        <Link
-          href={`/event/${eventId}`}
-          className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-        >
-          ← Back to Event
-        </Link>
+        <Link href={`/event/${eventId}`}>← Back</Link>
 
-        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-700 p-5 text-white">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-300">
-              Edit Event
-            </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Title">
+            <input value={title} onChange={e => setTitle(e.target.value)} />
+          </Field>
 
-            <h1 className="mt-2 text-2xl font-bold">
-              Update Event Details
-            </h1>
+          <Field label="Opponent">
+            <input value={opponent} onChange={e => setOpponent(e.target.value)} />
+          </Field>
 
-            <p className="mt-3 text-sm text-slate-200">
-              Make changes and save them back to your schedule.
-            </p>
-          </div>
+          <Field label="Date & Time">
+            <input
+              type="datetime-local"
+              value={startsAt}
+              onChange={e => setStartsAt(e.target.value)}
+            />
+          </Field>
 
-          <form onSubmit={handleSubmit} className="space-y-4 p-4">
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                Game Info
-              </p>
+          <Field label="Team Score">
+            <input
+              type="number"
+              value={teamScore}
+              onChange={e => setTeamScore(e.target.value)}
+            />
+          </Field>
 
-              <div className="mt-4 space-y-4">
-                <Field label="Title">
-                  <input
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                    placeholder="Team Practice"
-                    required
-                  />
-                </Field>
+          <Field label="Opponent Score">
+            <input
+              type="number"
+              value={opponentScore}
+              onChange={e => setOpponentScore(e.target.value)}
+            />
+          </Field>
 
-                <Field label="Opponent">
-                  <input
-                    value={opponent}
-                    onChange={e => setOpponent(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                    placeholder="River Cats"
-                  />
-                </Field>
-
-                <Field label="Date & Time">
-                  <input
-                    type="datetime-local"
-                    value={startsAt}
-                    onChange={e => setStartsAt(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                    required
-                  />
-                  <p className="text-xs text-slate-500">
-                    Entered and saved in Central time.
-                  </p>
-                </Field>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                Notes
-              </p>
-
-              <div className="mt-4">
-                <Field label="Event Notes">
-                  <textarea
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    rows={5}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                    placeholder="Anything important to remember for this game..."
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-
-              <Link
-                href={`/event/${eventId}`}
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                Cancel
-              </Link>
-            </div>
-          </form>
-        </div>
+          <button type="submit" disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </form>
       </div>
     </main>
   )

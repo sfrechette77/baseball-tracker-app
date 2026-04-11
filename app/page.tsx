@@ -39,6 +39,9 @@ type EventRow = {
   gear_notes: string | null
   travel_minutes: number | null
   travel_miles: number | null
+  team_score: number | null
+  opponent_score: number | null
+  result: string | null
   fields: FieldRow[] | null
 }
 
@@ -158,9 +161,9 @@ function getUrgency(
 
   return {
     text: '🟢 Plenty of time',
-    className: 'text-green-600',
-    leaveTime
-  }
+      className: 'text-green-600',
+      leaveTime
+    }
 }
 
 function getCountdownParts(eventTime: Date, now: Date) {
@@ -172,6 +175,28 @@ function getCountdownParts(eventTime: Date, now: Date) {
     minutes: Math.max(0, Math.floor((diff / (1000 * 60)) % 60)),
     seconds: Math.max(0, Math.floor((diff / 1000) % 60))
   }
+}
+
+function getScoreDisplay(event: EventRow) {
+  if (event.team_score === null || event.opponent_score === null) {
+    return null
+  }
+
+  const scoreText = `${event.team_score}–${event.opponent_score}`
+
+  if (event.result === 'win') {
+    return { text: `W ${scoreText}`, className: 'text-green-600' }
+  }
+
+  if (event.result === 'loss') {
+    return { text: `L ${scoreText}`, className: 'text-red-600' }
+  }
+
+  if (event.result === 'tie') {
+    return { text: `T ${scoreText}`, className: 'text-slate-600' }
+  }
+
+  return { text: scoreText, className: 'text-slate-700' }
 }
 
 function EventCard({
@@ -197,6 +222,7 @@ function EventCard({
 
   const countdown = getCountdownParts(eventTime, now)
   const urgency = getUrgency(eventTime, event.travel_minutes, now)
+  const score = getScoreDisplay(event)
 
   const chicagoNow = new Date()
   const isGameDay = isSameChicagoDay(eventTime, chicagoNow)
@@ -229,6 +255,12 @@ function EventCard({
           <p className="mt-1 text-sm text-slate-600">
             {event.title}
           </p>
+
+          {score && (
+            <p className={`mt-2 text-lg font-bold ${score.className}`}>
+              {score.text}
+            </p>
+          )}
         </div>
       ) : (
         <>
@@ -243,6 +275,12 @@ function EventCard({
           {event.opponent && (
             <p className="mt-1 text-sm text-slate-600">
               Opponent: {event.opponent}
+            </p>
+          )}
+
+          {score && (
+            <p className={`mt-2 text-lg font-bold ${score.className}`}>
+              {score.text}
             </p>
           )}
         </>
@@ -399,6 +437,9 @@ export default function HomePage() {
             gear_notes,
             travel_minutes,
             travel_miles,
+            team_score,
+            opponent_score,
+            result,
             fields (
               id,
               name,
@@ -532,6 +573,7 @@ export default function HomePage() {
                   {otherEvents.map(event => {
                     const eventTime = new Date(event.starts_at)
                     const field = getPrimaryField(event.fields)
+                    const score = getScoreDisplay(event)
 
                     return (
                       <div
@@ -549,6 +591,12 @@ export default function HomePage() {
                         {event.opponent && (
                           <p className="mt-1 text-sm text-slate-600">
                             Opponent: {event.opponent}
+                          </p>
+                        )}
+
+                        {score && (
+                          <p className={`mt-1 text-sm font-semibold ${score.className}`}>
+                            {score.text}
                           </p>
                         )}
 
