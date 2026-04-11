@@ -108,17 +108,6 @@ function getScoreDisplay(event: EventRow) {
   return { text: scoreText, className: 'text-slate-700' }
 }
 
-function formatWinPct(wins: number, losses: number, ties: number) {
-  const games = wins + losses + ties
-
-  if (games === 0) {
-    return '.000'
-  }
-
-  const pct = (wins + ties * 0.5) / games
-  return pct.toFixed(3).replace(/^0/, '')
-}
-
 export default function SchedulePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -195,9 +184,6 @@ export default function SchedulePage() {
     )
   }, [events])
 
-  const totalGames = record.wins + record.losses + record.ties
-  const winPct = formatWinPct(record.wins, record.losses, record.ties)
-
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
@@ -258,36 +244,18 @@ export default function SchedulePage() {
           <div className="space-y-6 p-4">
             <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                Team Record
+                Season Record
               </p>
 
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                <div className="rounded-2xl bg-white p-3 text-center">
-                  <p className="text-xl font-bold text-green-600">{record.wins}</p>
-                  <p className="text-xs text-slate-500">Wins</p>
-                </div>
+              <div className="mt-3 text-center">
+                <p className="text-3xl font-bold text-slate-900">
+                  {record.wins}–{record.losses}–{record.ties}
+                </p>
 
-                <div className="rounded-2xl bg-white p-3 text-center">
-                  <p className="text-xl font-bold text-red-600">{record.losses}</p>
-                  <p className="text-xs text-slate-500">Losses</p>
-                </div>
-
-                <div className="rounded-2xl bg-white p-3 text-center">
-                  <p className="text-xl font-bold text-slate-600">{record.ties}</p>
-                  <p className="text-xs text-slate-500">Ties</p>
-                </div>
-
-                <div className="rounded-2xl bg-white p-3 text-center">
-                  <p className="text-xl font-bold text-slate-900">{winPct}</p>
-                  <p className="text-xs text-slate-500">Win %</p>
-                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Wins – Losses – Ties
+                </p>
               </div>
-
-              <p className="mt-3 text-sm text-slate-600">
-                {totalGames === 0
-                  ? 'No completed results yet.'
-                  : `${totalGames} scored game${totalGames === 1 ? '' : 's'} recorded`}
-              </p>
             </section>
 
             {Object.keys(groupedEvents).length === 0 ? (
