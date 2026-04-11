@@ -31,6 +31,9 @@ type EventRow = {
   event_type: string | null
   starts_at: string
   status: string
+  team_score: number | null
+  opponent_score: number | null
+  result: string | null
   fields: FieldRow[] | null
 }
 
@@ -83,6 +86,39 @@ function getStatusClasses(status: string) {
   return 'bg-slate-100 text-slate-700 border-slate-200'
 }
 
+function getScoreDisplay(event: EventRow) {
+  if (event.team_score === null || event.opponent_score === null) {
+    return null
+  }
+
+  const scoreText = `${event.team_score}–${event.opponent_score}`
+
+  if (event.result === 'win') {
+    return { text: `W ${scoreText}`, className: 'text-green-600' }
+  }
+
+  if (event.result === 'loss') {
+    return { text: `L ${scoreText}`, className: 'text-red-600' }
+  }
+
+  if (event.result === 'tie') {
+    return { text: `T ${scoreText}`, className: 'text-slate-600' }
+  }
+
+  return { text: scoreText, className: 'text-slate-700' }
+}
+
+function formatWinPct(wins: number, losses: number, ties: number) {
+  const games = wins + losses + ties
+
+  if (games === 0) {
+    return '.000'
+  }
+
+  const pct = (wins + ties * 0.5) / games
+  return pct.toFixed(3).replace(/^0/, '')
+}
+
 export default function SchedulePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -102,6 +138,9 @@ export default function SchedulePage() {
             event_type,
             starts_at,
             status,
+            team_score,
+            opponent_score,
+            result,
             fields (
               name
             )
@@ -143,6 +182,22 @@ export default function SchedulePage() {
     }, {})
   }, [events])
 
+  const record = useMemo(() => {
+    return events.reduce(
+      (acc, event) => {
+        if (event.result === 'win') acc.wins += 1
+        else if (event.result === 'loss') acc.losses += 1
+        else if (event.result === 'tie') acc.ties += 1
+
+        return acc
+      },
+      { wins: 0, losses: 0, ties: 0 }
+    )
+  }, [events])
+
+  const totalGames = record.wins + record.losses + record.ties
+  const winPct = formatWinPct(record.wins, record.losses, record.ties)
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
@@ -159,7 +214,7 @@ export default function SchedulePage() {
         <div className="mx-auto max-w-md space-y-4">
           <Link
             href="/"
-            className="inline-flex items-center rounded-2xl border border-slate-900 bg-white px-4 py-3 text-sm font-semibold text-white shadow-sm"
+            className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             ← Back to Home
           </Link>
@@ -192,11 +247,49 @@ export default function SchedulePage() {
             </p>
 
             <h1 className="mt-2 text-2xl font-bold">
-              Upcoming Events
+              All Events
             </h1>
+
+            <p className="mt-3 text-sm text-slate-200">
+              Full season view with results
+            </p>
           </div>
 
           <div className="space-y-6 p-4">
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                Team Record
+              </p>
+
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                <div className="rounded-2xl bg-white p-3 text-center">
+                  <p className="text-xl font-bold text-green-600">{record.wins}</p>
+                  <p className="text-xs text-slate-500">Wins</p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-3 text-center">
+                  <p className="text-xl font-bold text-red-600">{record.losses}</p>
+                  <p className="text-xs text-slate-500">Losses</p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-3 text-center">
+                  <p className="text-xl font-bold text-slate-600">{record.ties}</p>
+                  <p className="text-xs text-slate-500">Ties</p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-3 text-center">
+                  <p className="text-xl font-bold text-slate-900">{winPct}</p>
+                  <p className="text-xs text-slate-500">Win %</p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-sm text-slate-600">
+                {totalGames === 0
+                  ? 'No completed results yet.'
+                  : `${totalGames} scored game${totalGames === 1 ? '' : 's'} recorded`}
+              </p>
+            </section>
+
             {Object.keys(groupedEvents).length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm text-slate-600">No scheduled events.</p>
@@ -211,6 +304,7 @@ export default function SchedulePage() {
                   {dayEvents.map(event => {
                     const eventTime = new Date(event.starts_at)
                     const field = getPrimaryField(event.fields)
+                    const score = getScoreDisplay(event)
 
                     return (
                       <Link
@@ -231,6 +325,12 @@ export default function SchedulePage() {
                             {event.opponent && (
                               <p className="mt-1 text-sm text-slate-600">
                                 Opponent: {event.opponent}
+                              </p>
+                            )}
+
+                            {score && (
+                              <p className={`mt-1 text-sm font-semibold ${score.className}`}>
+                                {score.text}
                               </p>
                             )}
 

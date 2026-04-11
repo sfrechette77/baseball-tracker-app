@@ -94,6 +94,14 @@ function formatChicagoTime(date: Date) {
   }).format(date)
 }
 
+function formatChicagoShortDate(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    month: 'short',
+    day: 'numeric'
+  }).format(date)
+}
+
 function getChicagoDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: APP_TIME_ZONE,
@@ -161,9 +169,9 @@ function getUrgency(
 
   return {
     text: '🟢 Plenty of time',
-      className: 'text-green-600',
-      leaveTime
-    }
+    className: 'text-green-600',
+    leaveTime
+  }
 }
 
 function getCountdownParts(eventTime: Date, now: Date) {
@@ -407,6 +415,7 @@ function EventCard({
 
 export default function HomePage() {
   const [events, setEvents] = useState<EventRow[]>([])
+  const [lastGame, setLastGame] = useState<EventRow | null>(null)
   const [weatherByField, setWeatherByField] = useState<WeatherByField>({})
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(new Date())
@@ -461,6 +470,39 @@ export default function HomePage() {
 
         const normalizedEvents = (data as RawEventRow[]).map(normalizeEvent)
         setEvents(normalizedEvents)
+
+        const { data: lastGameData, error: lastGameError } = await supabase
+          .from('events')
+          .select(`
+            id,
+            title,
+            opponent,
+            starts_at,
+            status,
+            notes,
+            gear_notes,
+            travel_minutes,
+            travel_miles,
+            team_score,
+            opponent_score,
+            result,
+            fields (
+              id,
+              name,
+              address_line,
+              city,
+              state,
+              postal_code
+            )
+          `)
+          .not('result', 'is', null)
+          .order('starts_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (!lastGameError && lastGameData) {
+          setLastGame(normalizeEvent(lastGameData as RawEventRow))
+        }
 
         const weatherMap: WeatherByField = {}
 
@@ -518,6 +560,7 @@ export default function HomePage() {
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
   const featuredField = featuredEvent ? getPrimaryField(featuredEvent.fields) : null
+  const lastGameScore = lastGame ? getScoreDisplay(lastGame) : null
 
   if (loading) {
     return (
@@ -527,7 +570,7 @@ export default function HomePage() {
     )
   }
 
-  if (events.length === 0) {
+  if (events.length === 0 && !lastGame) {
     return (
       <main className="min-h-screen bg-slate-100 p-6 text-slate-900">
         No upcoming events
@@ -554,6 +597,30 @@ export default function HomePage() {
           </div>
 
           <div className="space-y-4 p-4">
+            {lastGame && lastGameScore && (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                  Last Game
+                </p>
+
+                <div className="mt-3 rounded-2xl bg-white p-4">
+                  <p className={`text-2xl font-bold ${lastGameScore.className}`}>
+                    {lastGameScore.text}
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {lastGame.opponent
+                      ? `vs ${lastGame.opponent}`
+                      : lastGame.title}
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-600">
+                    {formatChicagoShortDate(new Date(lastGame.starts_at))}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {featuredEvent && (
               <EventCard
                 event={featuredEvent}
@@ -561,6 +628,12 @@ export default function HomePage() {
                 now={now}
                 featured
               />
+            )}
+
+            {!featuredEvent && (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-600">No upcoming events scheduled.</p>
+              </div>
             )}
 
             {otherEvents.length > 0 && (
