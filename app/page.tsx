@@ -65,6 +65,11 @@ type WeatherSummary = {
 
 type WeatherByEvent = Record<string, WeatherSummary>
 
+type ScoredGameRow = {
+  id: string
+  result: string | null
+}
+
 function normalizeEvent(event: RawEventRow): EventRow {
   return {
     ...event,
@@ -245,6 +250,16 @@ function getClosestForecast(
   }, null)
 
   if (!closest) {
+    return {
+      rainChance: null,
+      temperature: null
+    }
+  }
+
+  const closestTime = new Date(closest.forecast_time).getTime()
+  const timeDiff = Math.abs(closestTime - eventTime)
+
+  if (timeDiff > FORECAST_MATCH_WINDOW_MS) {
     return {
       rainChance: null,
       temperature: null
@@ -480,6 +495,7 @@ function EventCard({
 export default function HomePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [lastGame, setLastGame] = useState<EventRow | null>(null)
+  const [scoredGames, setScoredGames] = useState<ScoredGameRow[]>([])
   const [weatherByEvent, setWeatherByEvent] = useState<WeatherByEvent>({})
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(new Date())
@@ -568,6 +584,17 @@ export default function HomePage() {
           setLastGame(normalizeEvent(lastGameData as RawEventRow))
         }
 
+        const { data: scoredGamesData, error: scoredGamesError } = await supabase
+          .from('events')
+          .select('id, result')
+          .not('result', 'is', null)
+
+        if (scoredGamesError) {
+          console.error('Error loading scored games:', scoredGamesError)
+        } else {
+          setScoredGames((scoredGamesData ?? []) as ScoredGameRow[])
+        }
+
         const uniqueFieldIds = Array.from(
           new Set(
             normalizedEvents
@@ -648,16 +675,17 @@ export default function HomePage() {
   }, [])
 
   const record = useMemo(() => {
-    const winsFromUpcoming = events.filter(e => e.result === 'win').length
-    const lossesFromUpcoming = events.filter(e => e.result === 'loss').length
-    const tiesFromUpcoming = events.filter(e => e.result === 'tie').length
+    return scoredGames.reduce(
+      (acc, game) => {
+        if (game.result === 'win') acc.wins += 1
+        else if (game.result === 'loss') acc.losses += 1
+        else if (game.result === 'tie') acc.ties += 1
 
-    const wins = winsFromUpcoming + (lastGame?.result === 'win' ? 1 : 0)
-    const losses = lossesFromUpcoming + (lastGame?.result === 'loss' ? 1 : 0)
-    const ties = tiesFromUpcoming + (lastGame?.result === 'tie' ? 1 : 0)
-
-    return { wins, losses, ties }
-  }, [events, lastGame])
+        return acc
+      },
+      { wins: 0, losses: 0, ties: 0 }
+    )
+  }, [scoredGames])
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
