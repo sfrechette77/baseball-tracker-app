@@ -172,13 +172,38 @@ function getScoreDisplay(event: EventRow) {
     return null
   }
 
-  const scoreText = `${event.team_score}–${event.opponent_score}`
+  const team = event.team_score
+  const opp = event.opponent_score
 
-  if (event.result === 'win') return { text: `W ${scoreText}`, className: 'text-green-600' }
-  if (event.result === 'loss') return { text: `L ${scoreText}`, className: 'text-red-600' }
-  if (event.result === 'tie') return { text: `T ${scoreText}`, className: 'text-slate-600' }
+  // Always show higher score first
+  const high = Math.max(team, opp)
+  const low = Math.min(team, opp)
 
-  return { text: scoreText, className: 'text-slate-700' }
+  if (event.result === 'win') {
+    return {
+      text: `W ${team}–${opp}`,
+      className: 'text-green-600'
+    }
+  }
+
+  if (event.result === 'loss') {
+    return {
+      text: `L ${high}–${low}`,
+      className: 'text-red-600'
+    }
+  }
+
+  if (event.result === 'tie') {
+    return {
+      text: `T ${team}–${opp}`,
+      className: 'text-slate-600'
+    }
+  }
+
+  return {
+    text: `${team}–${opp}`,
+    className: 'text-slate-700'
+  }
 }
 
 function EventCard({
