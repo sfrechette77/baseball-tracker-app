@@ -244,7 +244,7 @@ export default function SchedulePage() {
           <div className="space-y-6 p-4">
             <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                Season Record
+                Record
               </p>
 
               <div className="mt-3 text-center">
@@ -253,7 +253,7 @@ export default function SchedulePage() {
                 </p>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  Wins – Losses – Ties
+                  W – L – T
                 </p>
               </div>
             </section>
