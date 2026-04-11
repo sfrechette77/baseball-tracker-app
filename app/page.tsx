@@ -251,17 +251,6 @@ function getClosestForecast(
     }
   }
 
-  const diff = Math.abs(
-    new Date(closest.forecast_time).getTime() - eventTime
-  )
-
-  if (diff > FORECAST_MATCH_WINDOW_MS) {
-    return {
-      rainChance: null,
-      temperature: null
-    }
-  }
-
   return {
     rainChance:
       typeof closest.rain_probability === 'number'
