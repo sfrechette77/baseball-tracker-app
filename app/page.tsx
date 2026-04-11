@@ -19,6 +19,8 @@ function createClient() {
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
+const FORECAST_MATCH_WINDOW_MS = 6 * 60 * 60 * 1000
+const FORECAST_LOOKAHEAD_MS = 5 * 24 * 60 * 60 * 1000
 
 type FieldRow = {
   id: string
@@ -49,13 +51,19 @@ type RawEventRow = Omit<EventRow, 'fields'> & {
   fields: FieldRow | FieldRow[] | null
 }
 
-type WeatherByField = Record<
-  string,
-  {
-    rainChance: number | null
-    temperature: number | null
-  }
->
+type WeatherForecastRow = {
+  field_id: string
+  forecast_time: string
+  rain_probability: number | null
+  temperature: number | null
+}
+
+type WeatherSummary = {
+  rainChance: number | null
+  temperature: number | null
+}
+
+type WeatherByEvent = Record<string, WeatherSummary>
 
 function normalizeEvent(event: RawEventRow): EventRow {
   return {
@@ -210,6 +218,62 @@ function getScoreDisplay(event: EventRow) {
   return { text: `${team}–${opp}`, className: 'text-slate-700' }
 }
 
+function getClosestForecast(
+  eventStartsAt: string,
+  forecasts: WeatherForecastRow[]
+): WeatherSummary {
+  if (!forecasts.length) {
+    return {
+      rainChance: null,
+      temperature: null
+    }
+  }
+
+  const eventTime = new Date(eventStartsAt).getTime()
+
+  const closest = forecasts.reduce<WeatherForecastRow | null>((best, current) => {
+    if (!best) return current
+
+    const bestDiff = Math.abs(
+      new Date(best.forecast_time).getTime() - eventTime
+    )
+    const currentDiff = Math.abs(
+      new Date(current.forecast_time).getTime() - eventTime
+    )
+
+    return currentDiff < bestDiff ? current : best
+  }, null)
+
+  if (!closest) {
+    return {
+      rainChance: null,
+      temperature: null
+    }
+  }
+
+  const diff = Math.abs(
+    new Date(closest.forecast_time).getTime() - eventTime
+  )
+
+  if (diff > FORECAST_MATCH_WINDOW_MS) {
+    return {
+      rainChance: null,
+      temperature: null
+    }
+  }
+
+  return {
+    rainChance:
+      typeof closest.rain_probability === 'number'
+        ? Math.round(closest.rain_probability * 100)
+        : null,
+    temperature:
+      typeof closest.temperature === 'number'
+        ? Math.round(closest.temperature)
+        : null
+  }
+}
+
 function EventCard({
   event,
   weather,
@@ -217,7 +281,7 @@ function EventCard({
   featured = false
 }: {
   event: EventRow
-  weather?: { rainChance: number | null; temperature: number | null }
+  weather?: WeatherSummary
   now: Date
   featured?: boolean
 }) {
@@ -322,27 +386,31 @@ function EventCard({
         </div>
       )}
 
-      <div className="mt-4 rounded-2xl border border-slate-200 p-4">
-        <p className="text-[11px] uppercase tracking-wide text-slate-500">
-          Weather Forecast
-        </p>
+      {(weather?.rainChance !== null || weather?.temperature !== null) && (
+        <div className="mt-4 rounded-2xl border border-slate-200 p-4">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">
+            Weather Forecast
+          </p>
 
-        {(weather?.rainChance ?? 0) > 40 ? (
-          <p className="mt-2 text-amber-700">
-            ⚠ Rain Risk – {weather?.rainChance ?? 0}%
-          </p>
-        ) : (
-          <p className="mt-2 text-green-700">
-            ☀ Weather Looks Good – {weather?.rainChance ?? 0}%
-          </p>
-        )}
+          {weather?.rainChance !== null && (
+            weather.rainChance > 40 ? (
+              <p className="mt-2 text-amber-700">
+                ⚠ Rain Risk – {weather.rainChance}%
+              </p>
+            ) : (
+              <p className="mt-2 text-green-700">
+                ☀ Weather Looks Good – {weather.rainChance}%
+              </p>
+            )
+          )}
 
-        {weather?.temperature !== null && weather?.temperature !== undefined && (
-          <p className="mt-1 text-sm text-slate-700">
-            Expected temperature: {weather.temperature}°F
-          </p>
-        )}
-      </div>
+          {weather?.temperature !== null && weather?.temperature !== undefined && (
+            <p className="mt-1 text-sm text-slate-700">
+              Expected temperature: {weather.temperature}°F
+            </p>
+          )}
+        </div>
+      )}
 
       {!isCompleted && event.travel_minutes !== null && (
         <div className="mt-4 rounded-2xl border border-slate-200 p-4">
@@ -422,7 +490,7 @@ function EventCard({
 export default function HomePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [lastGame, setLastGame] = useState<EventRow | null>(null)
-  const [weatherByField, setWeatherByField] = useState<WeatherByField>({})
+  const [weatherByEvent, setWeatherByEvent] = useState<WeatherByEvent>({})
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(new Date())
 
@@ -510,49 +578,74 @@ export default function HomePage() {
           setLastGame(normalizeEvent(lastGameData as RawEventRow))
         }
 
-        const weatherMap: WeatherByField = {}
+        const uniqueFieldIds = Array.from(
+          new Set(
+            normalizedEvents
+              .map(event => getPrimaryField(event.fields)?.id)
+              .filter((id): id is string => Boolean(id))
+          )
+        )
 
-        for (const event of normalizedEvents) {
-          const field = getPrimaryField(event.fields)
-          const fieldId = field?.id
+        const weatherMap: WeatherByEvent = {}
 
-          if (!fieldId || weatherMap[fieldId]) {
-            continue
-          }
+        if (uniqueFieldIds.length > 0) {
+          const forecastWindowEndIso = new Date(
+            Date.now() + FORECAST_LOOKAHEAD_MS
+          ).toISOString()
 
-          const eventTime = new Date(event.starts_at)
-
-          const { data: forecast } = await supabase
+          const { data: forecasts, error: forecastError } = await supabase
             .from('weather_forecasts')
-            .select('*')
-            .eq('field_id', fieldId)
+            .select('field_id, forecast_time, rain_probability, temperature')
+            .in('field_id', uniqueFieldIds)
+            .gte('forecast_time', nowIso)
+            .lte('forecast_time', forecastWindowEndIso)
+            .order('forecast_time', { ascending: true })
 
-          if (forecast && forecast.length > 0) {
-            const closest = forecast.reduce((prev, curr) => {
-              const prevDiff = Math.abs(
-                new Date(prev.forecast_time).getTime() - eventTime.getTime()
-              )
+          if (forecastError) {
+            console.error('Error loading weather forecasts:', forecastError)
+          } else if (forecasts) {
+            const forecastsByField: Record<string, WeatherForecastRow[]> = {}
 
-              const currDiff = Math.abs(
-                new Date(curr.forecast_time).getTime() - eventTime.getTime()
-              )
+            for (const forecast of forecasts as WeatherForecastRow[]) {
+              if (!forecastsByField[forecast.field_id]) {
+                forecastsByField[forecast.field_id] = []
+              }
 
-              return currDiff < prevDiff ? curr : prev
-            })
-
-            weatherMap[fieldId] = {
-              rainChance: Math.round(closest.rain_probability * 100),
-              temperature: Math.round(closest.temperature)
+              forecastsByField[forecast.field_id].push(forecast)
             }
-          } else {
-            weatherMap[fieldId] = {
-              rainChance: 0,
-              temperature: null
+
+            for (const event of normalizedEvents) {
+              const fieldId = getPrimaryField(event.fields)?.id
+
+              if (!fieldId) {
+                weatherMap[event.id] = {
+                  rainChance: null,
+                  temperature: null
+                }
+                continue
+              }
+
+              const eventTime = new Date(event.starts_at).getTime()
+              const forecastWindowEnd = Date.now() + FORECAST_LOOKAHEAD_MS
+
+              if (eventTime > forecastWindowEnd) {
+                weatherMap[event.id] = {
+                  rainChance: null,
+                  temperature: null
+                }
+                continue
+              }
+
+              const fieldForecasts = forecastsByField[fieldId] ?? []
+              weatherMap[event.id] = getClosestForecast(
+                event.starts_at,
+                fieldForecasts
+              )
             }
           }
         }
 
-        setWeatherByField(weatherMap)
+        setWeatherByEvent(weatherMap)
       } catch (err) {
         console.error('Unexpected error loading homepage data:', err)
       } finally {
@@ -577,7 +670,6 @@ export default function HomePage() {
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
-  const featuredField = featuredEvent ? getPrimaryField(featuredEvent.fields) : null
   const lastGameScore = lastGame ? getScoreDisplay(lastGame) : null
 
   if (loading) {
@@ -646,7 +738,7 @@ export default function HomePage() {
             {featuredEvent && (
               <EventCard
                 event={featuredEvent}
-                weather={featuredField?.id ? weatherByField[featuredField.id] : undefined}
+                weather={weatherByEvent[featuredEvent.id]}
                 now={now}
                 featured
               />
@@ -670,6 +762,7 @@ export default function HomePage() {
                     const field = getPrimaryField(event.fields)
                     const score = getScoreDisplay(event)
                     const address = formatAddress(field)
+                    const weather = weatherByEvent[event.id]
 
                     return (
                       <div
@@ -707,6 +800,24 @@ export default function HomePage() {
                             {address}
                           </p>
                         )}
+
+                        {weather &&
+                          (weather.rainChance !== null ||
+                            weather.temperature !== null) && (
+                            <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                              {weather.rainChance !== null && (
+                                <p className="text-sm text-slate-700">
+                                  🌧 {weather.rainChance}% rain
+                                </p>
+                              )}
+
+                              {weather.temperature !== null && (
+                                <p className="text-sm text-slate-700">
+                                  🌡 {weather.temperature}°F
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                         {event.travel_minutes !== null && score === null && (
                           <p className="mt-1 text-sm text-slate-600">
