@@ -1,212 +1,369 @@
 'use client'
 
-import { useEffect, useState, FormEvent } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 
 function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    )
+  }
+
+  return createBrowserClient(url, key)
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
 
-function getChicagoParts(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23'
-  }).formatToParts(date)
+type FieldRow = {
+  id: string
+  name: string | null
+  address_line: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+}
 
-  const getPart = (type: string) =>
-    parts.find(part => part.type === type)?.value ?? ''
+type EventRow = {
+  id: string
+  title: string
+  opponent: string | null
+  starts_at: string
+  status: string
+  notes: string | null
+  gear_notes: string | null
+  travel_minutes: number | null
+  travel_miles: number | null
+  team_score: number | null
+  opponent_score: number | null
+  result: string | null
+  fields: FieldRow[] | null
+}
 
+type RawEventRow = Omit<EventRow, 'fields'> & {
+  fields: FieldRow | FieldRow[] | null
+}
+
+function normalizeEvent(event: RawEventRow): EventRow {
   return {
-    year: Number(getPart('year')),
-    month: Number(getPart('month')),
-    day: Number(getPart('day')),
-    hour: Number(getPart('hour')),
-    minute: Number(getPart('minute'))
+    ...event,
+    fields: normalizeFieldRelation(event.fields)
   }
 }
 
-function formatForDateTimeLocal(dateString: string) {
-  const date = new Date(dateString)
-  const parts = getChicagoParts(date)
-
-  const year = String(parts.year)
-  const month = String(parts.month).padStart(2, '0')
-  const day = String(parts.day).padStart(2, '0')
-  const hour = String(parts.hour).padStart(2, '0')
-  const minute = String(parts.minute).padStart(2, '0')
-
-  return `${year}-${month}-${day}T${hour}:${minute}`
+function formatAddress(field: FieldRow | null) {
+  return [
+    field?.address_line,
+    field?.city,
+    field?.state,
+    field?.postal_code
+  ]
+    .filter(Boolean)
+    .join(', ')
 }
 
-function chicagoInputToIso(value: string) {
-  if (!value) return ''
+function formatChicagoDateTime(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(date)
+}
 
-  const [datePart, timePart] = value.split('T')
-  const [year, month, day] = datePart.split('-').map(Number)
-  const [hour, minute] = timePart.split(':').map(Number)
+function formatStatus(status: string) {
+  if (!status) return 'Unknown'
 
-  let guess = Date.UTC(year, month - 1, day, hour, minute)
+  return status
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
 
-  for (let i = 0; i < 3; i++) {
-    const actual = getChicagoParts(new Date(guess))
+function getStatusClasses(status: string) {
+  const normalized = status.toLowerCase()
 
-    const desiredWallTime = Date.UTC(year, month - 1, day, hour, minute)
-    const actualWallTime = Date.UTC(
-      actual.year,
-      actual.month - 1,
-      actual.day,
-      actual.hour,
-      actual.minute
-    )
-
-    const diff = desiredWallTime - actualWallTime
-
-    if (diff === 0) break
-
-    guess += diff
+  if (normalized.includes('cancel')) {
+    return 'bg-red-100 text-red-700 border-red-200'
   }
 
-  return new Date(guess).toISOString()
+  if (normalized.includes('postpon')) {
+    return 'bg-amber-100 text-amber-700 border-amber-200'
+  }
+
+  if (normalized.includes('complete') || normalized.includes('final')) {
+    return 'bg-green-100 text-green-700 border-green-200'
+  }
+
+  return 'bg-slate-100 text-slate-700 border-slate-200'
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-slate-800">
-        {label}
-      </label>
-      {children}
-    </div>
-  )
+function getScoreDisplay(event: EventRow) {
+  if (event.team_score === null || event.opponent_score === null) {
+    return null
+  }
+
+  const team = event.team_score
+  const opp = event.opponent_score
+  const high = Math.max(team, opp)
+  const low = Math.min(team, opp)
+
+  if (event.result === 'win') {
+    return { text: `W ${team}–${opp}`, className: 'text-green-600' }
+  }
+
+  if (event.result === 'loss') {
+    return { text: `L ${high}–${low}`, className: 'text-red-600' }
+  }
+
+  if (event.result === 'tie') {
+    return { text: `T ${team}–${opp}`, className: 'text-slate-600' }
+  }
+
+  return { text: `${team}–${opp}`, className: 'text-slate-700' }
 }
 
-export default function EditEventPage() {
+export default function EventPage() {
   const params = useParams()
-  const router = useRouter()
   const eventId = params.id as string
 
-  const [title, setTitle] = useState('')
-  const [opponent, setOpponent] = useState('')
-  const [notes, setNotes] = useState('')
-  const [startsAt, setStartsAt] = useState('')
-  const [teamScore, setTeamScore] = useState('')
-  const [opponentScore, setOpponentScore] = useState('')
+  const [event, setEvent] = useState<EventRow | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const loadEvent = async () => {
-      const supabase = createClient()
+      try {
+        const supabase = createClient()
 
-      const { data } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single()
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
+            id,
+            title,
+            opponent,
+            starts_at,
+            status,
+            notes,
+            gear_notes,
+            travel_minutes,
+            travel_miles,
+            team_score,
+            opponent_score,
+            result,
+            fields (
+              id,
+              name,
+              address_line,
+              city,
+              state,
+              postal_code
+            )
+          `)
+          .eq('id', eventId)
+          .single()
 
-      if (data) {
-        setTitle(data.title || '')
-        setOpponent(data.opponent || '')
-        setNotes(data.notes || '')
-        setStartsAt(data.starts_at ? formatForDateTimeLocal(data.starts_at) : '')
-        setTeamScore(data.team_score?.toString() || '')
-        setOpponentScore(data.opponent_score?.toString() || '')
+        if (error) {
+          console.error('Error loading event:', error)
+          setEvent(null)
+        } else if (data) {
+          setEvent(normalizeEvent(data as RawEventRow))
+        }
+      } catch (err) {
+        console.error('Unexpected error loading event:', err)
+        setEvent(null)
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
-    if (eventId) loadEvent()
+    if (eventId) {
+      loadEvent()
+    }
   }, [eventId])
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-
-    const supabase = createClient()
-
-    const team = teamScore ? Number(teamScore) : null
-    const opp = opponentScore ? Number(opponentScore) : null
-
-    let result = null
-    if (team !== null && opp !== null) {
-      if (team > opp) result = 'win'
-      else if (team < opp) result = 'loss'
-      else result = 'tie'
-    }
-
-    await supabase
-      .from('events')
-      .update({
-        title,
-        opponent: opponent || null,
-        notes: notes || null,
-        starts_at: chicagoInputToIso(startsAt),
-        team_score: team,
-        opponent_score: opp,
-        result
-      })
-      .eq('id', eventId)
-
-    router.push(`/event/${eventId}`)
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
+        <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          Loading event...
+        </div>
+      </main>
+    )
   }
 
-  if (loading) return <div>Loading...</div>
+  if (!event) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
+        <div className="mx-auto max-w-md space-y-4">
+          <Link
+            href="/schedule"
+            className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            ← Back to Schedule
+          </Link>
+
+          <div className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm">
+            Event not found
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  const eventTime = new Date(event.starts_at)
+  const field = getPrimaryField(event.fields)
+  const address = formatAddress(field)
+  const directionsUrl = address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    : ''
+  const score = getScoreDisplay(event)
+  const gearList = event.gear_notes
+    ? event.gear_notes.split(',').map(item => item.trim()).filter(Boolean)
+    : []
 
   return (
     <main className="min-h-screen bg-slate-100 p-4 pb-24 text-slate-900">
       <div className="mx-auto max-w-md space-y-4">
-        <Link href={`/event/${eventId}`}>← Back</Link>
+        <div className="flex gap-3">
+          <Link
+            href="/schedule"
+            className="inline-flex items-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            ← Back to Schedule
+          </Link>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Title">
-            <input value={title} onChange={e => setTitle(e.target.value)} />
-          </Field>
+          <Link
+            href={`/edit-event/${event.id}`}
+            className="inline-flex items-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
+            Edit Event
+          </Link>
+        </div>
 
-          <Field label="Opponent">
-            <input value={opponent} onChange={e => setOpponent(e.target.value)} />
-          </Field>
+        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-700 p-5 text-white">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-300">
+              Event Details
+            </p>
 
-          <Field label="Date & Time">
-            <input
-              type="datetime-local"
-              value={startsAt}
-              onChange={e => setStartsAt(e.target.value)}
-            />
-          </Field>
+            <h1 className="mt-2 text-2xl font-bold">
+              {event.title}
+            </h1>
 
-          <Field label="Team Score">
-            <input
-              type="number"
-              value={teamScore}
-              onChange={e => setTeamScore(e.target.value)}
-            />
-          </Field>
+            <p className="mt-3 text-sm text-slate-200">
+              {formatChicagoDateTime(eventTime)}
+            </p>
+          </div>
 
-          <Field label="Opponent Score">
-            <input
-              type="number"
-              value={opponentScore}
-              onChange={e => setOpponentScore(e.target.value)}
-            />
-          </Field>
+          <div className="space-y-4 p-4">
+            {score && (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
+                <p className={`text-3xl font-bold ${score.className}`}>
+                  {score.text}
+                </p>
 
-          <button type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </form>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {event.opponent ? `vs ${event.opponent}` : 'Final'}
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  {event.opponent && (
+                    <p className="text-sm text-slate-700">
+                      Opponent: {event.opponent}
+                    </p>
+                  )}
+                </div>
+
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(event.status)}`}
+                >
+                  {formatStatus(event.status)}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                Field
+              </p>
+
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {field?.name ?? 'Field TBD'}
+              </p>
+
+              <p className="text-sm text-slate-600">
+                {address || 'Address not available'}
+              </p>
+
+              {address && (
+                <a
+                  href={directionsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-block rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  Open Directions
+                </a>
+              )}
+            </div>
+
+            {event.travel_minutes !== null && !score && (
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                  Travel Time
+                </p>
+
+                <p className="mt-2 text-sm text-slate-700">
+                  🚗 {event.travel_minutes} minutes
+                  {event.travel_miles !== null ? ` • ${event.travel_miles} miles` : ''}
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                Gear Checklist
+              </p>
+
+              {gearList.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {gearList.map(item => (
+                    <p key={item} className="text-sm text-slate-700">
+                      ⚾ {item}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  No gear notes added
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                Notes
+              </p>
+
+              <p className="mt-2 text-sm text-slate-700">
+                {event.notes || 'No notes added'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   )
