@@ -19,7 +19,7 @@ function createClient() {
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
-const FORECAST_MATCH_WINDOW_MS = 6 * 60 * 60 * 1000
+const FORECAST_MATCH_WINDOW_MS = 9 * 60 * 60 * 1000
 const FORECAST_LOOKAHEAD_MS = 5 * 24 * 60 * 60 * 1000
 
 type FieldRow = {
@@ -302,8 +302,6 @@ function EventCard({
 
   const chicagoNow = new Date()
   const isGameDay = isSameChicagoDay(eventTime, chicagoNow)
-  const eventChicagoHour = getChicagoDateParts(eventTime).hour
-  const isTonight = isGameDay && eventChicagoHour >= 4
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -320,7 +318,7 @@ function EventCard({
           </p>
 
           <h2 className="mt-1 text-2xl font-bold text-slate-900">
-            {isTonight ? "Tonight's Game" : 'Game Today'}
+            Today&apos;s Game
           </h2>
 
           <p className="mt-1 text-sm text-slate-700">
@@ -384,30 +382,36 @@ function EventCard({
         </div>
       )}
 
-      {weather && (weather.rainChance !== null || weather.temperature !== null) && (
-        <div className="mt-4 rounded-2xl border border-slate-200 p-4">
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">
-            Weather Forecast
+      <div className="mt-4 rounded-2xl border border-slate-200 p-4">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+          Weather Forecast
+        </p>
+
+        {weather && (weather.rainChance !== null || weather.temperature !== null) ? (
+          <>
+            {weather.rainChance !== null &&
+              (weather.rainChance > 40 ? (
+                <p className="mt-2 text-amber-700">
+                  ⚠ Rain Risk – {weather.rainChance}%
+                </p>
+              ) : (
+                <p className="mt-2 text-green-700">
+                  ☀ Weather Looks Good – {weather.rainChance}%
+                </p>
+              ))}
+
+            {weather.temperature !== null && (
+              <p className="mt-1 text-sm text-slate-700">
+                Expected temperature: {weather.temperature}°F
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-slate-500">
+            Forecast not available yet
           </p>
-
-          {weather.rainChance !== null &&
-            (weather.rainChance > 40 ? (
-              <p className="mt-2 text-amber-700">
-                ⚠ Rain Risk – {weather.rainChance}%
-              </p>
-            ) : (
-              <p className="mt-2 text-green-700">
-                ☀ Weather Looks Good – {weather.rainChance}%
-              </p>
-            ))}
-
-          {weather.temperature !== null && (
-            <p className="mt-1 text-sm text-slate-700">
-              Expected temperature: {weather.temperature}°F
-            </p>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {!isCompleted && event.travel_minutes !== null && (
         <div className="mt-4 rounded-2xl border border-slate-200 p-4">
@@ -801,23 +805,24 @@ export default function HomePage() {
                           </p>
                         )}
 
-                        {weather &&
-                          (weather.rainChance !== null ||
-                            weather.temperature !== null) && (
-                            <div className="mt-3 rounded-xl bg-slate-50 p-3">
-                              {weather.rainChance !== null && (
-                                <p className="text-sm text-slate-700">
-                                  🌧 {weather.rainChance}% rain
-                                </p>
-                              )}
-
-                              {weather.temperature !== null && (
-                                <p className="text-sm text-slate-700">
-                                  🌡 {weather.temperature}°F
-                                </p>
-                              )}
-                            </div>
+                        <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                          {weather && weather.rainChance !== null ? (
+                            <p className="text-sm text-slate-700">
+                              🌧 {weather.rainChance}% rain
+                            </p>
+                          ) : (
+                            <p className="text-sm text-slate-500">
+                              Forecast not available yet
+                            </p>
                           )}
+
+                          {weather?.temperature !== null &&
+                            weather?.temperature !== undefined && (
+                              <p className="text-sm text-slate-700">
+                                🌡 {weather.temperature}°F
+                              </p>
+                            )}
+                        </div>
 
                         {event.travel_minutes !== null && score === null && (
                           <p className="mt-1 text-sm text-slate-600">
