@@ -242,40 +242,49 @@ export default function StatsPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-            {/* Column headers */}
-            <div className="grid grid-cols-6 gap-1 px-4 py-2 border-b border-white/10">
-              <p className="col-span-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</p>
-              {(['AVG', 'AB', 'H', 'RBI', 'R'] as const).map(col => (
-                <p key={col} className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold text-center">{col}</p>
-              ))}
-            </div>
-
-            {/* Player rows */}
-            <div className="divide-y divide-white/5">
-              {sortedPlayers.map((player, i) => (
-                <div key={player.id}
-                  className={`grid grid-cols-6 gap-1 px-4 py-3 items-center ${i === 0 ? 'bg-red-600/10' : ''}`}>
-                  <div className="col-span-2 flex items-center gap-2 min-w-0">
-                    {i === 0 && <span className="text-red-400 text-xs">★</span>}
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{player.name}</p>
-                      {player.jersey_number !== null && (
-                        <p className="text-[10px] text-slate-500">#{player.jersey_number}</p>
-                      )}
-                    </div>
-                  </div>
-                  <p className={`text-sm font-bold text-center tabular-nums ${
-                    sortBy === 'avg' ? 'text-red-400' : 'text-white'
-                  }`}>{player.avg}</p>
-                  <p className="text-sm text-slate-400 text-center tabular-nums">{player.at_bats}</p>
-                  <p className={`text-sm text-center tabular-nums ${sortBy === 'hits' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                    {player.hits}
-                  </p>
-                  <p className={`text-sm text-center tabular-nums ${sortBy === 'rbi' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                    {player.rbi}
-                  </p>
-                </div>
-              ))}
+            {/* Scrollable table wrapper */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold w-8">#</th>
+                    <th className="py-2 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
+                    {(['AVG', 'AB', 'H', 'RBI', 'R'] as const).map(col => (
+                      <th key={col} className="py-2 px-3 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {sortedPlayers.map((player, i) => (
+                    <tr key={player.id} className={i === 0 ? 'bg-red-600/10' : ''}>
+                      <td className="py-3 pl-4 pr-2 text-xs text-slate-500 tabular-nums">
+                        {player.jersey_number ?? '—'}
+                      </td>
+                      <td className="py-3 pr-2">
+                        <div className="flex items-center gap-1">
+                          {i === 0 && <span className="text-red-400 text-xs flex-shrink-0">★</span>}
+                          <span className="font-bold text-white whitespace-nowrap">{player.name}</span>
+                        </div>
+                      </td>
+                      <td className={`py-3 px-3 text-center tabular-nums font-bold ${sortBy === 'avg' ? 'text-red-400' : 'text-white'}`}>
+                        {player.avg}
+                      </td>
+                      <td className="py-3 px-3 text-center tabular-nums text-slate-400">
+                        {player.at_bats}
+                      </td>
+                      <td className={`py-3 px-3 text-center tabular-nums ${sortBy === 'hits' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                        {player.hits}
+                      </td>
+                      <td className={`py-3 px-3 text-center tabular-nums ${sortBy === 'rbi' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                        {player.rbi}
+                      </td>
+                      <td className={`py-3 px-3 text-center tabular-nums ${sortBy === 'runs' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                        {player.runs}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
