@@ -275,7 +275,7 @@ export default function SchedulePage() {
                       <div className="min-w-0">
                         <p className="font-bold text-white truncate">{event.title}</p>
                         <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-                        {event.opponent && (
+                        {event.opponent && event.event_type !== 'practice' && (
                           <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
                         )}
                         {score && (
