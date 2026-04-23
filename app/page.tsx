@@ -30,6 +30,7 @@ type EventRow = {
   id: string
   title: string
   opponent: string | null
+  event_type: string | null
   starts_at: string
   status: string
   notes: string | null
@@ -214,6 +215,8 @@ function EventCard({ event, weather, now, featured = false }: {
   const score = getScoreDisplay(event)
   const isCompleted = score !== null
   const isGameDay = isSameChicagoDay(eventTime, new Date())
+  const isGame = event.event_type === 'game' || event.event_type === 'tournament'
+  const isPractice = event.event_type === 'practice'
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
@@ -223,15 +226,24 @@ function EventCard({ event, weather, now, featured = false }: {
         </p>
       )}
 
-      {featured && isGameDay ? (
+      {featured && isGameDay && isGame ? (
         <div className="rounded-xl bg-red-600/20 border border-red-500/30 p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-red-300 font-semibold">Game Day</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-red-300 font-semibold">
+            {event.event_type === 'tournament' ? '🏆 Tournament Day' : '⚾ Game Day'}
+          </p>
           <h2 className="mt-1 text-2xl font-bold text-white">Today&apos;s Game</h2>
           <p className="mt-1 text-sm text-slate-300">
             {formatChicagoTime(eventTime)}{event.opponent ? ` vs ${event.opponent}` : ''}
           </p>
           <p className="mt-1 text-sm text-slate-400">{event.title}</p>
           {score && <p className={`mt-2 text-xl font-bold ${score.className}`}>{score.text}</p>}
+        </div>
+      ) : featured && isGameDay && isPractice ? (
+        <div className="rounded-xl bg-blue-600/20 border border-blue-500/30 p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-blue-300 font-semibold">🏋️ Practice Day</p>
+          <h2 className="mt-1 text-2xl font-bold text-white">Practice Today</h2>
+          <p className="mt-1 text-sm text-slate-300">{formatChicagoTime(eventTime)}</p>
+          <p className="mt-1 text-sm text-slate-400">{event.title}</p>
         </div>
       ) : (
         <>
@@ -390,7 +402,7 @@ export default function HomePage() {
 
         const { data, error } = await supabase
           .from('events')
-          .select(`id, title, opponent, starts_at, status, notes, gear_notes,
+          .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
             travel_minutes, travel_miles, team_score, opponent_score, result,
             fields (id, name, address_line, city, state, postal_code)`)
           .gte('starts_at', nowIso)
@@ -405,7 +417,7 @@ export default function HomePage() {
         // Past games with scores
         const { data: pastData } = await supabase
           .from('events')
-          .select(`id, title, opponent, starts_at, status, notes, gear_notes,
+          .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
             travel_minutes, travel_miles, team_score, opponent_score, result,
             fields (id, name, address_line, city, state, postal_code)`)
           .lt('starts_at', nowIso)
