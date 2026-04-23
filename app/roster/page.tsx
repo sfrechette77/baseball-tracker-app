@@ -139,10 +139,6 @@ export default function RosterPage() {
               <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
             </div>
           </div>
-          <div className="mt-4 rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-center">
-            <p className="text-2xl font-extrabold text-white">{players.length}</p>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">Players</p>
-          </div>
         </div>
       </div>
 
