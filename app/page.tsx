@@ -421,6 +421,7 @@ export default function HomePage() {
             travel_minutes, travel_miles, team_score, opponent_score, result,
             fields (id, name, address_line, city, state, postal_code)`)
           .lt('starts_at', nowIso)
+          .neq('event_type', 'practice')
           .order('starts_at', { ascending: false })
           .limit(5)
 
