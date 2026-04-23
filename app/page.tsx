@@ -550,9 +550,7 @@ export default function HomePage() {
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
               <h1 className="text-xl font-extrabold leading-tight text-white">
-                Chicago Elite 11U
-              </h1>
-              <p className="text-sm text-slate-400">Moore</p>
+                Chicago Elite 11U - Moore
             </div>
           </div>
 
