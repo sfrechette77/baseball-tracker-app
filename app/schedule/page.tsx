@@ -105,16 +105,25 @@ function RosterIcon({ active }: { active?: boolean }) {
   )
 }
 
-function BottomNav({ active }: { active: 'home' | 'schedule' | 'stats' | 'roster' }) {
+function StandingsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+    </svg>
+  )
+}
+
+function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'stats' | 'roster' }) {
   const links = [
     { href: '/', label: 'Home', key: 'home', Icon: HomeIcon },
     { href: '/schedule', label: 'Schedule', key: 'schedule', Icon: CalendarIcon },
+    { href: '/standings', label: 'Standings', key: 'standings', Icon: StandingsIcon },
     { href: '/stats', label: 'Stats', key: 'stats', Icon: ChartIcon },
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
-      <div className="mx-auto grid max-w-sm grid-cols-4">
+      <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
           return (
@@ -219,7 +228,7 @@ export default function SchedulePage() {
               <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2025</p>
               <h1 className="text-xl font-extrabold leading-tight text-white">Full Schedule</h1>
               <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
             </div>
@@ -266,7 +275,7 @@ export default function SchedulePage() {
                       <div className="min-w-0">
                         <p className="font-bold text-white truncate">{event.title}</p>
                         <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-                        {event.opponent && event.event_type !== 'practice' && (
+                        {event.opponent && (
                           <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
                         )}
                         {score && (
