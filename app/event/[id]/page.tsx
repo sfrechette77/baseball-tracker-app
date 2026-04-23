@@ -259,7 +259,7 @@ export default function EventPage() {
             {isPractice ? '🏋️ Practice' : event.event_type === 'tournament' ? '🏆 Tournament' : '⚾ Game'}
           </p>
           <h1 className="mt-1 text-2xl font-extrabold text-white leading-tight">{event.title}</h1>
-          {!isPractice && event.opponent && (
+          {!isPractice && event.opponent && event.event_type !== 'practice' && (
             <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
           )}
 
