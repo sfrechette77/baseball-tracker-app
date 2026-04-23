@@ -203,8 +203,8 @@ export default function StandingsPage() {
                             </span>
                           </div>
                         </td>
-                        <td className="py-3 px-2 text-center tabular-nums text-green-400 font-semibold">{team.wins}</td>
-                        <td className="py-3 px-2 text-center tabular-nums text-red-400 font-semibold">{team.losses}</td>
+                        <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{team.wins}</td>
+                        <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{team.losses}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{team.ties}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">
                           {calcPct(team.wins, team.losses, team.ties)}
