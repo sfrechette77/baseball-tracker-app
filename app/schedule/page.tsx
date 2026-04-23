@@ -194,6 +194,18 @@ export default function SchedulePage() {
     { wins: 0, losses: 0, ties: 0 }
   ), [events])
 
+  const leagueRecord = useMemo(() => events
+    .filter(e => e.result !== null && e.event_type !== 'tournament')
+    .reduce(
+      (acc, e) => {
+        if (e.result === 'win') acc.wins++
+        else if (e.result === 'loss') acc.losses++
+        else if (e.result === 'tie') acc.ties++
+        return acc
+      },
+      { wins: 0, losses: 0, ties: 0 }
+    ), [events])
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -251,6 +263,7 @@ export default function SchedulePage() {
               </div>
             </div>
           </div>
+        </div>
       </div>
 
       {/* Event list */}
