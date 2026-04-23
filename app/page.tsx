@@ -556,7 +556,7 @@ export default function HomePage() {
           </div>
 
           {/* Season Record */}
-          <div className="mt-5 rounded-xl bg-white/10 border border-white/10 px-4 py-3">
+          <div className="mt-5 inline-flex rounded-xl bg-white/10 border border-white/10 px-4 py-3 w-full max-w-[200px]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-wide text-white-400 font-semibold">Overall</p>
