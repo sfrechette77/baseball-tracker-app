@@ -9,7 +9,7 @@ function getSupabase() {
 }
 
 export async function POST(req: NextRequest) {
-  const adminPassword = process.env.CRON_SECRET
+  const adminPassword = process.env.ADMIN_PASSWORD
   const body = await req.json()
   const { password, action } = body
 
