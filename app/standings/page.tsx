@@ -221,11 +221,6 @@ export default function StandingsPage() {
           </div>
         )}
 
-        <p className="text-center text-xs text-slate-600 pb-2">
-          Update standings manually in your Supabase dashboard after each week.
-        </p>
-      </div>
-
       <BottomNav active="standings" />
     </main>
   )
