@@ -559,13 +559,13 @@ export default function HomePage() {
           <div className="mt-5 rounded-xl bg-white/10 border border-white/10 px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
+                <p className="text-[10px] uppercase tracking-wide text-white-400 font-semibold">Overall</p>
                 <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
                   {record.wins}–{record.losses}–{record.ties}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
+                <p className="text-[10px] uppercase tracking-wide text-white-400 font-semibold">League</p>
                 <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
                   {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
                 </p>
