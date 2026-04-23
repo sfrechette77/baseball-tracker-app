@@ -156,8 +156,8 @@ export default function StandingsPage() {
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">Standings</h1>
-              <p className="text-sm text-slate-400">11U American · MSBL</p>
+              <h1 className="text-xl font-extrabold leading-tight text-white">MSBL Standings</h1>
+              <p className="text-sm text-slate-400">11U - American</p>
             </div>
           </div>
         </div>
