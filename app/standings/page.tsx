@@ -181,7 +181,7 @@ export default function StandingsPage() {
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">L</th>
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">T</th>
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">PCT</th>
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">DIFF</th>
+                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">RD</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
