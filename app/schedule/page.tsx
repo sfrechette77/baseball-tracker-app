@@ -246,7 +246,10 @@ export default function SchedulePage() {
             </div>
           </div>
 
-          {/* Record bar */}
+      {/* Event list */}
+      <div className="mx-auto max-w-sm space-y-6 px-4 pt-4">
+
+        {/* Record bar */}
           <div className="mt-5 inline-flex rounded-xl bg-white/10 border border-white/10 px-4 py-3 w-full max-w-[220px]">
             <div className="flex items-center justify-between">
               <div>
@@ -265,9 +268,7 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
-
-      {/* Event list */}
-      <div className="mx-auto max-w-sm space-y-6 px-4 pt-4">
+        
         {Object.keys(groupedEvents).length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-sm text-slate-400">No scheduled events.</p>
