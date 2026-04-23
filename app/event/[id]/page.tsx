@@ -5,20 +5,31 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 
 function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  return createBrowserClient(url, key)
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
+
+type FieldRow = {
+  id: string
+  name: string | null
+  address_line: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+}
 
 type EventRow = {
   id: string
   title: string
   opponent: string | null
+  event_type: string | null
   starts_at: string
   status: string
   notes: string | null
@@ -28,6 +39,20 @@ type EventRow = {
   team_score: number | null
   opponent_score: number | null
   result: string | null
+  fields: FieldRow[] | null
+}
+
+type RawEventRow = Omit<EventRow, 'fields'> & {
+  fields: FieldRow | FieldRow[] | null
+}
+
+function normalizeEvent(event: RawEventRow): EventRow {
+  return { ...event, fields: normalizeFieldRelation(event.fields) }
+}
+
+function formatAddress(field: FieldRow | null) {
+  return [field?.address_line, field?.city, field?.state, field?.postal_code]
+    .filter(Boolean).join(', ')
 }
 
 function formatChicagoDateTime(date: Date) {
@@ -97,16 +122,25 @@ function RosterIcon({ active }: { active?: boolean }) {
   )
 }
 
-function BottomNav({ active }: { active: 'home' | 'schedule' | 'stats' | 'roster' }) {
+function StandingsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+    </svg>
+  )
+}
+
+function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'stats' | 'roster' }) {
   const links = [
     { href: '/', label: 'Home', key: 'home', Icon: HomeIcon },
     { href: '/schedule', label: 'Schedule', key: 'schedule', Icon: CalendarIcon },
+    { href: '/standings', label: 'Standings', key: 'standings', Icon: StandingsIcon },
     { href: '/stats', label: 'Stats', key: 'stats', Icon: ChartIcon },
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
-      <div className="mx-auto grid max-w-sm grid-cols-4">
+      <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
           return (
@@ -132,14 +166,31 @@ export default function EventPage() {
 
   useEffect(() => {
     const loadEvent = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single()
-      setEvent(data)
-      setLoading(false)
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('events')
+          .select(`
+            id, title, opponent, event_type, starts_at, status,
+            notes, gear_notes, travel_minutes, travel_miles,
+            team_score, opponent_score, result,
+            fields (id, name, address_line, city, state, postal_code)
+          `)
+          .eq('id', eventId)
+          .single()
+
+        if (error) {
+          console.error('Error loading event:', error)
+          setEvent(null)
+        } else if (data) {
+          setEvent(normalizeEvent(data as RawEventRow))
+        }
+      } catch (err) {
+        console.error('Unexpected error loading event:', err)
+        setEvent(null)
+      } finally {
+        setLoading(false)
+      }
     }
     if (eventId) loadEvent()
   }, [eventId])
@@ -168,8 +219,14 @@ export default function EventPage() {
     )
   }
 
+  const isPractice = event.event_type === 'practice'
+  const eventTime = new Date(event.starts_at)
+  const field = getPrimaryField(event.fields)
+  const address = formatAddress(field)
+  const directionsUrl = address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    : ''
   const score = getScoreDisplay(event)
-  const eventDate = new Date(event.starts_at)
   const gearList = event.gear_notes
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
@@ -187,19 +244,27 @@ export default function EventPage() {
               className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition">
               ← Schedule
             </Link>
-            <div className="relative h-10 w-10">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" />
+            <div className="flex items-center gap-3">
+              <Link href={`/edit-event/${event.id}`}
+                className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/20 transition">
+                Edit
+              </Link>
+              <div className="relative h-10 w-10">
+                <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" />
+              </div>
             </div>
           </div>
 
-          <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Event Details</p>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">
+            {isPractice ? '🏋️ Practice' : event.event_type === 'tournament' ? '🏆 Tournament' : '⚾ Game'}
+          </p>
           <h1 className="mt-1 text-2xl font-extrabold text-white leading-tight">{event.title}</h1>
-          {event.opponent && (
+          {!isPractice && event.opponent && (
             <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
           )}
 
-          {/* Score — shown prominently if available */}
-          {score && (
+          {/* Score — games only */}
+          {!isPractice && score && (
             <div className="mt-4 rounded-xl bg-white/10 border border-white/10 p-4 text-center">
               <p className={`text-4xl font-extrabold tabular-nums ${score.className}`}>{score.text}</p>
               {event.opponent && (
@@ -216,12 +281,25 @@ export default function EventPage() {
         {/* Date & Status */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Date & Time</p>
-          <p className="mt-2 text-sm font-semibold text-white">{formatChicagoDateTime(eventDate)}</p>
+          <p className="mt-2 text-sm font-semibold text-white">{formatChicagoDateTime(eventTime)}</p>
           <div className="mt-2">
             <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(event.status)}`}>
               {formatStatus(event.status)}
             </span>
           </div>
+        </div>
+
+        {/* Field */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Field</p>
+          <p className="mt-2 text-sm font-semibold text-white">{field?.name ?? 'TBD'}</p>
+          <p className="text-sm text-slate-400">{address || 'Address not available'}</p>
+          {address && (
+            <a href={directionsUrl} target="_blank" rel="noreferrer"
+              className="mt-2 inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition">
+              Directions ↗
+            </a>
+          )}
         </div>
 
         {/* Travel */}
