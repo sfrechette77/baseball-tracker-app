@@ -197,6 +197,14 @@ function RosterIcon({ active }: { active?: boolean }) {
   )
 }
 
+function StandingsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+    </svg>
+  )
+}
+
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
 function EventCard({ event, weather, now, featured = false }: {
@@ -250,7 +258,7 @@ function EventCard({ event, weather, now, featured = false }: {
         <>
           <h2 className="text-lg font-bold text-white">{event.title}</h2>
           <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-          {event.opponent && <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>}
+          {event.opponent && !isPractice && <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>}
           {score && <p className={`mt-2 text-lg font-bold ${score.className}`}>{score.text}</p>}
         </>
       )}
@@ -354,14 +362,6 @@ function PastGameRow({ event }: { event: EventRow }) {
 
 // ─── Bottom Nav ────────────────────────────────────────────────────────────────
 
-function StandingsIcon({ active }: { active?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
-    </svg>
-  )
-}
-
 function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'stats' | 'roster' }) {
   const links = [
     { href: '/', label: 'Home', key: 'home', Icon: HomeIcon },
@@ -424,7 +424,6 @@ export default function HomePage() {
         const normalizedEvents = (data as RawEventRow[]).map(normalizeEvent)
         setEvents(normalizedEvents)
 
-        // Past games with scores
         const { data: pastData } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
@@ -529,53 +528,44 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-900 pb-24 text-white">
-      {/* Header */}
+
+      {/* Header — logo and title only */}
       <div className="relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-6">
-        {/* Background texture */}
         <div className="pointer-events-none absolute inset-0 opacity-5"
           style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
-
         <div className="relative mx-auto max-w-sm">
-          {/* Logo + Team Name */}
           <div className="flex items-center gap-4">
             <div className="relative h-16 w-16 flex-shrink-0">
-              <Image
-                src="/Elite.png"
-                alt="Elite Baseball"
-                fill
-                className="object-contain drop-shadow-lg"
-                priority
-              />
+              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">
-                Chicago Elite 11U - Moore
-              </h1>  
-            </div>
-          </div>
-
-          {/* Season Record */}
-          <div className="mt-5 inline-flex rounded-xl bg-white/10 border border-white/10 px-4 py-3 w-full max-w-[200px]">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-white-400 font-semibold">Overall</p>
-                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                  {record.wins}–{record.losses}–{record.ties}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wide text-white-400 font-semibold">League</p>
-                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                  {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
-                </p>
-              </div>
+              <h1 className="text-xl font-extrabold leading-tight text-white">Chicago Elite 11U - Moore</h1>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+
+        {/* Record bar */}
+        <div className="rounded-xl bg-white/10 border border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
+              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
+                {record.wins}–{record.losses}–{record.ties}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
+              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
+                {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Next Up */}
         {featuredEvent ? (
@@ -608,7 +598,9 @@ export default function HomePage() {
                   <div key={event.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="font-bold text-white">{event.title}</p>
                     <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-                    {event.opponent && <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>}
+                    {event.opponent && event.event_type !== 'practice' && (
+                      <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
+                    )}
                     {score && <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>}
                     {field?.name && <p className="mt-1 text-sm text-slate-400">📍 {field.name}</p>}
                     {address && <p className="mt-0.5 text-xs text-slate-500">{address}</p>}
