@@ -230,7 +230,8 @@ export default function SchedulePage() {
 
   return (
     <main className="min-h-screen bg-slate-900 pb-24 text-white">
-      {/* Header */}
+
+      {/* Header — logo and title only */}
       <div className="relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-6">
         <div className="pointer-events-none absolute inset-0 opacity-5"
           style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
@@ -245,30 +246,31 @@ export default function SchedulePage() {
               <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
             </div>
           </div>
+        </div>
+      </div>
 
-      {/* Event list */}
-      <div className="mx-auto max-w-sm space-y-6 px-4 pt-4">
+      {/* Content */}
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
 
         {/* Record bar */}
-          <div className="mt-5 inline-flex rounded-xl bg-white/10 border border-white/10 px-4 py-3 w-full max-w-[220px]">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
-                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                  {record.wins}–{record.losses}–{record.ties}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
-                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                  {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
-                </p>
-              </div>
+        <div className="rounded-xl bg-white/10 border border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
+              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
+                {record.wins}–{record.losses}–{record.ties}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
+              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
+                {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
+              </p>
             </div>
           </div>
         </div>
-      </div>
-        
+
+        {/* Event list */}
         {Object.keys(groupedEvents).length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-sm text-slate-400">No scheduled events.</p>
