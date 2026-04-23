@@ -561,13 +561,13 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
-                <p className="text-2xl font-extrabold text-white tabular-nums">
+                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
                   {record.wins}–{record.losses}–{record.ties}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
-                <p className="text-2xl font-extrabold text-red-400 tabular-nums">
+                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
                   {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
                 </p>
               </div>
