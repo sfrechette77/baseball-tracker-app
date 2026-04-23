@@ -544,15 +544,15 @@ export default function HomePage() {
           <div className="mt-5 grid grid-cols-3 gap-3">
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-green-400">{record.wins}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Wins</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">W</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-red-400">{record.losses}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Losses</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">L</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{winPct !== null ? `${winPct}%` : '—'}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Win %</p>
+              <p className="text-2xl font-extrabold text-white">{record.ties</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">T</p>
             </div>
           </div>
         </div>
