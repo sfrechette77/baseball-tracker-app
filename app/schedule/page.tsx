@@ -247,7 +247,7 @@ export default function SchedulePage() {
           </div>
 
           {/* Record bar */}
-          <div className="mt-5 inline-flex rounded-x1 bg-white/10 border border-white/10 px-4 py-3 w-full max-w-[220px]">
+          <div className="mt-5 inline-flex rounded-xl bg-white/10 border border-white/10 px-4 py-3 w-full max-w-[220px]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
