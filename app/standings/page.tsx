@@ -220,7 +220,7 @@ export default function StandingsPage() {
             </div>
           </div>
         )}
-
+      </div>
       <BottomNav active="standings" />
     </main>
   )
