@@ -64,6 +64,7 @@ type WeatherByEvent = Record<string, WeatherSummary>
 type ScoredGameRow = {
   id: string
   result: string | null
+  event_type: string | null
 }
 
 function normalizeEvent(event: RawEventRow): EventRow {
@@ -353,17 +354,26 @@ function PastGameRow({ event }: { event: EventRow }) {
 
 // ─── Bottom Nav ────────────────────────────────────────────────────────────────
 
-function BottomNav({ active }: { active: 'home' | 'schedule' | 'stats' | 'roster' }) {
+function StandingsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+    </svg>
+  )
+}
+
+function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'stats' | 'roster' }) {
   const links = [
     { href: '/', label: 'Home', key: 'home', Icon: HomeIcon },
     { href: '/schedule', label: 'Schedule', key: 'schedule', Icon: CalendarIcon },
+    { href: '/standings', label: 'Standings', key: 'standings', Icon: StandingsIcon },
     { href: '/stats', label: 'Stats', key: 'stats', Icon: ChartIcon },
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
-      <div className="mx-auto grid max-w-sm grid-cols-4">
+      <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
           return (
@@ -421,7 +431,6 @@ export default function HomePage() {
             travel_minutes, travel_miles, team_score, opponent_score, result,
             fields (id, name, address_line, city, state, postal_code)`)
           .lt('starts_at', nowIso)
-          .neq('event_type', 'practice')
           .order('starts_at', { ascending: false })
           .limit(5)
 
@@ -429,7 +438,7 @@ export default function HomePage() {
 
         const { data: scoredGamesData } = await supabase
           .from('events')
-          .select('id, result')
+          .select('id, result, event_type')
           .not('result', 'is', null)
 
         setScoredGames((scoredGamesData ?? []) as ScoredGameRow[])
@@ -491,11 +500,17 @@ export default function HomePage() {
     { wins: 0, losses: 0, ties: 0 }
   ), [scoredGames])
 
-  const winPct = useMemo(() => {
-    const total = record.wins + record.losses + record.ties
-    if (total === 0) return null
-    return ((record.wins / total) * 100).toFixed(0)
-  }, [record])
+  const leagueRecord = useMemo(() => scoredGames
+    .filter(g => g.event_type !== 'tournament')
+    .reduce(
+      (acc, g) => {
+        if (g.result === 'win') acc.wins++
+        else if (g.result === 'loss') acc.losses++
+        else if (g.result === 'tie') acc.ties++
+        return acc
+      },
+      { wins: 0, losses: 0, ties: 0 }
+    ), [scoredGames])
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
@@ -540,19 +555,21 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Season Stats Bar */}
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-green-400">{record.wins}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">W</p>
-            </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-red-400">{record.losses}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">L</p>
-            </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{record.ties}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">T</p>
+          {/* Season Record */}
+          <div className="mt-5 rounded-xl bg-white/10 border border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
+                <p className="text-2xl font-extrabold text-white tabular-nums">
+                  {record.wins}–{record.losses}–{record.ties}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
+                <p className="text-2xl font-extrabold text-red-400 tabular-nums">
+                  {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
+                </p>
+              </div>
             </div>
           </div>
         </div>
