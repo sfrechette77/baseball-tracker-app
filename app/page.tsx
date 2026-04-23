@@ -551,7 +551,7 @@ export default function HomePage() {
               <p className="text-[10px] uppercase tracking-wide text-slate-400">L</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{record.ties</p>
+              <p className="text-2xl font-extrabold text-white">{record.ties}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">T</p>
             </div>
           </div>
