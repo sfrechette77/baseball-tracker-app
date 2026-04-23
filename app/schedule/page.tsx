@@ -235,21 +235,22 @@ export default function SchedulePage() {
           </div>
 
           {/* Record bar */}
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-green-400">{record.wins}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Wins</p>
-            </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-red-400">{record.losses}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Losses</p>
-            </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-slate-300">{record.ties}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Ties</p>
+          <div className="mt-5 rounded-xl bg-white/10 border border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
+                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
+                  {record.wins}–{record.losses}–{record.ties}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
+                <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
+                  {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
       </div>
 
       {/* Event list */}
