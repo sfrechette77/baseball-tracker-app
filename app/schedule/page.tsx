@@ -158,14 +158,21 @@ export default function SchedulePage() {
   }, [])
 
   const groupedEvents = useMemo(() => {
-    return events.reduce<Record<string, EventRow[]>>((groups, event) => {
-      const dateKey = new Intl.DateTimeFormat('en-US', {
-        timeZone: APP_TIME_ZONE, year: 'numeric', month: 'long', day: 'numeric'
-      }).format(new Date(event.starts_at))
-      if (!groups[dateKey]) groups[dateKey] = []
-      groups[dateKey].push(event)
-      return groups
-    }, {})
+    const now = new Date()
+    return events
+      .filter(event => {
+        const isPractice = event.event_type === 'practice'
+        const isPast = new Date(event.starts_at) < now
+        return !(isPractice && isPast)
+      })
+      .reduce<Record<string, EventRow[]>>((groups, event) => {
+        const dateKey = new Intl.DateTimeFormat('en-US', {
+          timeZone: APP_TIME_ZONE, year: 'numeric', month: 'long', day: 'numeric'
+        }).format(new Date(event.starts_at))
+        if (!groups[dateKey]) groups[dateKey] = []
+        groups[dateKey].push(event)
+        return groups
+      }, {})
   }, [events])
 
   const record = useMemo(() => events.reduce(
@@ -222,15 +229,15 @@ export default function SchedulePage() {
           <div className="mt-5 grid grid-cols-3 gap-3">
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-green-400">{record.wins}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">W</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Wins</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-red-400">{record.losses}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">L</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Losses</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-slate-300">{record.ties}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">T</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Ties</p>
             </div>
           </div>
         </div>
