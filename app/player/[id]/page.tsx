@@ -213,9 +213,7 @@ export default function PlayerPage() {
   return (
     <main className="min-h-screen bg-slate-900 pb-24 text-white">
       {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-6">
-        <div className="pointer-events-none absolute inset-0 opacity-5"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
         <div className="relative mx-auto max-w-sm">
           <div className="flex items-center justify-between mb-5">
             <Link href="/roster" className="text-sm font-semibold text-slate-400 hover:text-white transition">
