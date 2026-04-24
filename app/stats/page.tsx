@@ -102,7 +102,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
             <Link key={key} href={href}
               className={`flex flex-col items-center gap-1 py-3 transition ${isActive ? 'text-red-500' : 'text-slate-500 hover:text-slate-300'}`}>
               <Icon active={isActive} />
-              <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
+              < className="text-[10px] font-semibold uppercase tracking-wide">{label}</>
             </Link>
           )
         })}
@@ -269,7 +269,6 @@ export default function StatsPage() {
                       </td>
                       <td className="py-3 pr-2">
                         <div className="flex items-center gap-1">
-                          {i === 0 && <span className="text-red-400 text-xs flex-shrink-0">★</span>}
                           <span className="font-bold text-white whitespace-nowrap">{player.name}</span>
                         </div>
                       </td>
