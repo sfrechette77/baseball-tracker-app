@@ -383,10 +383,9 @@ export default function EventPage() {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                    {['AB', 'H', 'RBI', 'R', 'K'].map(h => (
+                    {['AB', 'H', 'RBI', 'R', 'BB', 'K'].map(h => (
                       <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
                     ))}
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">AVG</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -401,10 +400,8 @@ export default function EventPage() {
                       <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-red-400 font-semibold">
-                        {calcAvg(s.hits, s.at_bats)}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -422,7 +419,7 @@ export default function EventPage() {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                    {['P', 'IP', 'K', 'BB'].map(h => (
+                    {['P', 'IP', 'H', 'ER', 'K', 'BB'].map(h => (
                       <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -432,11 +429,13 @@ export default function EventPage() {
                     <tr key={s.player_id}>
                       <td className="py-3 pl-4 pr-2">
                         <p className="text-xs font-semibold text-white whitespace-nowrap">
-                          {s.players?.jersey_number ? `#${s.players.jersey_number} ` : ''}{s.players?.name ?? '—'}
+                          {s.players?.name ?? '—'}
                         </p>
                       </td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{s.pitch_count}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.pitch_count}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.innings_pitched}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.hits_allowed ?? 0}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.earned_runs ?? 0}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts_pitching}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
                     </tr>
