@@ -177,7 +177,7 @@ export default function PlayerPage() {
       }),
       { pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
     )
-    return totals.pitch_count > 0 ? totals : null
+    return totals
   }, [stats])
 
   const gamesWithStats = useMemo(() =>
@@ -275,7 +275,7 @@ export default function PlayerPage() {
         </div>
 
         {/* Season Pitching Summary — only if pitched */}
-        {seasonPitching && (
+        {seasonPitching !== null && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Pitching</p>
             <div className="grid grid-cols-4 gap-2">
