@@ -552,7 +552,7 @@ export default function HomePage() {
           src="/E_logo_extracted.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-1/2 w-64 -translate-x-1/2 -translate-y-1/2 opacity-[0.08]"
+          className="pointer-events-none absolute left-1/2 top-1/2 w-96 -translate-x-1/2 -translate-y-1/2 opacity-[0.15]"
         /> 
 
         {/* Record bar */}
