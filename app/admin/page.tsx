@@ -43,6 +43,7 @@ type StatRow = {
   earned_runs: number
   strikeouts_pitching: number
   walks: number
+  walks_allowed: number
 }
 
 type Standing = {
@@ -187,12 +188,12 @@ export default function AdminPage() {
       const supabase = createClient()
       const { data } = await supabase
         .from('player_stats')
-        .select('player_id, at_bats, hits, rbi, runs, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks, hits_allowed, earned_runs')
+        .select('player_id, at_bats, hits, rbi, runs, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks, hits_allowed, earned_runs, walks_allowed')
         .eq('event_id', statsEventId)
       const map: Record<string, StatRow> = {}
       for (const p of players) {
         const existing = (data ?? [] as unknown as StatRow[]).find((r: StatRow) => r.player_id === p.id)
-        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0, hits_allowed: 0, earned_runs: 0 }
+        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0, hits_allowed: 0, earned_runs: 0, walks_allowed: 0 }
       }
       setPlayerStats(map)
     }
@@ -229,7 +230,7 @@ export default function AdminPage() {
         action: 'update_player_stats', playerId, eventId: statsEventId,
         atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs, walks: stats.walks, strikeouts: stats.strikeouts,
         pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
-        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks ?? 0, hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
+        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks_allowed ?? 0, hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
       })
     }
     setStatsSaving(false)
@@ -458,7 +459,7 @@ export default function AdminPage() {
                           ['hits', s.hits, 'H'],
                           ['rbi', s.rbi, 'RBI'],
                           ['runs', s.runs, 'R'],
-                          ['walks', s.walks, 'BB'],
+                          ['walks', s.walks_allowed, 'BB'],
                           ['strikeouts', s.strikeouts, 'K'],
                         ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
                           <div key={field} className="space-y-0.5">
