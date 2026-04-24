@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
           team_score: teamScore,
           opponent_score: opponentScore,
           result,
-          status: 'final'
+          status: 'final',
           is_home: isHome ?? false
         })
         .eq('id', eventId)
