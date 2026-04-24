@@ -134,7 +134,7 @@ export default function RosterPage() {
               <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2025</p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
               <h1 className="text-xl font-extrabold leading-tight text-white">Roster</h1>
               <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
             </div>
