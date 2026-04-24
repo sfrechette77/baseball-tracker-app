@@ -229,7 +229,7 @@ export default function EventPage() {
             player_id, at_bats, hits, rbi, runs, walks, strikeouts,
             pitch_count, innings_pitched, hits_allowed, earned_runs,
             strikeouts_pitching, walks_allowed,
-            players (name, jersey_number)
+            players (name)
           `).eq('event_id', eventId)
         ])
 
@@ -429,11 +429,11 @@ export default function EventPage() {
                     <tr key={s.player_id}>
                       <td className="py-3 pl-4 pr-2">
                         <p className="text-xs font-semibold text-white whitespace-nowrap">
-                          {s.players?.jersey_number ? `#${s.players.jersey_number} ` : ''}{s.players?.name ?? '—'}
+                          {s.players?.name ?? '—'}
                         </p>
                       </td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.at_bats}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.hits}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks ?? 0}</td>
