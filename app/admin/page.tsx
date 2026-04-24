@@ -11,6 +11,7 @@ function createClient() {
 }
 
 const PASSWORD_KEY = 'admin_password'
+const INNINGS = [1, 2, 3, 4, 5, 6, 7]
 
 type EventRow = {
   id: string
@@ -26,7 +27,7 @@ type EventRow = {
 type Player = {
   id: string
   name: string
-  jersey_number: number | null
+  jersey_number: string | null
 }
 
 type StatRow = {
@@ -75,16 +76,13 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: input, action: 'update_score', eventId: 'test' })
     })
-    if (res.status === 401) {
-      setError(true)
-      return
-    }
+    if (res.status === 401) { setError(true); return }
     localStorage.setItem(PASSWORD_KEY, input)
     onSuccess(input)
   }
 
   return (
-    <main className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <p className="text-4xl mb-3">⚾</p>
@@ -92,14 +90,10 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
           <p className="text-slate-400 text-sm mt-1">Chicago Elite 11U · Moore</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
-          <input
-            type="password"
-            placeholder="Enter password"
-            value={input}
+          <input type="password" placeholder="Enter password" value={input}
             onChange={e => { setInput(e.target.value); setError(false) }}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500"
-          />
+            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500" />
           {error && <p className="text-red-400 text-sm">Incorrect password</p>}
           <button onClick={handleSubmit}
             className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition">
@@ -123,6 +117,8 @@ export default function AdminPage() {
   const [teamScore, setTeamScore] = useState('')
   const [opponentScore, setOpponentScore] = useState('')
   const [result, setResult] = useState<'win' | 'loss' | 'tie'>('win')
+  const [usInnings, setUsInnings] = useState<number[]>(Array(7).fill(0))
+  const [themInnings, setThemInnings] = useState<number[]>(Array(7).fill(0))
   const [scoreSaving, setScoreSaving] = useState(false)
   const [scoreMsg, setScoreMsg] = useState<string | null>(null)
 
@@ -165,6 +161,22 @@ export default function AdminPage() {
     load()
   }, [password])
 
+  // Load existing box scores + stats when score event changes
+  useEffect(() => {
+    if (!selectedEventId || !password) return
+    const load = async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('box_scores').select('*').eq('event_id', selectedEventId)
+      if (data) {
+        const us = data.find((r: { team: string }) => r.team === 'us')
+        const them = data.find((r: { team: string }) => r.team === 'them')
+        if (us) setUsInnings(INNINGS.map(i => us[`inning_${i}`] ?? 0))
+        if (them) setThemInnings(INNINGS.map(i => them[`inning_${i}`] ?? 0))
+      }
+    }
+    load()
+  }, [selectedEventId, password])
+
   // Load existing stats when stats event changes
   useEffect(() => {
     if (!statsEventId || !password) return
@@ -190,10 +202,7 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, password })
     })
-    if (res.status === 401) {
-      localStorage.removeItem(PASSWORD_KEY)
-      setPassword(null)
-    }
+    if (res.status === 401) { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }
     return res.json()
   }
 
@@ -201,36 +210,23 @@ export default function AdminPage() {
     if (!selectedEventId) return
     setScoreSaving(true)
     setScoreMsg(null)
-    const data = await api({
-      action: 'update_score',
-      eventId: selectedEventId,
-      teamScore: Number(teamScore),
-      opponentScore: Number(opponentScore),
-      result
-    })
+    await api({ action: 'update_score', eventId: selectedEventId, teamScore: Number(teamScore), opponentScore: Number(opponentScore), result })
+    await api({ action: 'update_box_score', eventId: selectedEventId, team: 'us', innings: usInnings })
+    await api({ action: 'update_box_score', eventId: selectedEventId, team: 'them', innings: themInnings })
     setScoreSaving(false)
-    setScoreMsg(data.ok ? '✅ Saved!' : `❌ ${data.error}`)
+    setScoreMsg('✅ Saved!')
   }
 
   const saveStats = async () => {
     if (!statsEventId) return
     setStatsSaving(true)
     setStatsMsg(null)
-    const entries = Object.entries(playerStats)
-    for (const [playerId, stats] of entries) {
+    for (const [playerId, stats] of Object.entries(playerStats)) {
       await api({
-        action: 'update_player_stats',
-        playerId,
-        eventId: statsEventId,
-        atBats: stats.at_bats,
-        hits: stats.hits,
-        rbi: stats.rbi,
-        runs: stats.runs,
-        strikeouts: stats.strikeouts,
-        pitchCount: stats.pitch_count ?? 0,
-        inningsPitched: stats.innings_pitched ?? 0,
-        strikeoutsPitching: stats.strikeouts_pitching ?? 0,
-        walks: stats.walks ?? 0
+        action: 'update_player_stats', playerId, eventId: statsEventId,
+        atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs, strikeouts: stats.strikeouts,
+        pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
+        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks ?? 0
       })
     }
     setStatsSaving(false)
@@ -241,43 +237,30 @@ export default function AdminPage() {
     setStandingsSaving(true)
     setStandingsMsg(null)
     for (const row of Object.values(editedStandings)) {
-      await api({
-        action: 'update_standing',
-        standingId: row.id,
-        wins: row.wins,
-        losses: row.losses,
-        ties: row.ties,
-        gamesPlayed: row.games_played,
-        runsFor: row.runs_for,
-        runsAgainst: row.runs_against
-      })
+      await api({ action: 'update_standing', standingId: row.id, wins: row.wins, losses: row.losses, ties: row.ties, gamesPlayed: row.games_played, runsFor: row.runs_for, runsAgainst: row.runs_against })
     }
     setStandingsSaving(false)
     setStandingsMsg('✅ Standings saved!')
   }
 
   const updateStat = (playerId: string, field: keyof StatRow, value: string) => {
-    setPlayerStats(prev => ({
-      ...prev,
-      [playerId]: { ...prev[playerId], [field]: Number(value) }
-    }))
+    setPlayerStats(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: Number(value) } }))
   }
 
   const updateStanding = (id: string, field: keyof Standing, value: string) => {
-    setEditedStandings(prev => ({
-      ...prev,
-      [id]: { ...prev[id], [field]: Number(value) }
-    }))
+    setEditedStandings(prev => ({ ...prev, [id]: { ...prev[id], [field]: Number(value) } }))
   }
 
   if (!password) return <PasswordGate onSuccess={setPassword} />
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
+  const usTotal = usInnings.reduce((a, b) => a + b, 0)
+  const themTotal = themInnings.reduce((a, b) => a + b, 0)
 
   return (
-    <main className="min-h-screen bg-slate-900 pb-10 text-white">
+    <main className="min-h-screen bg-black pb-10 text-white">
       {/* Header */}
-      <div className="bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-4">
+      <div className="bg-black px-4 pt-8 pb-4 border-b border-white/10">
         <div className="mx-auto max-w-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Admin</p>
@@ -314,6 +297,8 @@ export default function AdminPage() {
               <select value={selectedEventId} onChange={e => {
                 setSelectedEventId(e.target.value)
                 setScoreMsg(null)
+                setUsInnings(Array(7).fill(0))
+                setThemInnings(Array(7).fill(0))
                 const ev = events.find(ev => ev.id === e.target.value)
                 if (ev) {
                   setTeamScore(ev.team_score?.toString() ?? '')
@@ -323,7 +308,7 @@ export default function AdminPage() {
               }}
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
                 <option value="">— Pick a game —</option>
-                {events.filter(e => e.event_type !== 'practice').map(e => (
+                {events.map(e => (
                   <option key={e.id} value={e.id}>
                     {formatDate(e.starts_at)} — {e.opponent ? `vs ${e.opponent}` : e.title}
                   </option>
@@ -332,47 +317,94 @@ export default function AdminPage() {
             </div>
 
             {selectedEventId && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
-                  {selectedEvent?.opponent ? `vs ${selectedEvent.opponent}` : selectedEvent?.title}
-                </p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Our Score</p>
-                    <input type="number" value={teamScore} onChange={e => setTeamScore(e.target.value)}
-                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-2xl font-bold text-white text-center focus:outline-none focus:border-red-500" />
+              <>
+                {/* Final Score */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+                    Final Score — {selectedEvent?.opponent ? `vs ${selectedEvent.opponent}` : selectedEvent?.title}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Our Score</p>
+                      <input type="number" value={teamScore} onChange={e => setTeamScore(e.target.value)}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-2xl font-bold text-white text-center focus:outline-none focus:border-red-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Their Score</p>
+                      <input type="number" value={opponentScore} onChange={e => setOpponentScore(e.target.value)}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-2xl font-bold text-white text-center focus:outline-none focus:border-red-500" />
+                    </div>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">Their Score</p>
-                    <input type="number" value={opponentScore} onChange={e => setOpponentScore(e.target.value)}
-                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-2xl font-bold text-white text-center focus:outline-none focus:border-red-500" />
+                    <p className="text-xs text-slate-400 mb-2">Result</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['win', 'loss', 'tie'] as const).map(r => (
+                        <button key={r} onClick={() => setResult(r)}
+                          className={`rounded-xl py-3 text-sm font-bold transition ${result === r
+                            ? r === 'win' ? 'bg-green-600 text-white' : r === 'loss' ? 'bg-red-600 text-white' : 'bg-slate-600 text-white'
+                            : 'bg-white/10 text-slate-400'}`}>
+                          {r === 'win' ? 'W' : r === 'loss' ? 'L' : 'T'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-xs text-slate-400 mb-2">Result</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['win', 'loss', 'tie'] as const).map(r => (
-                      <button key={r} onClick={() => setResult(r)}
-                        className={`rounded-xl py-3 text-sm font-bold transition ${result === r
-                          ? r === 'win' ? 'bg-green-600 text-white'
-                            : r === 'loss' ? 'bg-red-600 text-white'
-                              : 'bg-slate-600 text-white'
-                          : 'bg-white/10 text-slate-400'}`}>
-                        {r === 'win' ? 'W' : r === 'loss' ? 'L' : 'T'}
-                      </button>
+                {/* Box Score Entry */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Box Score — Runs per Inning</p>
+
+                  {/* Column headers */}
+                  <div className="grid grid-cols-9 gap-1 text-center">
+                    <p className="col-span-2 text-left text-[10px] text-slate-500 uppercase font-semibold">Team</p>
+                    {INNINGS.map(i => (
+                      <p key={i} className="text-[10px] text-slate-500 uppercase font-semibold">{i}</p>
                     ))}
+                  </div>
+
+                  {/* Us row */}
+                  <div className="grid grid-cols-9 gap-1 items-center">
+                    <p className="col-span-2 text-xs font-bold text-white">Elite</p>
+                    {usInnings.map((val, idx) => (
+                      <input key={idx} type="number" min="0" value={val}
+                        onChange={e => {
+                          const next = [...usInnings]
+                          next[idx] = Number(e.target.value)
+                          setUsInnings(next)
+                        }}
+                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
+                    ))}
+                  </div>
+
+                  {/* Them row */}
+                  <div className="grid grid-cols-9 gap-1 items-center">
+                    <p className="col-span-2 text-xs font-semibold text-slate-400 truncate">
+                      {selectedEvent?.opponent ?? 'Opp'}
+                    </p>
+                    {themInnings.map((val, idx) => (
+                      <input key={idx} type="number" min="0" value={val}
+                        onChange={e => {
+                          const next = [...themInnings]
+                          next[idx] = Number(e.target.value)
+                          setThemInnings(next)
+                        }}
+                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
+                    ))}
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex justify-between rounded-xl bg-white/5 px-4 py-2">
+                    <span className="text-xs text-slate-400">Elite total: <span className="text-white font-bold">{usTotal}</span></span>
+                    <span className="text-xs text-slate-400">{selectedEvent?.opponent ?? 'Opp'} total: <span className="text-white font-bold">{themTotal}</span></span>
                   </div>
                 </div>
 
                 <button onClick={saveScore} disabled={scoreSaving}
                   className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
-                  {scoreSaving ? 'Saving...' : 'Save Score'}
+                  {scoreSaving ? 'Saving...' : 'Save Score + Box Score'}
                 </button>
-
                 {scoreMsg && <p className="text-sm text-center">{scoreMsg}</p>}
-              </div>
+              </>
             )}
           </>
         )}
@@ -385,7 +417,7 @@ export default function AdminPage() {
               <select value={statsEventId} onChange={e => { setStatsEventId(e.target.value); setStatsMsg(null) }}
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
                 <option value="">— Pick a game —</option>
-                {events.filter(e => e.event_type !== 'practice').map(e => (
+                {events.map(e => (
                   <option key={e.id} value={e.id}>
                     {formatDate(e.starts_at)} — {e.opponent ? `vs ${e.opponent}` : e.title}
                   </option>
@@ -395,14 +427,6 @@ export default function AdminPage() {
 
             {statsEventId && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
-                {/* Column headers */}
-                <div className="grid grid-cols-6 gap-1 text-center">
-                  <p className="col-span-2 text-left text-[10px] uppercase text-slate-500 font-semibold">Player</p>
-                  {['AB', 'H', 'RBI', 'R', 'K'].map(h => (
-                    <p key={h} className="text-[10px] uppercase text-slate-500 font-semibold">{h}</p>
-                  ))}
-                </div>
-
                 {players.map(player => {
                   const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
                   return (
@@ -451,7 +475,6 @@ export default function AdminPage() {
                   className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
                   {statsSaving ? 'Saving...' : 'Save All Stats'}
                 </button>
-
                 {statsMsg && <p className="text-sm text-center">{statsMsg}</p>}
               </div>
             )}
@@ -462,15 +485,12 @@ export default function AdminPage() {
         {tab === 'standings' && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Edit Standings</p>
-
-            {/* Column headers */}
             <div className="grid grid-cols-6 gap-1 text-center">
               <p className="col-span-2 text-left text-[10px] uppercase text-slate-500 font-semibold">Team</p>
               {['W', 'L', 'T', 'RF', 'RA'].map(h => (
                 <p key={h} className="text-[10px] uppercase text-slate-500 font-semibold">{h}</p>
               ))}
             </div>
-
             {standings.map(team => {
               const e = editedStandings[team.id] ?? team
               return (
@@ -492,12 +512,10 @@ export default function AdminPage() {
                 </div>
               )
             })}
-
             <button onClick={saveStandings} disabled={standingsSaving}
               className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
               {standingsSaving ? 'Saving...' : 'Save Standings'}
             </button>
-
             {standingsMsg && <p className="text-sm text-center">{standingsMsg}</p>}
           </div>
         )}
