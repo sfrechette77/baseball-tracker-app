@@ -9,7 +9,7 @@ function getSupabase() {
 }
 
 export async function POST(req: NextRequest) {
-  const adminPassword = process.env.CRON_SECRET
+  const adminPassword = process.env.ADMIN_PASSWORD
   const body = await req.json()
   const { password, action } = body
 
@@ -32,6 +32,26 @@ export async function POST(req: NextRequest) {
           status: 'final'
         })
         .eq('id', eventId)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── Upsert box score row ───────────────────────────────────────────────
+    if (action === 'update_box_score') {
+      const { eventId, team, innings } = body
+      const { error } = await supabase
+        .from('box_scores')
+        .upsert({
+          event_id: eventId,
+          team,
+          inning_1: innings[0] ?? 0,
+          inning_2: innings[1] ?? 0,
+          inning_3: innings[2] ?? 0,
+          inning_4: innings[3] ?? 0,
+          inning_5: innings[4] ?? 0,
+          inning_6: innings[5] ?? 0,
+          inning_7: innings[6] ?? 0,
+        }, { onConflict: 'event_id,team' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
     }
