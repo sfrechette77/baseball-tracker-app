@@ -36,6 +36,10 @@ type StatRow = {
   rbi: number
   runs: number
   strikeouts: number
+  pitch_count: number
+  innings_pitched: number
+  strikeouts_pitching: number
+  walks: number
 }
 
 type Standing = {
@@ -173,7 +177,7 @@ export default function AdminPage() {
       const map: Record<string, StatRow> = {}
       for (const p of players) {
         const existing = (data ?? []).find((r: StatRow) => r.player_id === p.id)
-        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0 }
+        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
       }
       setPlayerStats(map)
     }
@@ -222,7 +226,11 @@ export default function AdminPage() {
         hits: stats.hits,
         rbi: stats.rbi,
         runs: stats.runs,
-        strikeouts: stats.strikeouts
+        strikeouts: stats.strikeouts,
+        pitchCount: stats.pitch_count ?? 0,
+        inningsPitched: stats.innings_pitched ?? 0,
+        strikeoutsPitching: stats.strikeouts_pitching ?? 0,
+        walks: stats.walks ?? 0
       })
     }
     setStatsSaving(false)
@@ -396,23 +404,43 @@ export default function AdminPage() {
                 </div>
 
                 {players.map(player => {
-                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0 }
+                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
                   return (
                     <div key={player.id} className="space-y-1">
                       <p className="text-xs font-semibold text-slate-300">
                         {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
                       </p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wide">Batting</p>
                       <div className="grid grid-cols-5 gap-1">
                         {([
-                          ['at_bats', s.at_bats],
-                          ['hits', s.hits],
-                          ['rbi', s.rbi],
-                          ['runs', s.runs],
-                          ['strikeouts', s.strikeouts],
-                        ] as [keyof StatRow, number][]).map(([field, val]) => (
-                          <input key={field} type="number" value={val}
-                            onChange={e => updateStat(player.id, field, e.target.value)}
-                            className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                          ['at_bats', s.at_bats, 'AB'],
+                          ['hits', s.hits, 'H'],
+                          ['rbi', s.rbi, 'RBI'],
+                          ['runs', s.runs, 'R'],
+                          ['strikeouts', s.strikeouts, 'K'],
+                        ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
+                          <div key={field} className="space-y-0.5">
+                            <p className="text-[9px] text-slate-500 text-center">{label}</p>
+                            <input type="number" value={val}
+                              onChange={e => updateStat(player.id, field, e.target.value)}
+                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wide pt-1">Pitching</p>
+                      <div className="grid grid-cols-4 gap-1">
+                        {([
+                          ['pitch_count', s.pitch_count ?? 0, 'Pitches'],
+                          ['innings_pitched', s.innings_pitched ?? 0, 'IP'],
+                          ['strikeouts_pitching', s.strikeouts_pitching ?? 0, 'K'],
+                          ['walks', s.walks ?? 0, 'BB'],
+                        ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
+                          <div key={field} className="space-y-0.5">
+                            <p className="text-[9px] text-slate-500 text-center">{label}</p>
+                            <input type="number" value={val}
+                              onChange={e => updateStat(player.id, field, e.target.value)}
+                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                          </div>
                         ))}
                       </div>
                     </div>
