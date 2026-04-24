@@ -15,6 +15,7 @@ function createClient() {
 }
 
 const APP_TIME_ZONE = 'America/Chicago'
+const INNINGS = [1, 2, 3, 4, 5, 6, 7]
 
 type FieldRow = {
   id: string
@@ -44,6 +45,34 @@ type EventRow = {
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
   fields: FieldRow | FieldRow[] | null
+}
+
+type BoxScoreRow = {
+  team: string
+  inning_1: number
+  inning_2: number
+  inning_3: number
+  inning_4: number
+  inning_5: number
+  inning_6: number
+  inning_7: number
+}
+
+type PlayerStatRow = {
+  player_id: string
+  at_bats: number
+  hits: number
+  rbi: number
+  runs: number
+  strikeouts: number
+  pitch_count: number
+  innings_pitched: number
+  strikeouts_pitching: number
+  walks: number
+  players: {
+    name: string
+    jersey_number: string | null
+  } | null
 }
 
 function normalizeEvent(event: RawEventRow): EventRow {
@@ -88,6 +117,20 @@ function getScoreDisplay(event: EventRow) {
   return { text: `${team}–${opp}`, className: 'text-slate-300' }
 }
 
+function calcAvg(hits: number, atBats: number): string {
+  if (atBats === 0) return '.000'
+  const avg = hits / atBats
+  return avg >= 1 ? '1.000' : '.' + avg.toFixed(3).split('.')[1]
+}
+
+function getInningRuns(row: BoxScoreRow, inning: number): number {
+  return row[`inning_${inning}` as keyof BoxScoreRow] as number ?? 0
+}
+
+function getTotalRuns(row: BoxScoreRow): number {
+  return INNINGS.reduce((sum, i) => sum + getInningRuns(row, i), 0)
+}
+
 // ─── Nav Icons ────────────────────────────────────────────────────────────────
 
 function HomeIcon({ active }: { active?: boolean }) {
@@ -122,16 +165,25 @@ function RosterIcon({ active }: { active?: boolean }) {
   )
 }
 
-function BottomNav({ active }: { active: 'home' | 'schedule' | 'stats' | 'roster' }) {
+function StandingsIcon({ active }: { active?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+    </svg>
+  )
+}
+
+function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'stats' | 'roster' }) {
   const links = [
     { href: '/', label: 'Home', key: 'home', Icon: HomeIcon },
     { href: '/schedule', label: 'Schedule', key: 'schedule', Icon: CalendarIcon },
+    { href: '/standings', label: 'Standings', key: 'standings', Icon: StandingsIcon },
     { href: '/stats', label: 'Stats', key: 'stats', Icon: ChartIcon },
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
-      <div className="mx-auto grid max-w-sm grid-cols-4">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/95 backdrop-blur-md">
+      <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
           return (
@@ -153,29 +205,33 @@ export default function EventPage() {
   const params = useParams()
   const eventId = params.id as string
   const [event, setEvent] = useState<EventRow | null>(null)
+  const [boxScores, setBoxScores] = useState<BoxScoreRow[]>([])
+  const [playerStats, setPlayerStats] = useState<PlayerStatRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadEvent = async () => {
       try {
         const supabase = createClient()
-        const { data, error } = await supabase
-          .from('events')
-          .select(`
+        const [{ data: eventData, error }, { data: boxData }, { data: statsData }] = await Promise.all([
+          supabase.from('events').select(`
             id, title, opponent, event_type, starts_at, status,
             notes, gear_notes, travel_minutes, travel_miles,
             team_score, opponent_score, result,
             fields (id, name, address_line, city, state, postal_code)
-          `)
-          .eq('id', eventId)
-          .single()
+          `).eq('id', eventId).single(),
+          supabase.from('box_scores').select('*').eq('event_id', eventId),
+          supabase.from('player_stats').select(`
+            player_id, at_bats, hits, rbi, runs, strikeouts,
+            pitch_count, innings_pitched, strikeouts_pitching, walks,
+            players (name, jersey_number)
+          `).eq('event_id', eventId)
+        ])
 
-        if (error) {
-          console.error('Error loading event:', error)
-          setEvent(null)
-        } else if (data) {
-          setEvent(normalizeEvent(data as RawEventRow))
-        }
+        if (error) { setEvent(null) }
+        else if (eventData) { setEvent(normalizeEvent(eventData as RawEventRow)) }
+        setBoxScores((boxData ?? []) as BoxScoreRow[])
+        setPlayerStats((statsData ?? []) as unknown as PlayerStatRow[])
       } catch (err) {
         console.error('Unexpected error loading event:', err)
         setEvent(null)
@@ -188,7 +244,7 @@ export default function EventPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading event...</p>
@@ -199,7 +255,7 @@ export default function EventPage() {
 
   if (!event) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
           <p className="text-white font-bold">Event not found</p>
           <Link href="/schedule" className="mt-3 inline-block text-sm text-red-400 hover:text-red-300">
@@ -211,6 +267,7 @@ export default function EventPage() {
   }
 
   const isPractice = event.event_type === 'practice'
+  const isGame = event.event_type === 'game' || event.event_type === 'tournament'
   const eventTime = new Date(event.starts_at)
   const field = getPrimaryField(event.fields)
   const address = formatAddress(field)
@@ -222,14 +279,18 @@ export default function EventPage() {
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
 
+  const usRow = boxScores.find(r => r.team === 'us')
+  const themRow = boxScores.find(r => r.team === 'them')
+  const hasBoxScore = usRow || themRow
+
+  const playersWithStats = playerStats.filter(s => s.at_bats > 0 || (s.pitch_count ?? 0) > 0)
+  const pitchers = playerStats.filter(s => (s.pitch_count ?? 0) > 0)
+
   return (
-    <main className="min-h-screen bg-slate-900 pb-24 text-white">
+    <main className="min-h-screen bg-black pb-24 text-white">
       {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-6">
-        <div className="pointer-events-none absolute inset-0 opacity-5"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
         <div className="relative mx-auto max-w-sm">
-          {/* Back link + logo */}
           <div className="flex items-center justify-between mb-5">
             <Link href="/schedule"
               className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition">
@@ -254,7 +315,6 @@ export default function EventPage() {
             <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
           )}
 
-          {/* Score — games only */}
           {!isPractice && score && (
             <div className="mt-4 rounded-xl bg-white/10 border border-white/10 p-4 text-center">
               <p className={`text-4xl font-extrabold tabular-nums ${score.className}`}>{score.text}</p>
@@ -266,8 +326,126 @@ export default function EventPage() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="mx-auto max-w-sm space-y-3 px-4 pt-4">
+
+        {/* Box Score */}
+        {isGame && hasBoxScore && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Box Score</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[320px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold w-20">Team</th>
+                    {INNINGS.map(i => (
+                      <th key={i} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{i}</th>
+                    ))}
+                    <th className="py-2 px-3 text-center text-[10px] uppercase tracking-wide text-slate-300 font-bold">R</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {usRow && (
+                    <tr className="bg-red-600/5">
+                      <td className="py-3 pl-4 pr-2 text-xs font-bold text-white">Elite</td>
+                      {INNINGS.map(i => (
+                        <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-300">
+                          {getInningRuns(usRow, i)}
+                        </td>
+                      ))}
+                      <td className="py-3 px-3 text-center tabular-nums font-bold text-white">{getTotalRuns(usRow)}</td>
+                    </tr>
+                  )}
+                  {themRow && (
+                    <tr>
+                      <td className="py-3 pl-4 pr-2 text-xs font-semibold text-slate-400 truncate max-w-[80px]">
+                        {event.opponent ?? 'Opp'}
+                      </td>
+                      {INNINGS.map(i => (
+                        <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-400">
+                          {getInningRuns(themRow, i)}
+                        </td>
+                      ))}
+                      <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-300">{getTotalRuns(themRow)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Player Batting Stats */}
+        {isGame && playersWithStats.length > 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Batting</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[340px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
+                    {['AB', 'H', 'RBI', 'R', 'K'].map(h => (
+                      <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
+                    ))}
+                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">AVG</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {playersWithStats.filter(s => s.at_bats > 0).map(s => (
+                    <tr key={s.player_id}>
+                      <td className="py-3 pl-4 pr-2">
+                        <p className="text-xs font-semibold text-white whitespace-nowrap">
+                          {s.players?.jersey_number ? `#${s.players.jersey_number} ` : ''}{s.players?.name ?? '—'}
+                        </p>
+                      </td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.at_bats}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-red-400 font-semibold">
+                        {calcAvg(s.hits, s.at_bats)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pitching Stats */}
+        {isGame && pitchers.length > 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pitching</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[300px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
+                    {['P', 'IP', 'K', 'BB'].map(h => (
+                      <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {pitchers.map(s => (
+                    <tr key={s.player_id}>
+                      <td className="py-3 pl-4 pr-2">
+                        <p className="text-xs font-semibold text-white whitespace-nowrap">
+                          {s.players?.jersey_number ? `#${s.players.jersey_number} ` : ''}{s.players?.name ?? '—'}
+                        </p>
+                      </td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{s.pitch_count}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.innings_pitched}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts_pitching}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Date & Status */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
