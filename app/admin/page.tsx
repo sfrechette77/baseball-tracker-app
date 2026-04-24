@@ -39,6 +39,8 @@ type StatRow = {
   strikeouts: number
   pitch_count: number
   innings_pitched: number
+  hits_allowed: number
+  earned_runs: number
   strikeouts_pitching: number
   walks: number
 }
@@ -189,7 +191,7 @@ export default function AdminPage() {
       const map: Record<string, StatRow> = {}
       for (const p of players) {
         const existing = (data ?? [] as unknown as StatRow[]).find((r: StatRow) => r.player_id === p.id)
-        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
+        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0, hits_allowed: 0, earned_runs: 0 }
       }
       setPlayerStats(map)
     }
@@ -226,7 +228,7 @@ export default function AdminPage() {
         action: 'update_player_stats', playerId, eventId: statsEventId,
         atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs, strikeouts: stats.strikeouts,
         pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
-        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks ?? 0
+        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks ?? 0, hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
       })
     }
     setStatsSaving(false)
@@ -456,6 +458,8 @@ export default function AdminPage() {
                         {([
                           ['pitch_count', s.pitch_count ?? 0, 'Pitches'],
                           ['innings_pitched', s.innings_pitched ?? 0, 'IP'],
+                          ['hits_allowed', s.hits_allowed ?? 0, 'H'],
+                          ['earned_runs', s.earned_runs ?? 0, 'ER'],
                           ['strikeouts_pitching', s.strikeouts_pitching ?? 0, 'K'],
                           ['walks', s.walks ?? 0, 'BB'],
                         ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
