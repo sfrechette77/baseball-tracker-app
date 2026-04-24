@@ -102,7 +102,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
             <Link key={key} href={href}
               className={`flex flex-col items-center gap-1 py-3 transition ${isActive ? 'text-red-500' : 'text-slate-500 hover:text-slate-300'}`}>
               <Icon active={isActive} />
-              < className="text-[10px] font-semibold uppercase tracking-wide">{label}</>
+              <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
             </Link>
           )
         })}
