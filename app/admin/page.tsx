@@ -186,7 +186,7 @@ export default function AdminPage() {
       const supabase = createClient()
       const { data } = await supabase
         .from('player_stats')
-        .select('player_id, at_bats, hits, rbi, runs, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks')
+        .select('player_id, at_bats, hits, rbi, runs, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks, hits_allowed, earned_runs')
         .eq('event_id', statsEventId)
       const map: Record<string, StatRow> = {}
       for (const p of players) {
