@@ -176,7 +176,7 @@ export default function AdminPage() {
         .eq('event_id', statsEventId)
       const map: Record<string, StatRow> = {}
       for (const p of players) {
-        const existing = (data ?? []).find((r: StatRow) => r.player_id === p.id)
+        const existing = (data ?? [] as unknown as StatRow[]).find((r: StatRow) => r.player_id === p.id)
         map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
       }
       setPlayerStats(map)
