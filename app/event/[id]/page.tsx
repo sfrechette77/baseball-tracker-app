@@ -65,11 +65,14 @@ type PlayerStatRow = {
   hits: number
   rbi: number
   runs: number
+  walks: number
   strikeouts: number
   pitch_count: number
   innings_pitched: number
+  hits_allowed: number
+  earned_runs: number
   strikeouts_pitching: number
-  walks: number
+  walks_allowed: number
   players: {
     name: string
     jersey_number: string | null
@@ -223,8 +226,9 @@ export default function EventPage() {
           `).eq('id', eventId).single(),
           supabase.from('box_scores').select('*').eq('event_id', eventId),
           supabase.from('player_stats').select(`
-            player_id, at_bats, hits, rbi, runs, strikeouts,
-            pitch_count, innings_pitched, strikeouts_pitching, walks,
+            player_id, at_bats, hits, rbi, runs, walks, strikeouts,
+            pitch_count, innings_pitched, hits_allowed, earned_runs,
+            strikeouts_pitching, walks_allowed,
             players (name, jersey_number)
           `).eq('event_id', eventId)
         ])
@@ -415,10 +419,9 @@ export default function EventPage() {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                    {['AB', 'H', 'RBI', 'R', 'K'].map(h => (
+                    {['AB', 'H', 'RBI', 'R', 'BB', 'K'].map(h => (
                       <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
                     ))}
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">AVG</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -433,10 +436,8 @@ export default function EventPage() {
                       <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks ?? 0}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-red-400 font-semibold">
-                        {calcAvg(s.hits, s.at_bats)}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -470,7 +471,7 @@ export default function EventPage() {
                       <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{s.pitch_count}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.innings_pitched}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts_pitching}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks_allowed ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
