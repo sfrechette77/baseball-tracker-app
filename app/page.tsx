@@ -236,7 +236,7 @@ function EventCard({ event, weather, now, featured = false }: {
       )}
 
       {featured && isGameDay && isGame ? (
-        <div className="rounded-xl bg-red-600/20 border border-red-500/30 p-4">
+        <div className="rounded-xl bg-white/10 border border-white/20 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-red-300 font-semibold">
             {event.event_type === 'tournament' ? '🏆 Tournament Day' : '⚾ Game Day'}
           </p>
