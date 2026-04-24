@@ -190,7 +190,7 @@ export default function PlayerPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading player...</p>
@@ -201,7 +201,7 @@ export default function PlayerPage() {
 
   if (!player) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
           <p className="text-white font-bold">Player not found</p>
           <Link href="/roster" className="mt-3 inline-block text-sm text-red-400">← Roster</Link>
@@ -211,7 +211,7 @@ export default function PlayerPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-900 pb-24 text-white">
+    <main className="min-h-screen bg-black pb-24 text-white">
       {/* Header */}
       <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
         <div className="relative mx-auto max-w-sm">
