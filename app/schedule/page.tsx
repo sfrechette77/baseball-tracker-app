@@ -208,7 +208,7 @@ export default function SchedulePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading schedule...</p>
@@ -219,7 +219,7 @@ export default function SchedulePage() {
 
   if (errorMessage) {
     return (
-      <main className="min-h-screen bg-slate-900 p-4 text-white">
+      <main className="min-h-screen bg-black p-4 text-white">
         <div className="mx-auto max-w-sm rounded-2xl border border-red-500/30 bg-red-500/10 p-6">
           <h1 className="text-lg font-bold">Unable to load schedule</h1>
           <p className="mt-2 text-sm text-red-400">{errorMessage}</p>
@@ -229,12 +229,10 @@ export default function SchedulePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-900 pb-24 text-white">
+    <main className="min-h-screen bg-black pb-24 text-white">
 
       {/* Header — logo and title only */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-6">
-        <div className="pointer-events-none absolute inset-0 opacity-5"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
         <div className="relative mx-auto max-w-sm">
           <div className="flex items-center gap-4">
             <div className="relative h-16 w-16 flex-shrink-0">
