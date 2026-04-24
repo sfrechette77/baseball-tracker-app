@@ -146,7 +146,7 @@ export default function PlayerPage() {
             .order('event_id', { ascending: true })
         ])
         setPlayer(playerData as Player)
-        setStats((statsData ?? []) as StatRow[])
+        setStats((statsData ?? []) as unknown as StatRow[])
       } catch (err) {
         console.error(err)
       } finally {
