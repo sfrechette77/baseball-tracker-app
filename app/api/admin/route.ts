@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   try {
     // ── Update game score + result ──────────────────────────────────────────
     if (action === 'update_score') {
-      const { eventId, teamScore, opponentScore, result } = body
+      const { eventId, teamScore, opponentScore, result, isHome } = body
       const { error } = await supabase
         .from('events')
         .update({
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
           opponent_score: opponentScore,
           result,
           status: 'final'
+          is_home: isHome ?? false
         })
         .eq('id', eventId)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
