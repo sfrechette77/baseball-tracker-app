@@ -549,7 +549,7 @@ export default function HomePage() {
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
         <img
-          src="/E_logo_extracted.png
+          src="/E_logo_extracted.png"
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-1/2 w-64 -translate-x-1/2 -translate-y-1/2 opacity-[0.08]"
