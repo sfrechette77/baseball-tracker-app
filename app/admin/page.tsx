@@ -227,7 +227,7 @@ export default function AdminPage() {
     for (const [playerId, stats] of Object.entries(playerStats)) {
       await api({
         action: 'update_player_stats', playerId, eventId: statsEventId,
-        atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs, strikeouts: stats.strikeouts,
+        atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs, walks: stats.walks ?? 0, strikeouts: stats.strikeouts,
         pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
         strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks ?? 0, hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
       })
@@ -458,6 +458,7 @@ export default function AdminPage() {
                           ['hits', s.hits, 'H'],
                           ['rbi', s.rbi, 'RBI'],
                           ['runs', s.runs, 'R'],
+                          ['walks', s.walks, 'BB'],
                           ['strikeouts', s.strikeouts, 'K'],
                         ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
                           <div key={field} className="space-y-0.5">
