@@ -119,6 +119,7 @@ export default function AdminPage() {
   const [teamScore, setTeamScore] = useState('')
   const [opponentScore, setOpponentScore] = useState('')
   const [result, setResult] = useState<'win' | 'loss' | 'tie'>('win')
+  const [isHome, setIsHome] = useState(false)
   const [usInnings, setUsInnings] = useState<number[]>(Array(7).fill(0))
   const [themInnings, setThemInnings] = useState<number[]>(Array(7).fill(0))
   const [scoreSaving, setScoreSaving] = useState(false)
@@ -163,7 +164,7 @@ export default function AdminPage() {
     load()
   }, [password])
 
-  // Load existing box scores + stats when score event changes
+  // Load existing box scores when score event changes
   useEffect(() => {
     if (!selectedEventId || !password) return
     const load = async () => {
@@ -212,7 +213,7 @@ export default function AdminPage() {
     if (!selectedEventId) return
     setScoreSaving(true)
     setScoreMsg(null)
-    await api({ action: 'update_score', eventId: selectedEventId, teamScore: Number(teamScore), opponentScore: Number(opponentScore), result })
+    await api({ action: 'update_score', eventId: selectedEventId, teamScore: Number(teamScore), opponentScore: Number(opponentScore), result, isHome })
     await api({ action: 'update_box_score', eventId: selectedEventId, team: 'us', innings: usInnings })
     await api({ action: 'update_box_score', eventId: selectedEventId, team: 'them', innings: themInnings })
     setScoreSaving(false)
@@ -301,6 +302,7 @@ export default function AdminPage() {
                 setScoreMsg(null)
                 setUsInnings(Array(7).fill(0))
                 setThemInnings(Array(7).fill(0))
+                setIsHome(false)
                 const ev = events.find(ev => ev.id === e.target.value)
                 if (ev) {
                   setTeamScore(ev.team_score?.toString() ?? '')
@@ -346,6 +348,19 @@ export default function AdminPage() {
                             ? r === 'win' ? 'bg-green-600 text-white' : r === 'loss' ? 'bg-red-600 text-white' : 'bg-slate-600 text-white'
                             : 'bg-white/10 text-slate-400'}`}>
                           {r === 'win' ? 'W' : r === 'loss' ? 'L' : 'T'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-2">Game Location</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['away', 'home'] as const).map(loc => (
+                        <button key={loc} onClick={() => setIsHome(loc === 'home')}
+                          className={`rounded-xl py-3 text-sm font-bold transition ${
+                            isHome === (loc === 'home') ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400'
+                          }`}>
+                          {loc === 'home' ? '🏠 Home' : '✈️ Away'}
                         </button>
                       ))}
                     </div>
