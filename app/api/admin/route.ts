@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     // ── Upsert player stats for a game ─────────────────────────────────────
     if (action === 'update_player_stats') {
-      const { playerId, eventId, atBats, hits, rbi, runs, strikeouts, pitchCount, inningsPitched, strikeoutsPitching, walks, hitsAllowed, earnedRuns } = body
+      const { playerId, eventId, atBats, hits, rbi, runs, strikeouts, pitchCount, inningsPitched, strikeoutsPitching, walksAllowed, hitsAllowed, earnedRuns } = body
       const { error } = await supabase
         .from('player_stats')
         .upsert({
@@ -75,7 +75,8 @@ export async function POST(req: NextRequest) {
           strikeouts_pitching: strikeoutsPitching ?? 0,
           hits_allowed: hitsAllowed ?? 0,
           earned_runs: earnedRuns ?? 0,
-          walks: walks ?? 0
+          walks: walks ?? 0,
+          walks_allowed: walksAllowed ?? 0
         }, { onConflict: 'player_id,event_id' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
