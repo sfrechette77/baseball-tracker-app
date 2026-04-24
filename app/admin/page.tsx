@@ -36,13 +36,13 @@ type StatRow = {
   hits: number
   rbi: number
   runs: number
+  walks: number
   strikeouts: number
   pitch_count: number
   innings_pitched: number
   hits_allowed: number
   earned_runs: number
   strikeouts_pitching: number
-  walks: number
   walks_allowed: number
 }
 
@@ -188,12 +188,12 @@ export default function AdminPage() {
       const supabase = createClient()
       const { data } = await supabase
         .from('player_stats')
-        .select('player_id, at_bats, hits, rbi, runs, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks, hits_allowed, earned_runs, walks_allowed')
+        .select('player_id, at_bats, hits, rbi, runs, walks, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks_allowed, hits_allowed, earned_runs')
         .eq('event_id', statsEventId)
       const map: Record<string, StatRow> = {}
       for (const p of players) {
         const existing = (data ?? [] as unknown as StatRow[]).find((r: StatRow) => r.player_id === p.id)
-        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0, hits_allowed: 0, earned_runs: 0, walks_allowed: 0 }
+        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
       }
       setPlayerStats(map)
     }
@@ -228,9 +228,11 @@ export default function AdminPage() {
     for (const [playerId, stats] of Object.entries(playerStats)) {
       await api({
         action: 'update_player_stats', playerId, eventId: statsEventId,
-        atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs, walks: stats.walks, strikeouts: stats.strikeouts,
+        atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs,
+        walks: stats.walks ?? 0, strikeouts: stats.strikeouts,
         pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
-        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walks: stats.walks_allowed ?? 0, hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
+        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walksAllowed: stats.walks_allowed ?? 0,
+        hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
       })
     }
     setStatsSaving(false)
@@ -371,16 +373,12 @@ export default function AdminPage() {
                 {/* Box Score Entry */}
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
                   <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Box Score — Runs per Inning</p>
-
-                  {/* Column headers */}
                   <div className="grid grid-cols-9 gap-1 text-center">
                     <p className="col-span-2 text-left text-[10px] text-slate-500 uppercase font-semibold">Team</p>
                     {INNINGS.map(i => (
                       <p key={i} className="text-[10px] text-slate-500 uppercase font-semibold">{i}</p>
                     ))}
                   </div>
-
-                  {/* Us row */}
                   <div className="grid grid-cols-9 gap-1 items-center">
                     <p className="col-span-2 text-xs font-bold text-white">Elite</p>
                     {usInnings.map((val, idx) => (
@@ -393,8 +391,6 @@ export default function AdminPage() {
                         className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
                     ))}
                   </div>
-
-                  {/* Them row */}
                   <div className="grid grid-cols-9 gap-1 items-center">
                     <p className="col-span-2 text-xs font-semibold text-slate-400 truncate">
                       {selectedEvent?.opponent ?? 'Opp'}
@@ -409,8 +405,6 @@ export default function AdminPage() {
                         className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
                     ))}
                   </div>
-
-                  {/* Totals */}
                   <div className="flex justify-between rounded-xl bg-white/5 px-4 py-2">
                     <span className="text-xs text-slate-400">Elite total: <span className="text-white font-bold">{usTotal}</span></span>
                     <span className="text-xs text-slate-400">{selectedEvent?.opponent ?? 'Opp'} total: <span className="text-white font-bold">{themTotal}</span></span>
@@ -446,7 +440,7 @@ export default function AdminPage() {
             {statsEventId && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
                 {players.map(player => {
-                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0, walks_allowed: 0 }
+                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
                   return (
                     <div key={player.id} className="space-y-1">
                       <p className="text-xs font-semibold text-slate-300">
@@ -478,7 +472,7 @@ export default function AdminPage() {
                           ['hits_allowed', s.hits_allowed ?? 0, 'H'],
                           ['earned_runs', s.earned_runs ?? 0, 'ER'],
                           ['strikeouts_pitching', s.strikeouts_pitching ?? 0, 'K'],
-                          ['walks', s.walks_allowed ?? 0, 'BB'],
+                          ['walks_allowed', s.walks_allowed ?? 0, 'BB'],
                         ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
                           <div key={field} className="space-y-0.5">
                             <p className="text-[9px] text-slate-500 text-center">{label}</p>
