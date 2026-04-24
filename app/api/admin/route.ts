@@ -9,7 +9,7 @@ function getSupabase() {
 }
 
 export async function POST(req: NextRequest) {
-  const adminPassword = process.env.ADMIN_PASSWORD
+  const adminPassword = process.env.CRON_SECRET
   const body = await req.json()
   const { password, action } = body
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // ── Upsert player stats for a game ─────────────────────────────────────
     if (action === 'update_player_stats') {
-      const { playerId, eventId, atBats, hits, rbi, runs, strikeouts } = body
+      const { playerId, eventId, atBats, hits, rbi, runs, strikeouts, pitchCount, inningsPitched, strikeoutsPitching, walks } = body
       const { error } = await supabase
         .from('player_stats')
         .upsert({
@@ -48,7 +48,11 @@ export async function POST(req: NextRequest) {
           hits,
           rbi,
           runs,
-          strikeouts
+          strikeouts,
+          pitch_count: pitchCount ?? 0,
+          innings_pitched: inningsPitched ?? 0,
+          strikeouts_pitching: strikeoutsPitching ?? 0,
+          walks: walks ?? 0
         }, { onConflict: 'player_id,event_id' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
@@ -78,4 +82,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
- 
