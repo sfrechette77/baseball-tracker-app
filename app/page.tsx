@@ -517,7 +517,7 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading...</p>
@@ -530,9 +530,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-slate-900 pb-24 text-white">
 
       {/* Header — logo and title only */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 px-4 pt-8 pb-6">
-        <div className="pointer-events-none absolute inset-0 opacity-5"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
         <div className="relative mx-auto max-w-sm">
           <div className="flex items-center gap-4">
             <div className="relative h-16 w-16 flex-shrink-0">
