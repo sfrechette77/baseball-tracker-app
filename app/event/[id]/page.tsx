@@ -399,7 +399,7 @@ export default function EventPage() {
                         </p>
                       </td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.at_bats}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.hits}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
