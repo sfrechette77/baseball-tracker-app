@@ -69,6 +69,8 @@ type PlayerStatRow = {
   innings_pitched: number
   strikeouts_pitching: number
   walks: number
+  hits_allowed: number
+  earned_runs: number
   players: {
     name: string
     jersey_number: string | null
