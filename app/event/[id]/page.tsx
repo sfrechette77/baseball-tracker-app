@@ -40,6 +40,7 @@ type EventRow = {
   team_score: number | null
   opponent_score: number | null
   result: string | null
+  is_home: boolean | null
   fields: FieldRow[] | null
 }
 
@@ -69,8 +70,6 @@ type PlayerStatRow = {
   innings_pitched: number
   strikeouts_pitching: number
   walks: number
-  hits_allowed: number
-  earned_runs: number
   players: {
     name: string
     jersey_number: string | null
@@ -90,8 +89,7 @@ function formatChicagoDateTime(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: APP_TIME_ZONE,
     weekday: 'long', month: 'long', day: 'numeric',
-    year: 'numeric', hour: 'numeric', minute: '2-digit',
-    timeZoneName: 'short'
+    year: 'numeric', hour: 'numeric', minute: '2-digit'
   }).format(date)
 }
 
@@ -220,7 +218,7 @@ export default function EventPage() {
           supabase.from('events').select(`
             id, title, opponent, event_type, starts_at, status,
             notes, gear_notes, travel_minutes, travel_miles,
-            team_score, opponent_score, result,
+            team_score, opponent_score, result, is_home,
             fields (id, name, address_line, city, state, postal_code)
           `).eq('id', eventId).single(),
           supabase.from('box_scores').select('*').eq('event_id', eventId),
@@ -347,29 +345,60 @@ export default function EventPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {usRow && (
-                    <tr className="bg-red-600/5">
-                      <td className="py-3 pl-4 pr-2 text-xs font-bold text-white">Elite</td>
-                      {INNINGS.map(i => (
-                        <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-300">
-                          {getInningRuns(usRow, i)}
-                        </td>
-                      ))}
-                      <td className="py-3 px-3 text-center tabular-nums font-bold text-white">{getTotalRuns(usRow)}</td>
-                    </tr>
-                  )}
-                  {themRow && (
-                    <tr>
-                      <td className="py-3 pl-4 pr-2 text-xs font-semibold text-slate-400 truncate max-w-[80px]">
-                        {event.opponent ?? 'Opp'}
-                      </td>
-                      {INNINGS.map(i => (
-                        <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-400">
-                          {getInningRuns(themRow, i)}
-                        </td>
-                      ))}
-                      <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-300">{getTotalRuns(themRow)}</td>
-                    </tr>
+                  {event.is_home ? (
+                    <>
+                      {themRow && (
+                        <tr>
+                          <td className="py-3 pl-4 pr-2 text-xs font-semibold text-slate-400 truncate max-w-[80px]">
+                            {event.opponent ?? 'Opp'}
+                          </td>
+                          {INNINGS.map(i => (
+                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-400">
+                              {getInningRuns(themRow, i)}
+                            </td>
+                          ))}
+                          <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-300">{getTotalRuns(themRow)}</td>
+                        </tr>
+                      )}
+                      {usRow && (
+                        <tr className="bg-red-600/5">
+                          <td className="py-3 pl-4 pr-2 text-xs font-bold text-white">Elite</td>
+                          {INNINGS.map(i => (
+                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-300">
+                              {getInningRuns(usRow, i)}
+                            </td>
+                          ))}
+                          <td className="py-3 px-3 text-center tabular-nums font-bold text-white">{getTotalRuns(usRow)}</td>
+                        </tr>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {usRow && (
+                        <tr className="bg-red-600/5">
+                          <td className="py-3 pl-4 pr-2 text-xs font-bold text-white">Elite</td>
+                          {INNINGS.map(i => (
+                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-300">
+                              {getInningRuns(usRow, i)}
+                            </td>
+                          ))}
+                          <td className="py-3 px-3 text-center tabular-nums font-bold text-white">{getTotalRuns(usRow)}</td>
+                        </tr>
+                      )}
+                      {themRow && (
+                        <tr>
+                          <td className="py-3 pl-4 pr-2 text-xs font-semibold text-slate-400 truncate max-w-[80px]">
+                            {event.opponent ?? 'Opp'}
+                          </td>
+                          {INNINGS.map(i => (
+                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-400">
+                              {getInningRuns(themRow, i)}
+                            </td>
+                          ))}
+                          <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-300">{getTotalRuns(themRow)}</td>
+                        </tr>
+                      )}
+                    </>
                   )}
                 </tbody>
               </table>
@@ -386,9 +415,10 @@ export default function EventPage() {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                    {['AB', 'H', 'RBI', 'R', 'BB', 'K'].map(h => (
+                    {['AB', 'H', 'RBI', 'R', 'K'].map(h => (
                       <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
                     ))}
+                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">AVG</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -396,15 +426,17 @@ export default function EventPage() {
                     <tr key={s.player_id}>
                       <td className="py-3 pl-4 pr-2">
                         <p className="text-xs font-semibold text-white whitespace-nowrap">
-                          {s.players?.name ?? '—'}
+                          {s.players?.jersey_number ? `#${s.players.jersey_number} ` : ''}{s.players?.name ?? '—'}
                         </p>
                       </td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.at_bats}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.hits}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-red-400 font-semibold">
+                        {calcAvg(s.hits, s.at_bats)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -422,7 +454,7 @@ export default function EventPage() {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                    {['P', 'IP', 'H', 'ER', 'K', 'BB'].map(h => (
+                    {['P', 'IP', 'K', 'BB'].map(h => (
                       <th key={h} className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -432,13 +464,11 @@ export default function EventPage() {
                     <tr key={s.player_id}>
                       <td className="py-3 pl-4 pr-2">
                         <p className="text-xs font-semibold text-white whitespace-nowrap">
-                          {s.players?.name ?? '—'}
+                          {s.players?.jersey_number ? `#${s.players.jersey_number} ` : ''}{s.players?.name ?? '—'}
                         </p>
                       </td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.pitch_count}</td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{s.pitch_count}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.innings_pitched}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.hits_allowed ?? 0}</td>
-                      <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.earned_runs ?? 0}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts_pitching}</td>
                       <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks}</td>
                     </tr>
