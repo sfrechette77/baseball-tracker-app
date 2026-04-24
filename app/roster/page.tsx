@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 function createClient() {
@@ -134,10 +133,14 @@ export default function RosterPage() {
               <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2025</p>
               <h1 className="text-xl font-extrabold leading-tight text-white">Roster</h1>
               <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
             </div>
+          </div>
+          <div className="mt-4 rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-center">
+            <p className="text-2xl font-extrabold text-white">{players.length}</p>
+            <p className="text-[10px] uppercase tracking-wide text-slate-400">Players</p>
           </div>
         </div>
       </div>
@@ -151,19 +154,22 @@ export default function RosterPage() {
           </div>
         ) : (
           players.map(player => (
-            <div key={player.id}
-              className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              {/* Jersey number badge */}
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-600 font-extrabold text-white text-lg">
-                {player.jersey_number ?? '—'}
+            <Link key={player.id} href={`/player/${player.id}`}>
+              <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-600 font-extrabold text-white text-lg">
+                  {player.jersey_number ?? '—'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-white truncate">{player.name}</p>
+                  {player.position && (
+                    <p className="text-xs text-slate-400 mt-0.5">{player.position}</p>
+                  )}
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-slate-600 flex-shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-white truncate">{player.name}</p>
-                {player.position && (
-                  <p className="text-xs text-slate-400 mt-0.5">{player.position}</p>
-                )}
-              </div>
-            </div>
+            </Link>
           ))
         )}
       </div>
