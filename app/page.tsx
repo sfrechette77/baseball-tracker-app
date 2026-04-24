@@ -527,7 +527,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-900 pb-24 text-white">
+    <main className="min-h-screen bg-black-900 pb-24 text-white">
 
       {/* Header — logo and title only */}
       <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
