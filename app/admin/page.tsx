@@ -446,7 +446,7 @@ export default function AdminPage() {
             {statsEventId && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
                 {players.map(player => {
-                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
+                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0, walks_allowed: 0 }
                   return (
                     <div key={player.id} className="space-y-1">
                       <p className="text-xs font-semibold text-slate-300">
@@ -459,7 +459,7 @@ export default function AdminPage() {
                           ['hits', s.hits, 'H'],
                           ['rbi', s.rbi, 'RBI'],
                           ['runs', s.runs, 'R'],
-                          ['walks', s.walks_allowed, 'BB'],
+                          ['walks', s.walks, 'BB'],
                           ['strikeouts', s.strikeouts, 'K'],
                         ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
                           <div key={field} className="space-y-0.5">
@@ -478,7 +478,7 @@ export default function AdminPage() {
                           ['hits_allowed', s.hits_allowed ?? 0, 'H'],
                           ['earned_runs', s.earned_runs ?? 0, 'ER'],
                           ['strikeouts_pitching', s.strikeouts_pitching ?? 0, 'K'],
-                          ['walks', s.walks ?? 0, 'BB'],
+                          ['walks', s.walks_allowed ?? 0, 'BB'],
                         ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
                           <div key={field} className="space-y-0.5">
                             <p className="text-[9px] text-slate-500 text-center">{label}</p>
