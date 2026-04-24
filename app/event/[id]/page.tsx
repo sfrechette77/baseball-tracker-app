@@ -90,7 +90,8 @@ function formatChicagoDateTime(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: APP_TIME_ZONE,
     weekday: 'long', month: 'long', day: 'numeric',
-    year: 'numeric', hour: 'numeric', minute: '2-digit'
+    year: 'numeric', hour: 'numeric', minute: '2-digit',
+    timeZoneName: 'short'
   }).format(date)
 }
 
