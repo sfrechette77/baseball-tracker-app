@@ -517,7 +517,7 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading...</p>
@@ -527,7 +527,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-black-900 pb-24 text-white">
+    <main className="min-h-screen bg-black pb-24 text-white">
 
       {/* Header — logo and title only */}
       <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
