@@ -1,4 +1,3 @@
-// app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { UserMenu } from "@/components/user-menu";
@@ -15,13 +14,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chicago Elite 11U - Moore",
+  title: {
+    default: "Chicago Elite 11U - Moore",
+    template: "%s | Chicago Elite 11U",
+  },
   description: "Game day dashboard for Chicago Elite 11U - Moore baseball",
   manifest: "/manifest.json",
+  applicationName: "Chicago Elite 11U",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Elite 11U",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    title: "Chicago Elite 11U - Moore",
+    description: "Game day dashboard for Chicago Elite 11U - Moore baseball",
+    siteName: "Chicago Elite 11U",
+    type: "website",
   },
   icons: {
     icon: [
