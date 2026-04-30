@@ -2,10 +2,13 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') ?? '/'
 
   async function signInWithGoogle() {
     setLoading(true)
@@ -14,7 +17,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
     if (error) {
@@ -28,10 +31,9 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center bg-black text-white p-6">
       <div className="w-full max-w-sm space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold">Frechette Baseball</h1>
+          <h1 className="text-2xl font-semibold">Chicago Elite 11U - Moore</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to continue</p>
         </div>
-
         <button
           onClick={signInWithGoogle}
           disabled={loading}
@@ -45,7 +47,6 @@ export default function LoginPage() {
           </svg>
           {loading ? 'Redirecting…' : 'Continue with Google'}
         </button>
-
         {error && (
           <p className="text-red-400 text-sm">{error}</p>
         )}
