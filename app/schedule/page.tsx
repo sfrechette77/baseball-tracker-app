@@ -278,7 +278,7 @@ export default function SchedulePage() {
 
       {/* Page title */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-sm uppercase tracking-[0.2em] text-red-400 font-semibold">2026 Season</p>
+        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
       </div>
 
