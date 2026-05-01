@@ -529,23 +529,8 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
-      {/* Header — logo and title only */}
-      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
-        <div className="relative mx-auto max-w-sm">
-          <div className="flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">Chicago Elite 11U - Moore</h1>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Content */}
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
 
         {/* Record bar */}
         <div className="rounded-xl bg-white/10 border border-white/10 px-4 py-3">
