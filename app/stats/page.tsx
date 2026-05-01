@@ -165,20 +165,6 @@ export default function StatsPage() {
     })
   }, [playersWithStats, sortBy])
 
-  const teamTotals = useMemo(() => {
-    return playersWithStats.reduce(
-      (acc, p) => ({
-        at_bats: acc.at_bats + p.at_bats,
-        hits: acc.hits + p.hits,
-        rbi: acc.rbi + p.rbi,
-        runs: acc.runs + p.runs,
-      }),
-      { at_bats: 0, hits: 0, rbi: 0, runs: 0 }
-    )
-  }, [playersWithStats])
-
-  const teamAvg = calcAvg(teamTotals.hits, teamTotals.at_bats)
-
   if (loading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
@@ -200,23 +186,6 @@ export default function StatsPage() {
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
-      </div>
-
-      {/* Team summary tiles */}
-      <div className="mx-auto max-w-sm px-4 pt-4">
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: 'Team AVG', value: teamAvg },
-            { label: 'Hits', value: teamTotals.hits },
-            { label: 'RBI', value: teamTotals.rbi },
-            { label: 'Runs', value: teamTotals.runs },
-          ].map(({ label, value }) => (
-            <div key={label} className="rounded-xl bg-white/5 border border-white/10 p-2 text-center">
-              <p className="text-lg font-extrabold text-white tabular-nums">{value}</p>
-              <p className="text-[9px] uppercase tracking-wide text-slate-400 leading-tight mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
