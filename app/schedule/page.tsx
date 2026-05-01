@@ -289,8 +289,8 @@ export default function SchedulePage() {
         <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
           <div className="flex items-center justify-around text-center">
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Winning %</p>
-              <p className="text-base font-bold text-white tabular-nums mt-1">
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Winning %</p>
+              <p className="text-2x1 font-bold text-white tabular-nums mt-1">
                 {(() => {
                   const total = record.wins + record.losses + record.ties
                   if (total === 0) return '—'
@@ -299,14 +299,14 @@ export default function SchedulePage() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Overall</p>
-              <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Overall</p>
+              <p className="text-2x1 font-bold text-slate-300 tabular-nums mt-1">
                 {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
               </p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">League</p>
-              <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
+              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">League</p>
+              <p className="text-2x1 font-bold text-slate-300 tabular-nums mt-1">
                 {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
               </p>
             </div>
