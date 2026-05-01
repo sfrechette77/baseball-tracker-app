@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -26,8 +25,12 @@ type StandingRow = {
 function calcPct(wins: number, losses: number, ties: number): string {
   const total = wins + losses + ties
   if (total === 0) return '.000'
-  const pct = wins / total
+  const pct = (wins + ties * 0.5) / total
   return pct >= 1 ? '1.000' : '.' + pct.toFixed(3).split('.')[1]
+}
+
+function formatRecord(wins: number, losses: number, ties: number): string {
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`
 }
 
 // ─── Nav Icons ────────────────────────────────────────────────────────────────
@@ -81,7 +84,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
@@ -100,7 +103,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const OUR_TEAM = 'Elite Baseball 11u - Moore'
+const OUR_TEAM = 'Elite Baseball - Moore'
 
 export default function StandingsPage() {
   const [standings, setStandings] = useState<StandingRow[]>([])
@@ -125,8 +128,10 @@ export default function StandingsPage() {
 
   const sorted = useMemo(() => {
     return [...standings].sort((a, b) => {
-      const pctA = a.wins + a.losses + a.ties === 0 ? 0 : a.wins / (a.wins + a.losses + a.ties)
-      const pctB = b.wins + b.losses + b.ties === 0 ? 0 : b.wins / (b.wins + b.losses + b.ties)
+      const totalA = a.wins + a.losses + a.ties
+      const totalB = b.wins + b.losses + b.ties
+      const pctA = totalA === 0 ? 0 : (a.wins + a.ties * 0.5) / totalA
+      const pctB = totalB === 0 ? 0 : (b.wins + b.ties * 0.5) / totalB
       if (pctB !== pctA) return pctB - pctA
       return (b.runs_for - b.runs_against) - (a.runs_for - a.runs_against)
     })
@@ -134,7 +139,7 @@ export default function StandingsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading standings...</p>
@@ -144,78 +149,57 @@ export default function StandingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black pb-24 text-white">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
-        <div className="relative mx-auto max-w-sm">
-          <div className="flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">MSBL Standings</h1>
-              <p className="text-sm text-slate-400">11U - American</p>
-            </div>
-          </div>
-        </div>
+    <main className="min-h-screen bg-black pb-32 text-white">
+
+      {/* Page title */}
+      <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+        <p className="text-sm uppercase tracking-[0.2em] text-red-400 font-semibold">Season 2026</p>
+        <h1 className="text-3xl font-extrabold text-white mt-1">MSBL Standings</h1>
+        <p className="text-sm text-slate-400 mt-1">11U American Division</p>
       </div>
 
       {/* Standings table */}
-      <div className="mx-auto max-w-sm px-4 pt-4 space-y-3">
+      <div className="mx-auto max-w-sm px-4 pt-2">
         {standings.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
             <p className="text-slate-400 text-sm">No standings data yet.</p>
           </div>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[380px] text-sm">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold w-6">#</th>
-                    <th className="py-2 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Team</th>
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">W</th>
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">L</th>
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">T</th>
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">PCT</th>
-                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">RD</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {sorted.map((team, i) => {
-                    const isUs = team.team_name === OUR_TEAM
-                    const diff = team.runs_for - team.runs_against
-                    return (
-                      <tr key={team.id} className={isUs ? 'bg-red-600/10' : ''}>
-                        <td className="py-3 pl-4 pr-2 text-xs text-slate-500 tabular-nums">{i + 1}</td>
-                        <td className="py-3 pr-2">
-                          <div className="flex items-center gap-1.5">
-                            {isUs && (
-                              <div className="relative h-4 w-4 flex-shrink-0">
-                                <Image src="/Elite.png" alt="" fill className="object-contain" />
-                              </div>
-                            )}
-                            <span className={`text-sm whitespace-nowrap ${isUs ? 'font-bold text-white' : 'text-slate-300'}`}>
-                              {team.team_name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{team.wins}</td>
-                        <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">{team.losses}</td>
-                        <td className="py-3 px-2 text-center tabular-nums text-slate-400">{team.ties}</td>
-                        <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">
-                          {calcPct(team.wins, team.losses, team.ties)}
-                        </td>
-                        <td className={`py-3 px-2 text-center tabular-nums font-semibold ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                          {diff > 0 ? `+${diff}` : diff}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-2 pl-4 pr-2 text-left text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Team</th>
+                  <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-14">Record</th>
+                  <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-12">PCT</th>
+                  <th className="py-2 pl-2 pr-4 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-10">RD</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {sorted.map((team) => {
+                  const isUs = team.team_name === OUR_TEAM
+                  const diff = team.runs_for - team.runs_against
+                  return (
+                    <tr key={team.id} className={isUs ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
+                      <td className="py-3 pl-4 pr-2">
+                        <span className={`text-sm ${isUs ? 'font-bold text-white' : 'text-slate-300'}`}>
+                          {team.team_name}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center tabular-nums text-slate-300 font-semibold">
+                        {formatRecord(team.wins, team.losses, team.ties)}
+                      </td>
+                      <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">
+                        {calcPct(team.wins, team.losses, team.ties)}
+                      </td>
+                      <td className={`py-3 pl-2 pr-4 text-center tabular-nums font-semibold ${diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                        {diff > 0 ? `+${diff}` : diff}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
