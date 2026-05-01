@@ -278,7 +278,7 @@ export default function SchedulePage() {
 
       {/* Page title */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
+        <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">2026 Season</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
       </div>
 
@@ -290,7 +290,7 @@ export default function SchedulePage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Winning %</p>
-              <p className="text-3xl font-extrabold text-white tabular-nums leading-none mt-1">
+              <p className="text-base font-bold text-white tabular-nums mt-1">
                 {(() => {
                   const total = record.wins + record.losses + record.ties
                   if (total === 0) return '—'
