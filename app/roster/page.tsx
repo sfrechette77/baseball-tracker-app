@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 function createClient() {
@@ -70,7 +69,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
@@ -100,7 +99,6 @@ export default function RosterPage() {
         const { data } = await supabase
           .from('players')
           .select('id, name, jersey_number, position')
-          .order('jersey_number', { ascending: true })
         setPlayers((data ?? []) as Player[])
       } catch (err) {
         console.error(err)
@@ -111,9 +109,24 @@ export default function RosterPage() {
     load()
   }, [])
 
+  // Sort by jersey number numerically. "00" sorts as 0 but after "0".
+  const sortedPlayers = useMemo(() => {
+    return [...players].sort((a, b) => {
+      const aNum = a.jersey_number === null ? Infinity : parseInt(a.jersey_number, 10)
+      const bNum = b.jersey_number === null ? Infinity : parseInt(b.jersey_number, 10)
+      if (aNum !== bNum) return aNum - bNum
+      // Tie-break: "0" before "00", "5" before "05" — by string length
+      const aLen = (a.jersey_number ?? '').length
+      const bLen = (b.jersey_number ?? '').length
+      if (aLen !== bLen) return aLen - bLen
+      // Final tie-break: alphabetical by name
+      return a.name.localeCompare(b.name)
+    })
+  }, [players])
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading roster...</p>
@@ -123,32 +136,22 @@ export default function RosterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black pb-24 text-white">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
-        <div className="relative mx-auto max-w-sm">
-          <div className="flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">Roster</h1>
-              <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
-            </div>
-          </div>
-        </div>
+    <main className="min-h-screen bg-black pb-32 text-white">
+
+      {/* Page title */}
+      <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <h1 className="text-3xl font-extrabold text-white mt-1">Roster</h1>
       </div>
 
       {/* Player list */}
       <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
-        {players.length === 0 ? (
+        {sortedPlayers.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
             <p className="text-slate-400 text-sm">No players added yet.</p>
-            <p className="text-slate-500 text-xs mt-1">Add players in your Supabase dashboard.</p>
           </div>
         ) : (
-          players.map(player => (
+          sortedPlayers.map(player => (
             <Link key={player.id} href={`/player/${player.id}`}>
               <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-600 font-extrabold text-white text-lg">
