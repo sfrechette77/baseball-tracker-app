@@ -372,7 +372,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
   ] as const
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
@@ -527,7 +527,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-black pb-24 text-white">
+    <main className="min-h-screen bg-black pb-32 text-white">
 
       {/* Header — logo and title only */}
       <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
@@ -546,12 +546,6 @@ export default function HomePage() {
 
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
-        <img
-          src="/E_logo_extracted.png"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none fixed left-1/2 top-1/2 w-96 -translate-x-1/2 -translate-y-1/2 opacity-[0.20]"
-        /> 
 
         {/* Record bar */}
         <div className="rounded-xl bg-white/10 border border-white/10 px-4 py-3">
