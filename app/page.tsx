@@ -61,12 +61,6 @@ type WeatherSummary = {
 
 type WeatherByEvent = Record<string, WeatherSummary>
 
-type ScoredGameRow = {
-  id: string
-  result: string | null
-  event_type: string | null
-}
-
 function normalizeEvent(event: RawEventRow): EventRow {
   return { ...event, fields: normalizeFieldRelation(event.fields) }
 }
@@ -394,7 +388,6 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
 export default function HomePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [pastGames, setPastGames] = useState<EventRow[]>([])
-  const [scoredGames, setScoredGames] = useState<ScoredGameRow[]>([])
   const [weatherByEvent, setWeatherByEvent] = useState<WeatherByEvent>({})
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(new Date())
@@ -435,13 +428,6 @@ export default function HomePage() {
           .limit(5)
 
         if (pastData) setPastGames((pastData as RawEventRow[]).map(normalizeEvent))
-
-        const { data: scoredGamesData } = await supabase
-          .from('events')
-          .select('id, result, event_type')
-          .not('result', 'is', null)
-
-        setScoredGames((scoredGamesData ?? []) as ScoredGameRow[])
 
         // Weather
         const uniqueFieldIds = Array.from(new Set(
@@ -490,28 +476,6 @@ export default function HomePage() {
     loadData()
   }, [])
 
-  const record = useMemo(() => scoredGames.reduce(
-    (acc, g) => {
-      if (g.result === 'win') acc.wins++
-      else if (g.result === 'loss') acc.losses++
-      else if (g.result === 'tie') acc.ties++
-      return acc
-    },
-    { wins: 0, losses: 0, ties: 0 }
-  ), [scoredGames])
-
-  const leagueRecord = useMemo(() => scoredGames
-    .filter(g => g.event_type !== 'tournament')
-    .reduce(
-      (acc, g) => {
-        if (g.result === 'win') acc.wins++
-        else if (g.result === 'loss') acc.losses++
-        else if (g.result === 'tie') acc.ties++
-        return acc
-      },
-      { wins: 0, losses: 0, ties: 0 }
-    ), [scoredGames])
-
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
 
@@ -531,24 +495,6 @@ export default function HomePage() {
 
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
-
-        {/* Record bar */}
-        <div className="rounded-xl bg-white/10 border border-white/10 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
-              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                {record.wins}–{record.losses}–{record.ties}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
-              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Next Up */}
         {featuredEvent ? (
