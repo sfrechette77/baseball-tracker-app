@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
@@ -34,6 +33,8 @@ type RawEventRow = Omit<EventRow, 'fields'> & {
   fields: FieldRow | FieldRow[] | null
 }
 
+type FilterKey = 'upcoming' | 'past' | 'practices'
+
 function normalizeEvent(event: RawEventRow): EventRow {
   return { ...event, fields: normalizeFieldRelation(event.fields) }
 }
@@ -56,6 +57,18 @@ function getScoreDisplay(event: EventRow) {
   if (event.result === 'loss') return { text: `L ${high}–${low}`, className: 'text-red-400' }
   if (event.result === 'tie') return { text: `T ${team}–${opp}`, className: 'text-slate-400' }
   return { text: `${team}–${opp}`, className: 'text-slate-300' }
+}
+
+function getStartOfTodayChicago(): Date {
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric', month: 'numeric', day: 'numeric',
+  }).formatToParts(now)
+  const get = (t: string) => Number(parts.find(p => p.type === t)?.value)
+  // Start of "today" in Chicago, expressed as a UTC instant.
+  return new Date(Date.UTC(get('year'), get('month') - 1, get('day'), 5, 0, 0))
+  // Note: 5:00 UTC ≈ midnight Chicago during CDT (UTC-5). Close enough as a boundary.
 }
 
 // ─── Nav Icons ────────────────────────────────────────────────────────────────
@@ -109,7 +122,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
@@ -132,6 +145,7 @@ export default function SchedulePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [filter, setFilter] = useState<FilterKey>('upcoming')
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -153,23 +167,55 @@ export default function SchedulePage() {
     loadEvents()
   }, [])
 
-  const groupedEvents = useMemo(() => {
-    const now = new Date()
+  const filteredEvents = useMemo(() => {
+    const startOfToday = getStartOfTodayChicago()
+
+    if (filter === 'upcoming') {
+      // Games (not practices) that haven't been played yet — no score AND in the future
+      return events
+        .filter(e => e.event_type !== 'practice')
+        .filter(e => {
+          const hasScore = e.team_score !== null && e.opponent_score !== null
+          const isFuture = new Date(e.starts_at) >= startOfToday
+          return !hasScore && isFuture
+        })
+    }
+
+    if (filter === 'past') {
+      // Any game with a final score, newest first
+      return events
+        .filter(e => e.event_type !== 'practice')
+        .filter(e => e.team_score !== null && e.opponent_score !== null)
+        .slice()
+        .reverse()
+    }
+
+    // practices — chronological, upcoming first then past
     return events
-      .filter(event => {
-        const isPractice = event.event_type === 'practice'
-        const isPast = new Date(event.starts_at) < now
-        return !(isPractice && isPast)
+      .filter(e => e.event_type === 'practice')
+      .slice()
+      .sort((a, b) => {
+        const aTime = new Date(a.starts_at).getTime()
+        const bTime = new Date(b.starts_at).getTime()
+        const nowMs = Date.now()
+        const aFuture = aTime >= nowMs
+        const bFuture = bTime >= nowMs
+        if (aFuture && !bFuture) return -1
+        if (!aFuture && bFuture) return 1
+        return aTime - bTime
       })
-      .reduce<Record<string, EventRow[]>>((groups, event) => {
-        const dateKey = new Intl.DateTimeFormat('en-US', {
-          timeZone: APP_TIME_ZONE, year: 'numeric', month: 'long', day: 'numeric'
-        }).format(new Date(event.starts_at))
-        if (!groups[dateKey]) groups[dateKey] = []
-        groups[dateKey].push(event)
-        return groups
-      }, {})
-  }, [events])
+  }, [events, filter])
+
+  const groupedEvents = useMemo(() => {
+    return filteredEvents.reduce<Record<string, EventRow[]>>((groups, event) => {
+      const dateKey = new Intl.DateTimeFormat('en-US', {
+        timeZone: APP_TIME_ZONE, year: 'numeric', month: 'long', day: 'numeric'
+      }).format(new Date(event.starts_at))
+      if (!groups[dateKey]) groups[dateKey] = []
+      groups[dateKey].push(event)
+      return groups
+    }, {})
+  }, [filteredEvents])
 
   const record = useMemo(() => events.reduce(
     (acc, e) => {
@@ -215,27 +261,28 @@ export default function SchedulePage() {
     )
   }
 
-  return (
-    <main className="min-h-screen bg-black pb-24 text-white">
+  const filters: { key: FilterKey; label: string }[] = [
+    { key: 'upcoming', label: 'Upcoming' },
+    { key: 'past', label: 'Past' },
+    { key: 'practices', label: 'Practices' },
+  ]
 
-      {/* Header — logo and title only */}
-      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
-        <div className="relative mx-auto max-w-sm">
-          <div className="flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">Full Schedule</h1>
-              <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
-            </div>
-          </div>
-        </div>
+  const emptyMessage = {
+    upcoming: 'No upcoming games scheduled.',
+    past: 'No completed games yet.',
+    practices: 'No practices scheduled.',
+  }[filter]
+
+  return (
+    <main className="min-h-screen bg-black pb-32 text-white">
+
+      {/* Page title */}
+      <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+        <h1 className="text-2xl font-extrabold text-white">2026 Schedule</h1>
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-2">
 
         {/* Record strip */}
         <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
@@ -267,10 +314,30 @@ export default function SchedulePage() {
           </div>
         </div>
 
+        {/* Filter chips */}
+        <div className="flex gap-2">
+          {filters.map(f => {
+            const isActive = filter === f.key
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                  isActive
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                {f.label}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Event list */}
         {Object.keys(groupedEvents).length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-400">No scheduled events.</p>
+            <p className="text-sm text-slate-400">{emptyMessage}</p>
           </div>
         ) : (
           Object.entries(groupedEvents).map(([dateLabel, dayEvents]) => (
@@ -286,21 +353,21 @@ export default function SchedulePage() {
                   <Link key={event.id} href={`/event/${event.id}`}
                     className="block rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10">
                     <div className="min-w-0">
-                        {event.opponent && event.event_type !== 'practice' ? (
-                          <>
-                            <p className="font-bold text-white truncate">vs {event.opponent}</p>
-                            <p className="mt-1 text-xs text-slate-500 truncate">{event.title}</p>
-                          </>
-                        ) : (
-                          <p className="font-bold text-white truncate">{event.title}</p>
-                        )}
-                        <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-                        {score && (
-                          <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>
-                        )}
-                        {field?.name && (
-                          <p className="mt-1 text-xs text-slate-500">📍 {field.name}</p>
-                        )}
+                      {event.opponent && event.event_type !== 'practice' ? (
+                        <>
+                          <p className="font-bold text-white truncate">vs {event.opponent}</p>
+                          <p className="mt-1 text-xs text-slate-500 truncate">{event.title}</p>
+                        </>
+                      ) : (
+                        <p className="font-bold text-white truncate">{event.title}</p>
+                      )}
+                      <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
+                      {score && (
+                        <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>
+                      )}
+                      {field?.name && (
+                        <p className="mt-1 text-xs text-slate-500">📍 {field.name}</p>
+                      )}
                     </div>
                   </Link>
                 )
