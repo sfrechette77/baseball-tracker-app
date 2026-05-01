@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -94,7 +93,7 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
     { href: '/roster', label: 'Roster', key: 'roster', Icon: RosterIcon },
   ] as const
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto grid max-w-sm grid-cols-5">
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
@@ -123,12 +122,10 @@ export default function StatsPage() {
     const load = async () => {
       try {
         const supabase = createClient()
-
         const [{ data: playerData }, { data: statData }] = await Promise.all([
           supabase.from('players').select('id, name, jersey_number, position').order('jersey_number', { ascending: true }),
           supabase.from('player_stats').select('player_id, at_bats, hits, rbi, runs, strikeouts')
         ])
-
         setPlayers((playerData ?? []) as Player[])
         setStats((statData ?? []) as StatRow[])
       } catch (err) {
@@ -168,7 +165,6 @@ export default function StatsPage() {
     })
   }, [playersWithStats, sortBy])
 
-  // Team totals
   const teamTotals = useMemo(() => {
     return playersWithStats.reduce(
       (acc, p) => ({
@@ -185,7 +181,7 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
           <p className="text-slate-400 text-sm">Loading stats...</p>
@@ -194,36 +190,32 @@ export default function StatsPage() {
     )
   }
 
-  return (
-    <main className="min-h-screen bg-black pb-24 text-white">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
-        <div className="relative mx-auto max-w-sm">
-          <div className="flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" priority />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
-              <h1 className="text-xl font-extrabold leading-tight text-white">Batting Stats</h1>
-              <p className="text-sm text-slate-400">Chicago Elite 11U · Moore</p>
-            </div>
-          </div>
+  // Sort key → which column to highlight in the table
+  const highlightedCol: 'avg' | 'hits' | 'rbi' | 'runs' = sortBy
 
-          {/* Team batting summary */}
-          <div className="mt-5 grid grid-cols-5 gap-2">
-            {[
-              { label: 'Team AVG', value: teamAvg },
-              { label: 'Hits', value: teamTotals.hits },
-              { label: 'RBI', value: teamTotals.rbi },
-              { label: 'Runs', value: teamTotals.runs },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl bg-white/10 p-2 text-center border border-white/10">
-                <p className="text-lg font-extrabold text-white">{value}</p>
-                <p className="text-[9px] uppercase tracking-wide text-slate-400 leading-tight">{label}</p>
-              </div>
-            ))}
-          </div>
+  return (
+    <main className="min-h-screen bg-black pb-32 text-white">
+
+      {/* Page title */}
+      <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
+      </div>
+
+      {/* Team summary tiles */}
+      <div className="mx-auto max-w-sm px-4 pt-4">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { label: 'Team AVG', value: teamAvg },
+            { label: 'Hits', value: teamTotals.hits },
+            { label: 'RBI', value: teamTotals.rbi },
+            { label: 'Runs', value: teamTotals.runs },
+          ].map(({ label, value }) => (
+            <div key={label} className="rounded-xl bg-white/5 border border-white/10 p-2 text-center">
+              <p className="text-lg font-extrabold text-white tabular-nums">{value}</p>
+              <p className="text-[9px] uppercase tracking-wide text-slate-400 leading-tight mt-0.5">{label}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -233,7 +225,7 @@ export default function StatsPage() {
         <div className="flex gap-2">
           {(['avg', 'hits', 'rbi', 'runs'] as const).map(key => (
             <button key={key} onClick={() => setSortBy(key)}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
+              className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
                 sortBy === key ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'
               }`}>
               {key === 'avg' ? 'AVG' : key.toUpperCase()}
@@ -241,63 +233,52 @@ export default function StatsPage() {
           ))}
         </div>
 
-        {/* Stats table header */}
+        {/* Stats table */}
         {players.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
             <p className="text-slate-400 text-sm">No players added yet.</p>
-            <p className="text-slate-500 text-xs mt-1">Add players in your Supabase dashboard, then enter stats per game.</p>
           </div>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-            {/* Scrollable table wrapper */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="py-2 pl-4 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold w-8">#</th>
-                    <th className="py-2 pr-2 text-left text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                    {(['AVG', 'AB', 'H', 'RBI', 'R'] as const).map(col => (
-                      <th key={col} className="py-2 px-3 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{col}</th>
-                    ))}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-2 pl-4 pr-2 text-left text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
+                  <th className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-12 ${highlightedCol === 'avg' ? 'text-red-400' : 'text-slate-500'}`}>AVG</th>
+                  <th className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${highlightedCol === 'hits' ? 'text-red-400' : 'text-slate-500'}`}>H</th>
+                  <th className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${highlightedCol === 'rbi' ? 'text-red-400' : 'text-slate-500'}`}>RBI</th>
+                  <th className={`py-2 pl-2 pr-4 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${highlightedCol === 'runs' ? 'text-red-400' : 'text-slate-500'}`}>R</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {sortedPlayers.map((player, i) => (
+                  <tr key={player.id} className={i === 0 ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
+                    <td className="py-3 pl-4 pr-2">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xs text-slate-500 tabular-nums">
+                          {player.jersey_number ?? '—'}
+                        </span>
+                        <span className="text-sm text-slate-300">{player.name}</span>
+                      </div>
+                    </td>
+                    <td className={`py-3 px-2 text-center tabular-nums ${highlightedCol === 'avg' ? 'text-red-400 font-bold' : 'text-slate-300'}`}>
+                      {player.avg}
+                    </td>
+                    <td className={`py-3 px-2 text-center tabular-nums ${highlightedCol === 'hits' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                      {player.hits}
+                    </td>
+                    <td className={`py-3 px-2 text-center tabular-nums ${highlightedCol === 'rbi' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                      {player.rbi}
+                    </td>
+                    <td className={`py-3 pl-2 pr-4 text-center tabular-nums ${highlightedCol === 'runs' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                      {player.runs}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {sortedPlayers.map((player, i) => (
-                    <tr key={player.id} className={i === 0 ? 'bg-red-600/10' : ''}>
-                      <td className="py-3 pl-4 pr-2 text-xs text-slate-500 tabular-nums">
-                        {player.jersey_number ?? '—'}
-                      </td>
-                      <td className="py-3 pr-2">
-                        <div className="flex items-center gap-1">
-                          <span className="font-bold text-white whitespace-nowrap">{player.name}</span>
-                        </div>
-                      </td>
-                      <td className={`py-3 px-3 text-center tabular-nums font-bold ${sortBy === 'avg' ? 'text-red-400' : 'text-white'}`}>
-                        {player.avg}
-                      </td>
-                      <td className="py-3 px-3 text-center tabular-nums text-slate-400">
-                        {player.at_bats}
-                      </td>
-                      <td className={`py-3 px-3 text-center tabular-nums ${sortBy === 'hits' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                        {player.hits}
-                      </td>
-                      <td className={`py-3 px-3 text-center tabular-nums ${sortBy === 'rbi' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                        {player.rbi}
-                      </td>
-                      <td className={`py-3 px-3 text-center tabular-nums ${sortBy === 'runs' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                        {player.runs}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-
-        <p className="text-center text-xs text-slate-600 pb-2">
-          Enter stats per game in your Supabase dashboard under player_stats
-        </p>
       </div>
 
       <BottomNav active="stats" />
