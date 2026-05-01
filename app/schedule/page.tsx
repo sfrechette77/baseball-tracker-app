@@ -287,7 +287,7 @@ export default function SchedulePage() {
 
         {/* Record strip */}
         <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-around text-center">
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Winning %</p>
               <p className="text-base font-bold text-white tabular-nums mt-1">
@@ -298,19 +298,17 @@ export default function SchedulePage() {
                 })()}
               </p>
             </div>
-            <div className="flex gap-6 text-right">
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Overall</p>
-                <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
-                  {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">League</p>
-                <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
-                  {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
-                </p>
-              </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Overall</p>
+              <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
+                {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">League</p>
+              <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
+                {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
+              </p>
             </div>
           </div>
         </div>
