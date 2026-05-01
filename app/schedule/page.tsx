@@ -301,7 +301,6 @@ export default function SchedulePage() {
                         {field?.name && (
                           <p className="mt-1 text-xs text-slate-500">📍 {field.name}</p>
                         )}
-                      </div>
                     </div>
                   </Link>
                 )
