@@ -46,19 +46,6 @@ function formatChicagoDateTime(date: Date) {
   }).format(date)
 }
 
-function formatStatus(status: string) {
-  if (!status) return 'Unknown'
-  return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-}
-
-function getStatusClasses(status: string) {
-  const n = status.toLowerCase()
-  if (n.includes('cancel')) return 'bg-red-500/20 text-red-400 border-red-500/30'
-  if (n.includes('postpon')) return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-  if (n.includes('complete') || n.includes('final')) return 'bg-green-500/20 text-green-400 border-green-500/30'
-  return 'bg-white/10 text-slate-300 border-white/20'
-}
-
 function getScoreDisplay(event: EventRow) {
   if (event.team_score === null || event.opponent_score === null) return null
   const team = event.team_score
@@ -250,20 +237,32 @@ export default function SchedulePage() {
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
 
-        {/* Record bar */}
-        <div className="rounded-xl bg-white/10 border border-white/10 px-4 py-3">
-          <div className="flex items-center justify-between">
+        {/* Record strip */}
+        <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Overall</p>
-              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                {record.wins}–{record.losses}–{record.ties}
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Winning %</p>
+              <p className="text-3xl font-extrabold text-white tabular-nums leading-none mt-1">
+                {(() => {
+                  const total = record.wins + record.losses + record.ties
+                  if (total === 0) return '—'
+                  return ((record.wins + record.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
+                })()}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">League</p>
-              <p className="text-2xl font-extrabold text-slate-300 tabular-nums">
-                {leagueRecord.wins}–{leagueRecord.losses}–{leagueRecord.ties}
-              </p>
+            <div className="flex gap-6 text-right">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Overall</p>
+                <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
+                  {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">League</p>
+                <p className="text-base font-bold text-slate-300 tabular-nums mt-1">
+                  {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -286,13 +285,16 @@ export default function SchedulePage() {
                 return (
                   <Link key={event.id} href={`/event/${event.id}`}
                     className="block rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-bold text-white truncate">{event.title}</p>
-                        <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-                        {event.opponent && event.event_type !== 'practice' && (
-                          <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
+                    <div className="min-w-0">
+                        {event.opponent && event.event_type !== 'practice' ? (
+                          <>
+                            <p className="font-bold text-white truncate">vs {event.opponent}</p>
+                            <p className="mt-1 text-xs text-slate-500 truncate">{event.title}</p>
+                          </>
+                        ) : (
+                          <p className="font-bold text-white truncate">{event.title}</p>
                         )}
+                        <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
                         {score && (
                           <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>
                         )}
@@ -300,9 +302,6 @@ export default function SchedulePage() {
                           <p className="mt-1 text-xs text-slate-500">📍 {field.name}</p>
                         )}
                       </div>
-                      <span className={`flex-shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(event.status)}`}>
-                        {formatStatus(event.status)}
-                      </span>
                     </div>
                   </Link>
                 )
