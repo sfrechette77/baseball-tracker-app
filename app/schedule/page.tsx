@@ -66,9 +66,7 @@ function getStartOfTodayChicago(): Date {
     year: 'numeric', month: 'numeric', day: 'numeric',
   }).formatToParts(now)
   const get = (t: string) => Number(parts.find(p => p.type === t)?.value)
-  // Start of "today" in Chicago, expressed as a UTC instant.
   return new Date(Date.UTC(get('year'), get('month') - 1, get('day'), 5, 0, 0))
-  // Note: 5:00 UTC ≈ midnight Chicago during CDT (UTC-5). Close enough as a boundary.
 }
 
 // ─── Nav Icons ────────────────────────────────────────────────────────────────
@@ -171,7 +169,6 @@ export default function SchedulePage() {
     const startOfToday = getStartOfTodayChicago()
 
     if (filter === 'upcoming') {
-      // Games (not practices) that haven't been played yet — no score AND in the future
       return events
         .filter(e => e.event_type !== 'practice')
         .filter(e => {
@@ -182,7 +179,6 @@ export default function SchedulePage() {
     }
 
     if (filter === 'past') {
-      // Any game with a final score, newest first
       return events
         .filter(e => e.event_type !== 'practice')
         .filter(e => e.team_score !== null && e.opponent_score !== null)
@@ -190,7 +186,6 @@ export default function SchedulePage() {
         .reverse()
     }
 
-    // practices — chronological, upcoming first then past
     return events
       .filter(e => e.event_type === 'practice')
       .slice()
@@ -273,56 +268,38 @@ export default function SchedulePage() {
     practices: 'No practices scheduled.',
   }[filter]
 
+  const winPct = (() => {
+    const total = record.wins + record.losses + record.ties
+    if (total === 0) return '—'
+    return ((record.wins + record.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
+  })()
+
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
-      {/* Page title with record */}
+      {/* Page title with record subtitle */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
 
         <p className="mt-3 text-xs text-slate-400 tabular-nums">
           <span className="text-slate-500">PCT </span>
-          <span className="text-white font-semibold">
-            {/* ... */}
+          <span className="text-white font-semibold">{winPct}</span>
+          <span className="mx-2 text-slate-700">·</span>
+          <span className="text-slate-500">Overall </span>
+          <span className="text-slate-300 font-semibold">
+            {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
           </span>
-          {/* ... rest of the spans ... */}
+          <span className="mx-2 text-slate-700">·</span>
+          <span className="text-slate-500">League </span>
+          <span className="text-slate-300 font-semibold">
+            {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
+          </span>
         </p>
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-2">
-
-      {/* Content */}
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-2">
-
-        {/* Record strip */}
-        <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-          <div className="flex items-center justify-around text-center">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Winning %</p>
-              <p className="text-2x1 font-bold text-white tabular-nums mt-1">
-                {(() => {
-                  const total = record.wins + record.losses + record.ties
-                  if (total === 0) return '—'
-                  return ((record.wins + record.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
-                })()}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Overall</p>
-              <p className="text-2x1 font-bold text-slate-300 tabular-nums mt-1">
-                {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">League</p>
-              <p className="text-2x1 font-bold text-slate-300 tabular-nums mt-1">
-                {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
 
         {/* Filter chips */}
         <div className="flex gap-2">
