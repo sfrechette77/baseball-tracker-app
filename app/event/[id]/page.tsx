@@ -349,61 +349,53 @@ export default function EventPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {event.is_home ? (
-                    <>
-                      {themRow && (
-                        <tr>
-                          <td className="py-3 pl-4 pr-2 text-xs font-semibold text-slate-400 truncate max-w-[80px]">
-                            {event.opponent ?? 'Opp'}
-                          </td>
-                          {INNINGS.map(i => (
-                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-400">
-                              {getInningRuns(themRow, i)}
+                  {(() => {
+                    // Home team always on bottom (baseball convention)
+                    const usIsHome = event.is_home === true
+                    const topRow = usIsHome ? themRow : usRow
+                    const bottomRow = usIsHome ? usRow : themRow
+                    const topIsUs = !usIsHome
+                    const bottomIsUs = usIsHome
+
+                    return (
+                      <>
+                        {topRow && (
+                          <tr className={topIsUs ? 'bg-red-600/5' : ''}>
+                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[80px]">
+                              {topIsUs
+                                ? <span className="font-bold text-white">Elite</span>
+                                : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
                             </td>
-                          ))}
-                          <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-300">{getTotalRuns(themRow)}</td>
-                        </tr>
-                      )}
-                      {usRow && (
-                        <tr className="bg-red-600/5">
-                          <td className="py-3 pl-4 pr-2 text-xs font-bold text-white">Elite</td>
-                          {INNINGS.map(i => (
-                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-300">
-                              {getInningRuns(usRow, i)}
+                            {INNINGS.map(i => (
+                              <td key={i} className={`py-3 px-2 text-center tabular-nums ${topIsUs ? 'text-slate-300' : 'text-slate-400'}`}>
+                                {getInningRuns(topRow, i)}
+                              </td>
+                            ))}
+                            <td className={`py-3 px-3 text-center tabular-nums font-bold ${topIsUs ? 'text-white' : 'text-slate-300'}`}>
+                              {getTotalRuns(topRow)}
                             </td>
-                          ))}
-                          <td className="py-3 px-3 text-center tabular-nums font-bold text-white">{getTotalRuns(usRow)}</td>
-                        </tr>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {usRow && (
-                        <tr className="bg-red-600/5">
-                          <td className="py-3 pl-4 pr-2 text-xs font-bold text-white">Elite</td>
-                          {INNINGS.map(i => (
-                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-300">
-                              {getInningRuns(usRow, i)}
+                          </tr>
+                        )}
+                        {bottomRow && (
+                          <tr className={bottomIsUs ? 'bg-red-600/5' : ''}>
+                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[80px]">
+                              {bottomIsUs
+                                ? <span className="font-bold text-white">Elite</span>
+                                : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
                             </td>
-                          ))}
-                          <td className="py-3 px-3 text-center tabular-nums font-bold text-white">{getTotalRuns(usRow)}</td>
-                        </tr>
-                      )}
-                      {themRow && (
-                        <tr>
-                          <td className="py-3 pl-4 pr-2 text-xs font-semibold text-slate-400 truncate max-w-[80px]">
-                            {event.opponent ?? 'Opp'}
-                          </td>
-                          {INNINGS.map(i => (
-                            <td key={i} className="py-3 px-2 text-center tabular-nums text-slate-400">
-                              {getInningRuns(themRow, i)}
+                            {INNINGS.map(i => (
+                              <td key={i} className={`py-3 px-2 text-center tabular-nums ${bottomIsUs ? 'text-slate-300' : 'text-slate-400'}`}>
+                                {getInningRuns(bottomRow, i)}
+                              </td>
+                            ))}
+                            <td className={`py-3 px-3 text-center tabular-nums font-bold ${bottomIsUs ? 'text-white' : 'text-slate-300'}`}>
+                              {getTotalRuns(bottomRow)}
                             </td>
-                          ))}
-                          <td className="py-3 px-3 text-center tabular-nums font-bold text-slate-300">{getTotalRuns(themRow)}</td>
-                        </tr>
-                      )}
-                    </>
-                  )}
+                          </tr>
+                        )}
+                      </>
+                    )
+                  })()}
                 </tbody>
               </table>
             </div>
