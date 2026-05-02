@@ -117,9 +117,6 @@ export default function AdminPage() {
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
   const [selectedEventId, setSelectedEventId] = useState('')
-  const [teamScore, setTeamScore] = useState('')
-  const [opponentScore, setOpponentScore] = useState('')
-  const [result, setResult] = useState<'win' | 'loss' | 'tie'>('win')
   const [isHome, setIsHome] = useState(false)
   const [usInnings, setUsInnings] = useState<number[]>(Array(7).fill(0))
   const [themInnings, setThemInnings] = useState<number[]>(Array(7).fill(0))
@@ -165,17 +162,23 @@ export default function AdminPage() {
     load()
   }, [password])
 
-  // Load existing box scores when score event changes
+  // Load existing box scores AND is_home when score event changes
   useEffect(() => {
     if (!selectedEventId || !password) return
     const load = async () => {
       const supabase = createClient()
-      const { data } = await supabase.from('box_scores').select('*').eq('event_id', selectedEventId)
-      if (data) {
-        const us = data.find((r: { team: string }) => r.team === 'us')
-        const them = data.find((r: { team: string }) => r.team === 'them')
+      const [{ data: boxData }, { data: eventData }] = await Promise.all([
+        supabase.from('box_scores').select('*').eq('event_id', selectedEventId),
+        supabase.from('events').select('is_home').eq('id', selectedEventId).single(),
+      ])
+      if (boxData) {
+        const us = boxData.find((r: { team: string }) => r.team === 'us')
+        const them = boxData.find((r: { team: string }) => r.team === 'them')
         if (us) setUsInnings(INNINGS.map(i => us[`inning_${i}`] ?? 0))
         if (them) setThemInnings(INNINGS.map(i => them[`inning_${i}`] ?? 0))
+      }
+      if (eventData?.is_home !== undefined && eventData.is_home !== null) {
+        setIsHome(eventData.is_home)
       }
     }
     load()
@@ -214,13 +217,22 @@ export default function AdminPage() {
     if (!selectedEventId) return
     setScoreSaving(true)
     setScoreMsg(null)
-    await api({ action: 'update_score', eventId: selectedEventId, teamScore: Number(teamScore), opponentScore: Number(opponentScore), result, isHome })
-    await api({ action: 'update_box_score', eventId: selectedEventId, team: 'us', innings: usInnings })
-    await api({ action: 'update_box_score', eventId: selectedEventId, team: 'them', innings: themInnings })
+    const res = await api({
+      action: 'save_game',
+      eventId: selectedEventId,
+      usInnings,
+      themInnings,
+      isHome,
+    })
     setScoreSaving(false)
-    setScoreMsg('✅ Saved!')
+    if (res?.error) {
+      setScoreMsg(`❌ ${res.error}`)
+    } else if (res?.ok) {
+      setScoreMsg(`✅ Saved! ${res.teamScore}–${res.opponentScore} ${res.result}`)
+    } else {
+      setScoreMsg('❌ Save failed (unknown error)')
+    }
   }
-
   const saveStats = async () => {
     if (!statsEventId) return
     setStatsSaving(true)
@@ -306,12 +318,6 @@ export default function AdminPage() {
                 setUsInnings(Array(7).fill(0))
                 setThemInnings(Array(7).fill(0))
                 setIsHome(false)
-                const ev = events.find(ev => ev.id === e.target.value)
-                if (ev) {
-                  setTeamScore(ev.team_score?.toString() ?? '')
-                  setOpponentScore(ev.opponent_score?.toString() ?? '')
-                  setResult((ev.result as 'win' | 'loss' | 'tie') ?? 'win')
-                }
               }}
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
                 <option value="">— Pick a game —</option>
@@ -330,18 +336,28 @@ export default function AdminPage() {
                   <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
                     Final Score — {selectedEvent?.opponent ? `vs ${selectedEvent.opponent}` : selectedEvent?.title}
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1">Our Score</p>
-                      <input type="number" value={teamScore} onChange={e => setTeamScore(e.target.value)}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-2xl font-bold text-white text-center focus:outline-none focus:border-red-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1">Their Score</p>
-                      <input type="number" value={opponentScore} onChange={e => setOpponentScore(e.target.value)}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-2xl font-bold text-white text-center focus:outline-none focus:border-red-500" />
-                    </div>
-                  </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+                    <p className="text-xs text-slate-400 mb-1">Final Score (auto-calculated)</p>
+                    <p className="text-3xl font-extrabold tabular-nums">
+                      <span className={usTotal > themTotal ? 'text-green-400' : usTotal < themTotal ? 'text-red-400' : 'text-slate-300'}>
+                        {usTotal}
+                      </span>
+                      <span className="text-slate-600 mx-3">–</span>
+                      <span className={themTotal > usTotal ? 'text-green-400' : themTotal < usTotal ? 'text-red-400' : 'text-slate-300'}>
+                        {themTotal}
+                      </span>
+                    </p>
+                    <p className="text-xs mt-2 font-bold uppercase tracking-wide">
+                      {usTotal === themTotal && usTotal === 0 ? (
+                        <span className="text-slate-600">Enter inning runs below</span>
+                      ) : usTotal > themTotal ? (
+                        <span className="text-green-400">Win</span>
+                      ) : usTotal < themTotal ? (
+                        <span className="text-red-400">Loss</span>
+                      ) : (
+                        <span className="text-slate-400">Tie</span>
+                      )}
+                    </p>
                   <div>
                     <p className="text-xs text-slate-400 mb-2">Result</p>
                     <div className="grid grid-cols-3 gap-2">
