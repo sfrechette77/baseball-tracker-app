@@ -276,11 +276,22 @@ export default function SchedulePage() {
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
-      {/* Page title */}
+      {/* Page title with record */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
+
+        <p className="mt-3 text-xs text-slate-400 tabular-nums">
+          <span className="text-slate-500">PCT </span>
+          <span className="text-white font-semibold">
+            {/* ... */}
+          </span>
+          {/* ... rest of the spans ... */}
+        </p>
       </div>
+
+      {/* Content */}
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-2">
 
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-2">
