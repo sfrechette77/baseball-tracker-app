@@ -358,18 +358,6 @@ export default function AdminPage() {
                         <span className="text-slate-400">Tie</span>
                       )}
                     </p>
-                  <div>
-                    <p className="text-xs text-slate-400 mb-2">Result</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['win', 'loss', 'tie'] as const).map(r => (
-                        <button key={r} onClick={() => setResult(r)}
-                          className={`rounded-xl py-3 text-sm font-bold transition ${result === r
-                            ? r === 'win' ? 'bg-green-600 text-white' : r === 'loss' ? 'bg-red-600 text-white' : 'bg-slate-600 text-white'
-                            : 'bg-white/10 text-slate-400'}`}>
-                          {r === 'win' ? 'W' : r === 'loss' ? 'L' : 'T'}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                   <div>
                     <p className="text-xs text-slate-400 mb-2">Game Location</p>
