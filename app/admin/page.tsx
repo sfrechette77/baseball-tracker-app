@@ -57,7 +57,30 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'score' | 'stats' | 'standings'
+type Tab = 'score' | 'stats' | 'events' | 'standings'
+
+type Field = {
+  id: string
+  name: string
+}
+
+type EventListRow = {
+  id: string
+  title: string
+  opponent: string | null
+  event_type: string | null
+  starts_at: string
+  field_id: string | null
+  is_home: boolean | null
+  travel_minutes: number | null
+  travel_miles: number | null
+  notes: string | null
+  gear_notes: string | null
+  status: string
+  team_score: number | null
+}
+
+type EventFilter = 'upcoming' | 'past' | 'all'
 
 function formatDate(dateStr: string) {
   return new Intl.DateTimeFormat('en-US', {
@@ -136,30 +159,57 @@ export default function AdminPage() {
   const [standingsSaving, setStandingsSaving] = useState(false)
   const [standingsMsg, setStandingsMsg] = useState<string | null>(null)
 
+  // Events tab
+  const [allEvents, setAllEvents] = useState<EventListRow[]>([])
+  const [fields, setFields] = useState<Field[]>([])
+  const [eventFilter, setEventFilter] = useState<EventFilter>('upcoming')
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [formMode, setFormMode] = useState<'none' | 'game' | 'practice'>('none')
+  const [eventForm, setEventForm] = useState({
+    title: '', opponent: '', eventType: 'game' as 'game' | 'tournament' | 'practice',
+    startsAt: '', fieldId: '', isHome: false,
+    travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
+  })
+  const [eventSaving, setEventSaving] = useState(false)
+  const [eventMsg, setEventMsg] = useState<string | null>(null)
+
   useEffect(() => {
     const saved = localStorage.getItem(PASSWORD_KEY)
     if (saved) setPassword(saved)
   }, [])
 
+  const reloadEvents = async () => {
+    const supabase = createClient()
+    const [{ data: eventsForScore }, { data: allEventsData }] = await Promise.all([
+      supabase.from('events').select('id, title, opponent, starts_at, event_type, team_score, opponent_score, result')
+        .neq('event_type', 'practice').order('starts_at', { ascending: false }),
+      supabase.from('events').select('id, title, opponent, event_type, starts_at, field_id, is_home, travel_minutes, travel_miles, notes, gear_notes, status, team_score')
+        .order('starts_at', { ascending: false }),
+    ])
+    setEvents((eventsForScore ?? []) as EventRow[])
+    setAllEvents((allEventsData ?? []) as EventListRow[])
+  }
+
   useEffect(() => {
     if (!password) return
     const load = async () => {
       const supabase = createClient()
-      const [{ data: eventsData }, { data: playersData }, { data: standingsData }] = await Promise.all([
-        supabase.from('events').select('id, title, opponent, starts_at, event_type, team_score, opponent_score, result')
-          .neq('event_type', 'practice').order('starts_at', { ascending: false }),
+      const [{ data: playersData }, { data: standingsData }, { data: fieldsData }] = await Promise.all([
         supabase.from('players').select('id, name, jersey_number').order('jersey_number', { ascending: true }),
-        supabase.from('standings').select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against')
+        supabase.from('standings').select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against'),
+        supabase.from('fields').select('id, name').order('name', { ascending: true }),
       ])
-      setEvents((eventsData ?? []) as EventRow[])
       setPlayers((playersData ?? []) as Player[])
       const s = (standingsData ?? []) as Standing[]
       setStandings(s)
       const map: Record<string, Standing> = {}
       for (const row of s) map[row.id] = { ...row }
       setEditedStandings(map)
+      setFields((fieldsData ?? []) as Field[])
+      await reloadEvents()
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password])
 
   // Load existing box scores AND is_home when score event changes
@@ -269,6 +319,123 @@ export default function AdminPage() {
     setEditedStandings(prev => ({ ...prev, [id]: { ...prev[id], [field]: Number(value) } }))
   }
 
+  // Convert ISO timestamp from DB to value compatible with <input type="datetime-local">
+  const toDatetimeLocal = (iso: string): string => {
+    const d = new Date(iso)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  const startNewGame = () => {
+    setEditingEventId(null)
+    setFormMode('game')
+    setEventMsg(null)
+    setEventForm({
+      title: '', opponent: '', eventType: 'game', startsAt: '', fieldId: '',
+      isHome: false, travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
+    })
+  }
+
+  const startNewPractice = () => {
+    setEditingEventId(null)
+    setFormMode('practice')
+    setEventMsg(null)
+    setEventForm({
+      title: 'Practice', opponent: '', eventType: 'practice', startsAt: '', fieldId: '',
+      isHome: false, travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
+    })
+  }
+
+  const editEvent = (ev: EventListRow) => {
+    setEditingEventId(ev.id)
+    setFormMode(ev.event_type === 'practice' ? 'practice' : 'game')
+    setEventMsg(null)
+    setEventForm({
+      title: ev.title,
+      opponent: ev.opponent ?? '',
+      eventType: (ev.event_type as 'game' | 'tournament' | 'practice') ?? 'game',
+      startsAt: toDatetimeLocal(ev.starts_at),
+      fieldId: ev.field_id ?? '',
+      isHome: ev.is_home ?? false,
+      travelMinutes: ev.travel_minutes?.toString() ?? '',
+      travelMiles: ev.travel_miles?.toString() ?? '',
+      notes: ev.notes ?? '',
+      gearNotes: ev.gear_notes ?? '',
+    })
+  }
+
+  const cancelEventForm = () => {
+    setEditingEventId(null)
+    setFormMode('none')
+    setEventMsg(null)
+  }
+
+  const saveEvent = async () => {
+    if (!eventForm.title || !eventForm.startsAt) {
+      setEventMsg('❌ Title and start time are required')
+      return
+    }
+    setEventSaving(true)
+    setEventMsg(null)
+    const startsAtIso = new Date(eventForm.startsAt).toISOString()
+    const payload = {
+      title: eventForm.title,
+      opponent: formMode === 'practice' ? null : eventForm.opponent,
+      eventType: formMode === 'practice' ? 'practice' : eventForm.eventType,
+      startsAt: startsAtIso,
+      fieldId: eventForm.fieldId || null,
+      isHome: formMode === 'practice' ? false : eventForm.isHome,
+      travelMinutes: eventForm.travelMinutes ? Number(eventForm.travelMinutes) : null,
+      travelMiles: eventForm.travelMiles ? Number(eventForm.travelMiles) : null,
+      notes: eventForm.notes || null,
+      gearNotes: eventForm.gearNotes || null,
+    }
+
+    let res
+    if (editingEventId) {
+      res = await api({ action: 'update_event', eventId: editingEventId, ...payload })
+    } else if (formMode === 'practice') {
+      res = await api({ action: 'create_practice', ...payload })
+    } else {
+      res = await api({ action: 'create_event', ...payload })
+    }
+
+    setEventSaving(false)
+    if (res?.error) {
+      setEventMsg(`❌ ${res.error}`)
+    } else if (res?.ok) {
+      setEventMsg('✅ Saved!')
+      await reloadEvents()
+      setTimeout(() => { cancelEventForm() }, 700)
+    } else {
+      setEventMsg('❌ Save failed (unknown error)')
+    }
+  }
+
+  const deleteEvent = async () => {
+    if (!editingEventId) return
+    if (!confirm('Delete this event? This will also delete its box score and player stats. This cannot be undone.')) return
+    setEventSaving(true)
+    setEventMsg(null)
+    const res = await api({ action: 'delete_event', eventId: editingEventId })
+    setEventSaving(false)
+    if (res?.error) {
+      setEventMsg(`❌ ${res.error}`)
+    } else if (res?.ok) {
+      await reloadEvents()
+      cancelEventForm()
+    } else {
+      setEventMsg('❌ Delete failed')
+    }
+  }
+
+  const filteredEvents = (() => {
+    const now = new Date().getTime()
+    if (eventFilter === 'upcoming') return allEvents.filter(e => new Date(e.starts_at).getTime() >= now)
+    if (eventFilter === 'past') return allEvents.filter(e => new Date(e.starts_at).getTime() < now)
+    return allEvents
+  })()
+  
   if (!password) return <PasswordGate onSuccess={setPassword} />
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
@@ -291,10 +458,11 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-3 gap-2">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-2">
           {([
             { key: 'score', label: '🏆 Score' },
             { key: 'stats', label: '📊 Stats' },
+            { key: 'events', label: '📅 Events' },      
             { key: 'standings', label: '📋 Standings' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -497,6 +665,184 @@ export default function AdminPage() {
                 {statsMsg && <p className="text-sm text-center">{statsMsg}</p>}
               </div>
             )}
+          </>
+        )}
+
+        {/* ── Events Tab ─────────────────────────────────────────────────── */}
+        {tab === 'events' && (
+          <>
+            {/* Filter + create buttons */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                {(['upcoming', 'past', 'all'] as const).map(f => (
+                  <button key={f} onClick={() => setEventFilter(f)}
+                    className={`rounded-xl py-2 text-xs font-bold uppercase tracking-wide transition ${eventFilter === f ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={startNewGame}
+                  className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition">
+                  + Add Game
+                </button>
+                <button onClick={startNewPractice}
+                  className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition">
+                  + Add Practice
+                </button>
+              </div>
+            </div>
+
+            {/* Form */}
+            {formMode !== 'none' && (
+              <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                    {editingEventId
+                      ? `Editing ${formMode === 'practice' ? 'Practice' : 'Game'}`
+                      : `New ${formMode === 'practice' ? 'Practice' : 'Game'}`}
+                  </p>
+                  <button onClick={cancelEventForm}
+                    className="text-xs text-slate-500 hover:text-white">
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">Title</label>
+                  <input type="text" value={eventForm.title}
+                    onChange={e => setEventForm({ ...eventForm, title: e.target.value })}
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                </div>
+
+                {formMode === 'game' && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Opponent</label>
+                      <input type="text" value={eventForm.opponent}
+                        onChange={e => setEventForm({ ...eventForm, opponent: e.target.value })}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Type</label>
+                      <select value={eventForm.eventType}
+                        onChange={e => setEventForm({ ...eventForm, eventType: e.target.value as 'game' | 'tournament' })}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                        <option value="game">Game</option>
+                        <option value="tournament">Tournament</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Home / Away</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['away', 'home'] as const).map(loc => (
+                          <button key={loc} onClick={() => setEventForm({ ...eventForm, isHome: loc === 'home' })}
+                            className={`rounded-xl py-2 text-xs font-bold transition ${
+                              eventForm.isHome === (loc === 'home') ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400'
+                            }`}>
+                            {loc === 'home' ? '🏠 Home' : '✈️ Away'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">Date & Time</label>
+                  <input type="datetime-local" value={eventForm.startsAt}
+                    onChange={e => setEventForm({ ...eventForm, startsAt: e.target.value })}
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">Field</label>
+                  <select value={eventForm.fieldId}
+                    onChange={e => setEventForm({ ...eventForm, fieldId: e.target.value })}
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                    <option value="">— No field —</option>
+                    {fields.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {formMode === 'game' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Travel min</label>
+                      <input type="number" value={eventForm.travelMinutes}
+                        onChange={e => setEventForm({ ...eventForm, travelMinutes: e.target.value })}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Travel mi</label>
+                      <input type="number" value={eventForm.travelMiles}
+                        onChange={e => setEventForm({ ...eventForm, travelMiles: e.target.value })}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">Notes</label>
+                  <textarea value={eventForm.notes} rows={2}
+                    onChange={e => setEventForm({ ...eventForm, notes: e.target.value })}
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">Gear (comma separated)</label>
+                  <input type="text" value={eventForm.gearNotes}
+                    onChange={e => setEventForm({ ...eventForm, gearNotes: e.target.value })}
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                </div>
+
+                <button onClick={saveEvent} disabled={eventSaving}
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  {eventSaving ? 'Saving...' : (editingEventId ? 'Save Changes' : 'Create Event')}
+                </button>
+
+                {editingEventId && (
+                  <button onClick={deleteEvent} disabled={eventSaving}
+                    className="w-full rounded-xl border border-red-500/40 bg-transparent py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 transition disabled:opacity-50">
+                    Delete Event
+                  </button>
+                )}
+
+                {eventMsg && <p className="text-sm text-center">{eventMsg}</p>}
+              </div>
+            )}
+
+            {/* List */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-2 space-y-1">
+              {filteredEvents.length === 0 ? (
+                <p className="p-3 text-sm text-slate-500 text-center">No events.</p>
+              ) : (
+                filteredEvents.map(ev => (
+                  <button key={ev.id} onClick={() => editEvent(ev)}
+                    className={`w-full text-left rounded-xl px-3 py-2 transition ${editingEventId === ev.id ? 'bg-red-500/20' : 'hover:bg-white/10'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">
+                          {ev.event_type === 'practice'
+                            ? '🏋️ ' + ev.title
+                            : ev.opponent ? `vs ${ev.opponent}` : ev.title}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {formatDate(ev.starts_at)}
+                          {ev.team_score !== null && ' · final'}
+                          {ev.event_type === 'tournament' && ' · 🏆'}
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-600">›</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </>
         )}
 
