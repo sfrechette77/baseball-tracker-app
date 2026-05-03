@@ -106,6 +106,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, id: data.id })
     }
 
+    // ── Update display status (and write to log) atomically ────────────────
+    if (action === 'update_game_status') {
+      const { eventId, displayStatus, message, changedBy } = body
+      if (!eventId || !displayStatus) {
+        return NextResponse.json({ error: 'Missing eventId or displayStatus' }, { status: 400 })
+      }
+      if (!['on', 'watching', 'off'].includes(displayStatus)) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+      }
+
+      // Read current status so we can record it as old_status in the log
+      const { data: current, error: readError } = await supabase
+        .from('events')
+        .select('display_status')
+        .eq('id', eventId)
+        .single()
+      if (readError) {
+        return NextResponse.json({ error: `Could not read event: ${readError.message}` }, { status: 500 })
+      }
+
+      const now = new Date().toISOString()
+
+      // Update event
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({
+          display_status: displayStatus,
+          status_message: message || null,
+          status_updated_at: now,
+          status_updated_by: changedBy || 'Admin',
+        })
+        .eq('id', eventId)
+      if (updateError) {
+        return NextResponse.json({ error: `Failed updating event: ${updateError.message}` }, { status: 500 })
+      }
+
+      // Append to log
+      const { error: logError } = await supabase
+        .from('game_status_log')
+        .insert({
+          event_id: eventId,
+          old_status: current?.display_status ?? null,
+          new_status: displayStatus,
+          message: message || null,
+          changed_by: changedBy || 'Admin',
+        })
+      if (logError) {
+        // The update succeeded but log failed — return a soft warning, not a hard error
+        return NextResponse.json({
+          ok: true,
+          warning: `Status saved but log failed: ${logError.message}`,
+        })
+      }
+
+      return NextResponse.json({ ok: true })
+    }
+
     // ── Create a new practice ───────────────────────────────────────────────
     if (action === 'create_practice') {
       const { title, startsAt, fieldId, notes, gearNotes } = body
