@@ -27,6 +27,7 @@ type EventRow = {
   opponent_score: number | null
   result: string | null
   fields: FieldRow[] | null
+  display_status: string | null
 }
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
@@ -152,7 +153,7 @@ export default function SchedulePage() {
         const { data, error } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status,
-            team_score, opponent_score, result, fields (name)`)
+            team_score, opponent_score, result, display_status, fields (name)`)
           .order('starts_at', { ascending: true })
         if (error) setErrorMessage(error.message)
         else setEvents(((data ?? []) as RawEventRow[]).map(normalizeEvent))
@@ -349,6 +350,17 @@ export default function SchedulePage() {
                         <p className="font-bold text-white truncate">{event.title}</p>
                       )}
                       <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
+                      {event.display_status && (
+                        <p className={`mt-1 text-xs font-bold uppercase tracking-wide ${
+                          event.display_status === 'on' ? 'text-green-400' :
+                          event.display_status === 'watching' ? 'text-amber-400' :
+                          'text-red-400'
+                        }`}>
+                          {event.display_status === 'on' ? '🟢 Game On' :
+                           event.display_status === 'watching' ? '🟡 Watching' :
+                           '🔴 Game Off'}
+                        </p>
+                      )}
                       {score && (
                         <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>
                       )}
