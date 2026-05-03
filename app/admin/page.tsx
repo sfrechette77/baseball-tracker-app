@@ -57,7 +57,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'score' | 'stats' | 'events' | 'standings'
+type Tab = 'status' |'score' | 'stats' | 'events' | 'standings'
 
 type Field = {
   id: string
@@ -135,7 +135,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
 
 export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('score')
+  const [tab, setTab] = useState<Tab>('status')
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -158,6 +158,16 @@ export default function AdminPage() {
   const [editedStandings, setEditedStandings] = useState<Record<string, Standing>>({})
   const [standingsSaving, setStandingsSaving] = useState(false)
   const [standingsMsg, setStandingsMsg] = useState<string | null>(null)
+
+  // Status
+  const [statusEventId, setStatusEventId] = useState('')
+  const [currentDisplayStatus, setCurrentDisplayStatus] = useState<'on' | 'watching' | 'off' | null>(null)
+  const [currentMessage, setCurrentMessage] = useState('')
+  const [currentUpdatedAt, setCurrentUpdatedAt] = useState<string | null>(null)
+  const [statusDraftStatus, setStatusDraftStatus] = useState<'on' | 'watching' | 'off' | null>(null)
+  const [statusDraftMessage, setStatusDraftMessage] = useState('')
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
@@ -234,6 +244,28 @@ export default function AdminPage() {
     load()
   }, [selectedEventId, password])
 
+  // Load existing status when status event changes
+  useEffect(() => {
+    if (!statusEventId || !password) return
+    const load = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('events')
+        .select('display_status, status_message, status_updated_at')
+        .eq('id', statusEventId)
+        .single()
+      if (data) {
+        const ds = (data.display_status as 'on' | 'watching' | 'off' | null) ?? null
+        setCurrentDisplayStatus(ds)
+        setCurrentMessage(data.status_message ?? '')
+        setCurrentUpdatedAt(data.status_updated_at ?? null)
+        setStatusDraftStatus(ds)
+        setStatusDraftMessage(data.status_message ?? '')
+      }
+    }
+    load()
+  }, [statusEventId, password])
+
   // Load existing stats when stats event changes
   useEffect(() => {
     if (!statsEventId || !password) return
@@ -299,6 +331,30 @@ export default function AdminPage() {
     }
     setStatsSaving(false)
     setStatsMsg('✅ All stats saved!')
+  }
+
+  const saveStatus = async () => {
+    if (!statusEventId || !statusDraftStatus) return
+    setStatusSaving(true)
+    setStatusMsg(null)
+    const res = await api({
+      action: 'update_game_status',
+      eventId: statusEventId,
+      displayStatus: statusDraftStatus,
+      message: statusDraftMessage,
+      changedBy: 'Steve',
+    })
+    setStatusSaving(false)
+    if (res?.error) {
+      setStatusMsg(`❌ ${res.error}`)
+    } else if (res?.ok) {
+      setStatusMsg(res.warning ? `⚠ ${res.warning}` : '✅ Broadcast saved')
+      setCurrentDisplayStatus(statusDraftStatus)
+      setCurrentMessage(statusDraftMessage)
+      setCurrentUpdatedAt(new Date().toISOString())
+    } else {
+      setStatusMsg('❌ Save failed')
+    }
   }
 
   const saveStandings = async () => {
@@ -458,8 +514,9 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-2">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-5 gap-1">
           {([
+            { key: 'status', label: '📡 Status' },
             { key: 'score', label: '🏆 Score' },
             { key: 'stats', label: '📊 Stats' },
             { key: 'events', label: '📅 Events' },      
@@ -475,6 +532,95 @@ export default function AdminPage() {
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
 
+        {/* ── Status Tab ─────────────────────────────────────────────────── */}
+        {tab === 'status' && (
+          <>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pick a Game to Broadcast</p>
+              <select value={statusEventId} onChange={e => { setStatusEventId(e.target.value); setStatusMsg(null) }}
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                <option value="">— Pick a game —</option>
+                {events
+                  .filter(e => new Date(e.starts_at).getTime() >= Date.now() - 24 * 60 * 60 * 1000)
+                  .reverse()
+                  .map(e => (
+                    <option key={e.id} value={e.id}>
+                      {formatDate(e.starts_at)} — {e.opponent ? `vs ${e.opponent}` : e.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {statusEventId && (
+              <>
+                {/* Current state */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-2">Current Broadcast</p>
+                  {currentDisplayStatus ? (
+                    <>
+                      <p className={`text-lg font-extrabold ${
+                        currentDisplayStatus === 'on' ? 'text-green-400' :
+                        currentDisplayStatus === 'watching' ? 'text-amber-400' :
+                        'text-red-400'
+                      }`}>
+                        {currentDisplayStatus === 'on' ? '🟢 Game On' :
+                         currentDisplayStatus === 'watching' ? '🟡 Watching' :
+                         '🔴 Off'}
+                      </p>
+                      {currentMessage && (
+                        <p className="text-sm text-slate-300 mt-1">{currentMessage}</p>
+                      )}
+                      {currentUpdatedAt && (
+                        <p className="text-xs text-slate-500 mt-2">
+                          Updated {new Date(currentUpdatedAt).toLocaleString('en-US', { timeZone: 'America/Chicago' })}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-slate-500">No broadcast set yet</p>
+                  )}
+                </div>
+
+                {/* Draft new status */}
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-4">
+                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Set Broadcast</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {([
+                      { key: 'on', label: '🟢 Game On', desc: 'Show up as scheduled', cls: 'border-green-500/40 bg-green-500/10' },
+                      { key: 'watching', label: '🟡 Watching', desc: 'Monitoring — decision pending', cls: 'border-amber-500/40 bg-amber-500/10' },
+                      { key: 'off', label: '🔴 Off / Canceled', desc: 'Game is off', cls: 'border-red-500/40 bg-red-500/10' },
+                    ] as const).map(({ key, label, desc, cls }) => (
+                      <button key={key} onClick={() => setStatusDraftStatus(key)}
+                        className={`rounded-xl border-2 p-3 text-left transition ${
+                          statusDraftStatus === key
+                            ? cls
+                            : 'border-white/10 bg-white/5 hover:bg-white/10'
+                        }`}>
+                        <p className="font-bold text-white">{label}</p>
+                        <p className="text-xs text-slate-400">{desc}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">Message (optional)</label>
+                    <textarea value={statusDraftMessage} rows={2}
+                      placeholder="Coaches arriving at 8am to evaluate, decision by 9am"
+                      onChange={e => setStatusDraftMessage(e.target.value)}
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                  </div>
+
+                  <button onClick={saveStatus} disabled={statusSaving || !statusDraftStatus}
+                    className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                    {statusSaving ? 'Broadcasting...' : 'Save & Broadcast'}
+                  </button>
+                  {statusMsg && <p className="text-sm text-center">{statusMsg}</p>}
+                </div>
+              </>
+            )}
+          </>
+        )}
+        
         {/* ── Score Tab ──────────────────────────────────────────────────── */}
         {tab === 'score' && (
           <>
