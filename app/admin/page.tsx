@@ -443,7 +443,7 @@ export default function AdminPage() {
   const themTotal = themInnings.reduce((a, b) => a + b, 0)
 
   return (
-    <main className="min-h-screen bg-black pb-10 text-white">
+    <main className="min-h-screen bg-black pb-10 text-white" style={{ colorScheme: 'dark' }}>
       {/* Header */}
       <div className="bg-black px-4 pt-8 pb-4 border-b border-white/10">
         <div className="mx-auto max-w-sm flex items-center justify-between">
