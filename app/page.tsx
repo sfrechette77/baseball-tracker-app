@@ -449,10 +449,9 @@ export default function HomePage() {
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
             travel_minutes, travel_miles, team_score, opponent_score, result,
+            display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code)`)
           .gte('starts_at', nowIso)
-          .order('starts_at', { ascending: true })
-          .limit(3)
 
         if (error || !data) { setLoading(false); return }
 
@@ -523,16 +522,6 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading...</p>
-        </div>
-      </main>
-    )
-  }
-
-  return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
       {/* Content */}
@@ -552,49 +541,12 @@ export default function HomePage() {
             />
           </section>
         ) : (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-sm text-slate-400">No upcoming events scheduled.</p>
+          </div>
+        )}
 
         {/* Coming Up */}
-        {otherEvents.length > 0 && (
-          <section>
-            <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">Coming Up</p>
-            <div className="space-y-2">
-              {otherEvents.map(event => {
-                const eventTime = new Date(event.starts_at)
-                const field = getPrimaryField(event.fields)
-                const score = getScoreDisplay(event)
-                const address = formatAddress(field)
-                const weather = weatherByEvent[event.id]
-                return (
-                  <div key={event.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className="font-bold text-white">{event.title}</p>
-                    <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
-                    {event.opponent && event.event_type !== 'practice' && (
-                      <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
-                    )}
-                    {score && <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>}
-                    {field?.name && <p className="mt-1 text-sm text-slate-400">📍 {field.name}</p>}
-                    {address && <p className="mt-0.5 text-xs text-slate-500">{address}</p>}
-                    <div className="mt-2 flex gap-3">
-                      {weather?.rainChance !== null && weather?.rainChance !== undefined ? (
-                        <span className="text-xs text-slate-400">🌧 {weather.rainChance}% rain</span>
-                      ) : (
-                        <span className="text-xs text-slate-600">No forecast yet</span>
-                      )}
-                      {weather?.temperature !== null && weather?.temperature !== undefined && (
-                        <span className="text-xs text-slate-400">🌡 {weather.temperature}°F</span>
-                      )}
-                    </div>
-                    {event.travel_minutes !== null && score === null && (
-                      <p className="mt-1 text-xs text-slate-400">
-                        🚗 {event.travel_minutes} min{event.travel_miles !== null ? ` • ${event.travel_miles} mi` : ''}
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
 
         {/* Past Games */}
         {pastGames.length > 0 && (
