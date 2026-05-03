@@ -147,8 +147,9 @@ function getClosestForecast(eventStartsAt: string, forecasts: WeatherForecastRow
   const eventTime = new Date(eventStartsAt).getTime()
   const closest = forecasts.reduce<WeatherForecastRow | null>((best, cur) => {
     if (!best) return cur
-    return Math.abs(new Date(cur.forecast_time).getTime() - eventTime) 
-      Math.abs(new Date(best.forecast_time).getTime() - eventTime) ? cur : best
+    const curDiff = Math.abs(new Date(cur.forecast_time).getTime() - eventTime)
+    const bestDiff = Math.abs(new Date(best.forecast_time).getTime() - eventTime)
+    return curDiff < bestDiff ? cur : best
   }, null)
   if (!closest) return { rainChance: null, temperature: null }
   if (Math.abs(new Date(closest.forecast_time).getTime() - eventTime) > FORECAST_MATCH_WINDOW_MS)
