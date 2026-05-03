@@ -41,6 +41,9 @@ type EventRow = {
   opponent_score: number | null
   result: string | null
   fields: FieldRow[] | null
+  display_status: string | null
+  status_message: string | null
+  status_updated_at: string | null
 }
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
@@ -383,6 +386,45 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
   )
 }
 
+// ─── Status Banner ────────────────────────────────────────────────────────────
+
+function StatusBanner({ event }: { event: EventRow }) {
+  if (!event.display_status) return null
+
+  const config = {
+    on: { label: '🟢 Game On', cls: 'border-green-500/40 bg-green-500/10 text-green-400' },
+    watching: { label: '🟡 Watching', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
+    off: { label: '🔴 Game Off', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
+  }[event.display_status as 'on' | 'watching' | 'off']
+
+  if (!config) return null
+
+  return (
+    <div className={`rounded-2xl border-2 p-4 ${config.cls.split(' ').slice(0, 2).join(' ')}`}>
+      <p className={`font-bold ${config.cls.split(' ').slice(2).join(' ')}`}>{config.label}</p>
+      {event.status_message && (
+        <p className="mt-1 text-sm text-slate-300">{event.status_message}</p>
+      )}
+      {event.status_updated_at && (
+        <p className="mt-2 text-xs text-slate-500">
+          Updated {formatRelativeTime(new Date(event.status_updated_at))}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin} min ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  return `${diffDay}d ago`
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
@@ -420,7 +462,7 @@ export default function HomePage() {
         const { data: pastData } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
-            travel_minutes, travel_miles, team_score, opponent_score, result,
+            travel_minutes, travel_miles, team_score, opponent_score, result, display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code)`)
           .lt('starts_at', nowIso)
           .neq('event_type', 'practice')
@@ -496,6 +538,9 @@ export default function HomePage() {
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
 
+        {/* Status banner — appears only if a broadcast has been set */}
+        {featuredEvent && <StatusBanner event={featuredEvent} />}
+
         {/* Next Up */}
         {featuredEvent ? (
           <section>
@@ -507,10 +552,6 @@ export default function HomePage() {
             />
           </section>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-400">No upcoming events scheduled.</p>
-          </div>
-        )}
 
         {/* Coming Up */}
         {otherEvents.length > 0 && (
