@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
@@ -148,7 +147,7 @@ function getClosestForecast(eventStartsAt: string, forecasts: WeatherForecastRow
   const eventTime = new Date(eventStartsAt).getTime()
   const closest = forecasts.reduce<WeatherForecastRow | null>((best, cur) => {
     if (!best) return cur
-    return Math.abs(new Date(cur.forecast_time).getTime() - eventTime) <
+    return Math.abs(new Date(cur.forecast_time).getTime() - eventTime) 
       Math.abs(new Date(best.forecast_time).getTime() - eventTime) ? cur : best
   }, null)
   if (!closest) return { rainChance: null, temperature: null }
@@ -158,6 +157,17 @@ function getClosestForecast(eventStartsAt: string, forecasts: WeatherForecastRow
     rainChance: typeof closest.rain_probability === 'number' ? Math.round(closest.rain_probability * 100) : null,
     temperature: typeof closest.temperature === 'number' ? Math.round(closest.temperature) : null
   }
+}
+
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin} min ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  return `${diffDay}d ago`
 }
 
 // ─── Nav Icons ────────────────────────────────────────────────────────────────
@@ -199,6 +209,34 @@ function StandingsIcon({ active }: { active?: boolean }) {
     <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
     </svg>
+  )
+}
+
+// ─── Status Banner ────────────────────────────────────────────────────────────
+
+function StatusBanner({ event }: { event: EventRow }) {
+  if (!event.display_status) return null
+
+  const config = {
+    on: { label: '🟢 Game On', cls: 'border-green-500/40 bg-green-500/10 text-green-400' },
+    watching: { label: '🟡 Watching', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
+    off: { label: '🔴 Game Off', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
+  }[event.display_status as 'on' | 'watching' | 'off']
+
+  if (!config) return null
+
+  return (
+    <div className={`rounded-2xl border-2 p-4 ${config.cls.split(' ').slice(0, 2).join(' ')}`}>
+      <p className={`font-bold ${config.cls.split(' ').slice(2).join(' ')}`}>{config.label}</p>
+      {event.status_message && (
+        <p className="mt-1 text-sm text-slate-300">{event.status_message}</p>
+      )}
+      {event.status_updated_at && (
+        <p className="mt-2 text-xs text-slate-500">
+          Updated {formatRelativeTime(new Date(event.status_updated_at))}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -386,45 +424,6 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
   )
 }
 
-// ─── Status Banner ────────────────────────────────────────────────────────────
-
-function StatusBanner({ event }: { event: EventRow }) {
-  if (!event.display_status) return null
-
-  const config = {
-    on: { label: '🟢 Game On', cls: 'border-green-500/40 bg-green-500/10 text-green-400' },
-    watching: { label: '🟡 Watching', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
-    off: { label: '🔴 Game Off', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
-  }[event.display_status as 'on' | 'watching' | 'off']
-
-  if (!config) return null
-
-  return (
-    <div className={`rounded-2xl border-2 p-4 ${config.cls.split(' ').slice(0, 2).join(' ')}`}>
-      <p className={`font-bold ${config.cls.split(' ').slice(2).join(' ')}`}>{config.label}</p>
-      {event.status_message && (
-        <p className="mt-1 text-sm text-slate-300">{event.status_message}</p>
-      )}
-      {event.status_updated_at && (
-        <p className="mt-2 text-xs text-slate-500">
-          Updated {formatRelativeTime(new Date(event.status_updated_at))}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function formatRelativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin} min ago`
-  const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
-  const diffDay = Math.floor(diffHr / 24)
-  return `${diffDay}d ago`
-}
-
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
@@ -452,6 +451,8 @@ export default function HomePage() {
             display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code)`)
           .gte('starts_at', nowIso)
+          .order('starts_at', { ascending: true })
+          .limit(3)
 
         if (error || !data) { setLoading(false); return }
 
@@ -461,7 +462,8 @@ export default function HomePage() {
         const { data: pastData } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
-            travel_minutes, travel_miles, team_score, opponent_score, result, display_status, status_message, status_updated_at,
+            travel_minutes, travel_miles, team_score, opponent_score, result,
+            display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code)`)
           .lt('starts_at', nowIso)
           .neq('event_type', 'practice')
@@ -522,6 +524,16 @@ export default function HomePage() {
 
   if (loading) {
     return (
+      <main className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
+          <p className="text-slate-400 text-sm">Loading...</p>
+        </div>
+      </main>
+    )
+  }
+
+  return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
       {/* Content */}
@@ -542,12 +554,52 @@ export default function HomePage() {
           </section>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-400">No upcoming events scheduled.
-</p>
+            <p className="text-sm text-slate-400">No upcoming events scheduled.</p>
           </div>
         )}
 
         {/* Coming Up */}
+        {otherEvents.length > 0 && (
+          <section>
+            <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">Coming Up</p>
+            <div className="space-y-2">
+              {otherEvents.map(event => {
+                const eventTime = new Date(event.starts_at)
+                const field = getPrimaryField(event.fields)
+                const score = getScoreDisplay(event)
+                const address = formatAddress(field)
+                const weather = weatherByEvent[event.id]
+                return (
+                  <div key={event.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="font-bold text-white">{event.title}</p>
+                    <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
+                    {event.opponent && event.event_type !== 'practice' && (
+                      <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
+                    )}
+                    {score && <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>}
+                    {field?.name && <p className="mt-1 text-sm text-slate-400">📍 {field.name}</p>}
+                    {address && <p className="mt-0.5 text-xs text-slate-500">{address}</p>}
+                    <div className="mt-2 flex gap-3">
+                      {weather?.rainChance !== null && weather?.rainChance !== undefined ? (
+                        <span className="text-xs text-slate-400">🌧 {weather.rainChance}% rain</span>
+                      ) : (
+                        <span className="text-xs text-slate-600">No forecast yet</span>
+                      )}
+                      {weather?.temperature !== null && weather?.temperature !== undefined && (
+                        <span className="text-xs text-slate-400">🌡 {weather.temperature}°F</span>
+                      )}
+                    </div>
+                    {event.travel_minutes !== null && score === null && (
+                      <p className="mt-1 text-xs text-slate-400">
+                        🚗 {event.travel_minutes} min{event.travel_miles !== null ? ` • ${event.travel_miles} mi` : ''}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Past Games */}
         {pastGames.length > 0 && (
