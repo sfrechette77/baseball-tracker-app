@@ -542,7 +542,8 @@ export default function HomePage() {
           </section>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-400">No upcoming events scheduled.</p>
+            <p className="text-sm text-slate-400">No upcoming events scheduled.
+</p>
           </div>
         )}
 
