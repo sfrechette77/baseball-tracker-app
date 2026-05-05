@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Update display status (and write to log) atomically ────────────────
-    if (action === 'update_game_status') {
+   if (action === 'update_game_status') {
       const { eventId, displayStatus, message, changedBy } = body
       if (!eventId || displayStatus === undefined) {
         return NextResponse.json({ error: 'Missing eventId or displayStatus' }, { status: 400 })
