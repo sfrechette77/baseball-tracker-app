@@ -143,25 +143,23 @@ export async function POST(req: NextRequest) {
       }
 
       // Append to log
-      const { error: logError } = await supabase
-        .from('game_status_log')
-        .insert({
-          event_id: eventId,
-          old_status: current?.display_status ?? null,
-          new_status: displayStatus,
-          message: message || null,
-          changed_by: changedBy || 'Admin',
-        })
-      if (logError) {
-        // The update succeeded but log failed — return a soft warning, not a hard error
-        return NextResponse.json({
-          ok: true,
-          warning: `Status saved but log failed: ${logError.message}`,
-        })
+      if (displayStatus !== null) {
+        const { error: logError } = await supabase
+          .from('game_status_log')
+          .insert({
+            event_id: eventId,
+            old_status: current?.display_status ?? null,
+            new_status: displayStatus,
+            message: message || null,
+            changed_by: changedBy || 'Admin',
+          })
+        if (logError) {
+          return NextResponse.json({
+            ok: true,
+            warning: `Status saved but log failed: ${logError.message}`,
+          })
+        }
       }
-
-      return NextResponse.json({ ok: true })
-    }
 
     // ── Create a new practice ───────────────────────────────────────────────
     if (action === 'create_practice') {
