@@ -334,7 +334,7 @@ export default function AdminPage() {
   }
 
   const saveStatus = async () => {
-    if (!statusEventId || !statusDraftStatus) return
+    if (!statusEventId) return
     setStatusSaving(true)
     setStatusMsg(null)
     const res = await api({
@@ -619,7 +619,7 @@ export default function AdminPage() {
                       className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
                   </div>
 
-                  <button onClick={saveStatus} disabled={statusSaving || !statusDraftStatus}
+                  <button onClick={saveStatus} disabled={statusSaving || !statusDraftStatus === undefined}
                     className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
                     {statusSaving ? 'Broadcasting...' : 'Save & Broadcast'}
                   </button>
