@@ -179,7 +179,7 @@ export default function PlayerPage() {
     )
     return {
       ...totals,
-      innings_piched: Math.round(totals.innings_pitched * 10) / 10
+      innings_pitched: Math.round(totals.innings_pitched * 10) / 10
     }  
   }, [stats])
 
