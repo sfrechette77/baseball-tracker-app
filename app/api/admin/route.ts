@@ -142,6 +142,44 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Failed updating event: ${updateError.message}` }, { status: 500 })
       }
 
+      // Only log if setting a status (not clearing)
+      if (displayStatus !== null) {
+        const { error: logError } = await supabase
+          .from('game_status_log')
+          .insert({
+            event_id: eventId,
+            old_status: current?.display_status ?? null,
+            new_status: displayStatus,
+            message: message || null,
+            changed_by: changedBy || 'Admin',
+          })
+        if (logError) {
+          return NextResponse.json({
+            ok: true,
+            warning: `Status saved but log failed: ${logError.message}`,
+          })
+        }
+      }
+
+      return NextResponse.json({ ok: true })
+    }
+
+      const now = new Date().toISOString()
+
+      // Update event
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({
+          display_status: displayStatus,
+          status_message: message || null,
+          status_updated_at: now,
+          status_updated_by: changedBy || 'Admin',
+        })
+        .eq('id', eventId)
+      if (updateError) {
+        return NextResponse.json({ error: `Failed updating event: ${updateError.message}` }, { status: 500 })
+      }
+
       // Append to log
       if (displayStatus !== null) {
         const { error: logError } = await supabase
