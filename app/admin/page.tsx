@@ -600,6 +600,15 @@ export default function AdminPage() {
                         <p className="text-xs text-slate-400">{desc}</p>
                       </button>
                     ))}
+                    <button onClick={() => setStatusDraftStatus(null)}
+                      className={`rounded-xl border-2 p-3 text-left transition ${
+                        statusDraftStatus === null
+                          ? 'border-slate-500/40 bg-slate-500/10'
+                          : 'border-white/10 bg-white/5 hover:bg-white/10'
+                      }`}>
+                      <p className="font-bold text-white">⊘ Clear Status</p>
+                      <p className="text-xs text-slate-400">Remove broadcast — parents see nothing</p>
+                    </button>
                   </div>
 
                   <div className="space-y-2">
