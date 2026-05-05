@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Update display status (and write to log) atomically ────────────────
-   if (action === 'update_game_status') {
+    if (action === 'update_game_status') {
       const { eventId, displayStatus, message, changedBy } = body
       if (!eventId || displayStatus === undefined) {
         return NextResponse.json({ error: 'Missing eventId or displayStatus' }, { status: 400 })
@@ -163,27 +163,6 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ ok: true })
     }
-
-      const now = new Date().toISOString()
-
-      // Append to log
-      if (displayStatus !== null) {
-        const { error: logError } = await supabase
-          .from('game_status_log')
-          .insert({
-            event_id: eventId,
-            old_status: current?.display_status ?? null,
-            new_status: displayStatus,
-            message: message || null,
-            changed_by: changedBy || 'Admin',
-          })
-        if (logError) {
-          return NextResponse.json({
-            ok: true,
-            warning: `Status saved but log failed: ${logError.message}`,
-          })
-        }
-      }
 
     // ── Create a new practice ───────────────────────────────────────────────
     if (action === 'create_practice') {
