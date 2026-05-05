@@ -177,7 +177,10 @@ export default function PlayerPage() {
       }),
       { pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
     )
-    return totals
+    return {
+      ...totals,
+      innings_piched: Math.round(totals.innings_pitched * 10) / 10
+    }  
   }, [stats])
 
   const gamesWithStats = useMemo(() =>
