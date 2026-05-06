@@ -23,9 +23,11 @@ type ForecastResponse = {
 export async function GET(req: NextRequest) {
   // Protect the endpoint — only Vercel cron or requests with the secret can trigger it
   const authHeader = req.headers.get('authorization')
+  const querySecret = req.nextUrl.searchParams.get('cron_secret')
   const cronSecret = process.env.CRON_SECRET
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  
+  const isAuthorized = (authHeader === `Bearer ${cronSecret}`) || (querySecret === cronSecret)
+  if (cronSecret && !isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
