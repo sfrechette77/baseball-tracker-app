@@ -28,6 +28,7 @@ type EventRow = {
   result: string | null
   fields: FieldRow[] | null
   display_status: string | null
+  is_home: boolean
 }
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
