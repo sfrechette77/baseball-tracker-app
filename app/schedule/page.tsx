@@ -154,7 +154,7 @@ export default function SchedulePage() {
         const { data, error } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status,
-            team_score, opponent_score, result, display_status, fields (name)`)
+            team_score, opponent_score, result, display_status, is_home, fields (name)`)
           .order('starts_at', { ascending: true })
         if (error) setErrorMessage(error.message)
         else setEvents(((data ?? []) as RawEventRow[]).map(normalizeEvent))
