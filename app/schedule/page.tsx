@@ -343,7 +343,7 @@ export default function SchedulePage() {
                     <div className="min-w-0">
                       {event.opponent && event.event_type !== 'practice' ? (
                         <>
-                          <p className="font-bold text-white truncate">vs {event.opponent}</p>
+                          <p className="font-bold text-white truncate">{event.is_home ? 'vs' : '@'} {event.opponent}</p>
                           <p className="mt-1 text-xs text-slate-500 truncate">{event.title}</p>
                         </>
                       ) : (
