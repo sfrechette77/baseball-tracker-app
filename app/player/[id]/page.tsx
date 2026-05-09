@@ -222,9 +222,6 @@ export default function PlayerPage() {
             <Link href="/roster" className="text-sm font-semibold text-slate-400 hover:text-white transition">
               ← Roster
             </Link>
-            <div className="relative h-10 w-10">
-              <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" />
-            </div>
           </div>
 
           <div className="flex items-center gap-4">
