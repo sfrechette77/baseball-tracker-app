@@ -46,8 +46,9 @@ type EventRow = {
   arrival_buffer_minutes: number | null
 }
 
-type RawEventRow = Omit<EventRow, 'fields'> & {
+type RawEventRow = Omit<EventRow, 'fields' | 'arrival_buffer_minutes'> & {
   fields: FieldRow | FieldRow[] | null
+  team: { arrival_buffer_minutes: number | null } | { arrival_buffer_minutes: number | null }[] | null
 }
 
 type WeatherForecastRow = {
