@@ -65,10 +65,6 @@ type WeatherSummary = {
 type WeatherByEvent = Record<string, WeatherSummary>
 
 function normalizeEvent(event: RawEventRow): EventRow {
-  return { ...event, fields: normalizeFieldRelation(event.fields) }
-}
-
-function normalizeEvent(event: RawEventRow): EventRow {
   const bufferMinutes = Array.isArray(event.team) ? event.team[0]?.arrival_buffer_minutes : 
                         event.team?.arrival_buffer_minutes ?? null
   return { 
