@@ -43,6 +43,7 @@ type EventRow = {
   display_status: string | null
   status_message: string | null
   status_updated_at: string | null
+  arrival_buffer_minutes: number | null
 }
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
@@ -65,6 +66,16 @@ type WeatherByEvent = Record<string, WeatherSummary>
 
 function normalizeEvent(event: RawEventRow): EventRow {
   return { ...event, fields: normalizeFieldRelation(event.fields) }
+}
+
+function normalizeEvent(event: RawEventRow): EventRow {
+  const bufferMinutes = Array.isArray(event.team) ? event.team[0]?.arrival_buffer_minutes : 
+                        event.team?.arrival_buffer_minutes ?? null
+  return { 
+    ...event, 
+    fields: normalizeFieldRelation(event.fields),
+    arrival_buffer_minutes: bufferMinutes
+  }
 }
 
 function formatAddress(field: FieldRow | null) {
@@ -110,9 +121,10 @@ function isSameChicagoDay(a: Date, b: Date) {
   return ap.year === bp.year && ap.month === bp.month && ap.day === bp.day
 }
 
-function getUrgency(eventTime: Date, travelMinutes: number | null, now: Date) {
+function getUrgency(eventTime: Date, travelMinutes: number | null, arrivalBufferMinutes: number | null, now: Date) {
   if (travelMinutes === null) return { text: null, className: 'text-slate-700', leaveTime: null }
-  const leaveMinutes = travelMinutes + 45
+  const buffer = arrivalBufferMinutes ?? 45
+  const leaveMinutes = travelMinutes + buffer
   const leaveTime = new Date(eventTime.getTime() - leaveMinutes * 60000)
   const minsUntilLeave = Math.floor((leaveTime.getTime() - now.getTime()) / 60000)
   if (minsUntilLeave < 0) return { text: '🔴 Leave now', className: 'text-red-600', leaveTime }
@@ -256,7 +268,7 @@ function EventCard({ event, weather, now, featured = false }: {
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
   const countdown = getCountdownParts(eventTime, now)
-  const urgency = getUrgency(eventTime, event.travel_minutes, now)
+  const urgency = getUrgency(eventTime, event.travel_minutes, event.arrival_buffer_minutes, now)
   const score = getScoreDisplay(event)
   const isCompleted = score !== null
   const isGameDay = isSameChicagoDay(eventTime, new Date())
@@ -450,7 +462,8 @@ export default function HomePage() {
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
             travel_minutes, travel_miles, team_score, opponent_score, result,
             display_status, status_message, status_updated_at,
-            fields (id, name, address_line, city, state, postal_code)`)
+            fields (id, name, address_line, city, state, postal_code),
+            team:team_id (arrival_buffer_minutes)`)
           .gte('starts_at', nowIso)
           .order('starts_at', { ascending: true })
           .limit(3)
