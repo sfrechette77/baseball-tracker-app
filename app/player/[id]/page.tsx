@@ -229,7 +229,7 @@ export default function PlayerPage() {
               {player.jersey_number ?? '—'}
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Season 2026</p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">2026 Stats</p>
               <h1 className="text-xl font-extrabold text-white leading-tight">{player.name}</h1>
               {player.position && <p className="text-sm text-slate-400">{player.position}</p>}
             </div>
