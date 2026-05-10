@@ -23,6 +23,17 @@ type StandingRow = {
   win_pct: number
 }
 
+type LeagueGameRow = {
+  id: string
+  played_at: string
+  home_score: number | null
+  away_score: number | null
+  status: string
+  home_team: { id: string; name: string } | null
+  away_team: { id: string; name: string } | null
+  events: { id: string }[] | null  // linked event if exists
+}
+
 function calcPct(wins: number, losses: number, ties: number): string {
   const total = wins + losses + ties
   if (total === 0) return '.000'
@@ -219,7 +230,8 @@ const OUR_TEAM = 'Elite Baseball - Moore'
 
 export default function StandingsPage() {
   const [standings, setStandings] = useState<StandingRow[]>([])
-  const [activeTab, setActiveTab] = useState<'standings' | 'rules'>('standings')
+  const [leagueGames, setLeagueGames] = useState<LeagueGameRow[]>([])
+  const [activeTab, setActiveTab] = useState<'standings' | 'results' | 'rules'>('standings')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -238,6 +250,37 @@ export default function StandingsPage() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+  const loadLeagueGames = async () => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('league_games')
+      .select(`
+        id, played_at, home_score, away_score, status,
+        home_team:home_team_id (id, name),
+        away_team:away_team_id (id, name),
+        events!events_league_game_id_fkey (id)
+      `)
+      .order('played_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error loading league games:', error)
+      return
+    }
+    
+    if (data) {
+      // Normalize home_team and away_team — Supabase returns them as arrays sometimes
+      const normalized = data.map((g: any) => ({
+        ...g,
+        home_team: Array.isArray(g.home_team) ? g.home_team[0] : g.home_team,
+        away_team: Array.isArray(g.away_team) ? g.away_team[0] : g.away_team,
+      }))
+      setLeagueGames(normalized as LeagueGameRow[])
+    }
+  }
+  loadLeagueGames()
+}, [])
 
   const sorted = useMemo(() => {
     return [...standings].sort((a, b) => {
@@ -272,9 +315,10 @@ export default function StandingsPage() {
       </div>
 
       {/* Internal tabs */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-3 gap-2 mb-4">
           {([
             { key: 'standings', label: 'Standings' },
+            { key: 'results', label: 'Results' },
             { key: 'rules', label: 'Rules' },
           ] as const).map(({ key, label }) => (
             <button
@@ -338,6 +382,80 @@ export default function StandingsPage() {
         )}
       </div>
       )}
+
+      {activeTab === 'results' && (
+  <div className="mx-auto max-w-sm px-4 pt-2">
+    {leagueGames.length === 0 ? (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+        <p className="text-slate-400 text-sm">No league games yet.</p>
+      </div>
+    ) : (
+      <div className="space-y-2">
+        {leagueGames.map((game) => {
+          const eventId = game.events?.[0]?.id ?? null
+          const homeName = game.home_team?.name ?? 'Unknown'
+          const awayName = game.away_team?.name ?? 'Unknown'
+          const playedDate = new Date(game.played_at)
+          const dateLabel = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Chicago',
+            month: 'short', day: 'numeric',
+          }).format(playedDate)
+          
+          const isFinal = game.status === 'final' && game.home_score !== null && game.away_score !== null
+          const homeWon = isFinal && (game.home_score ?? 0) > (game.away_score ?? 0)
+          const awayWon = isFinal && (game.away_score ?? 0) > (game.home_score ?? 0)
+
+          const cardContent = (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{dateLabel}</p>
+              <div className="mt-2 space-y-1">
+                {/* Away team */}
+                <div className="flex items-center justify-between">
+                  <p className={`text-sm ${awayWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                    {awayName}
+                  </p>
+                  {isFinal && (
+                    <p className={`text-sm tabular-nums ${awayWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                      {game.away_score}
+                    </p>
+                  )}
+                </div>
+                {/* Home team */}
+                <div className="flex items-center justify-between">
+                  <p className={`text-sm ${homeWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                    {homeName}
+                  </p>
+                  {isFinal && (
+                    <p className={`text-sm tabular-nums ${homeWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                      {game.home_score}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {!isFinal && (
+                <p className="mt-2 text-xs text-slate-500 italic">
+                  {game.status === 'scheduled' ? 'Scheduled' : 
+                   game.status === 'postponed' ? 'Postponed' :
+                   game.status === 'forfeit' ? 'Forfeit' :
+                   game.status === 'canceled' ? 'Canceled' : game.status}
+                </p>
+              )}
+            </div>
+          )
+          
+          // If linked to an event, make it tappable to event detail
+          return eventId ? (
+            <Link key={game.id} href={`/event/${eventId}`}>
+              {cardContent}
+            </Link>
+          ) : (
+            <div key={game.id}>{cardContent}</div>
+          )
+        })}
+      </div>
+    )}
+  </div>
+)}
       
       {/* League Rules */}
       {activeTab === 'rules' && (
