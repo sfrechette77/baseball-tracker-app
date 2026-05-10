@@ -218,6 +218,7 @@ const OUR_TEAM = 'Elite Baseball - Moore'
 
 export default function StandingsPage() {
   const [standings, setStandings] = useState<StandingRow[]>([])
+  const [activeTab, setActiveTab] = useState<'standings' | 'rules'>('standings')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -269,7 +270,28 @@ export default function StandingsPage() {
         <p className="text-sm text-slate-400 mt-1">11U American Division</p>
       </div>
 
+      {/* Internal tabs */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {([
+            { key: 'standings', label: 'Standings' },
+            { key: 'rules', label: 'Rules' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`rounded-xl py-2 px-3 text-sm font-bold transition ${
+                activeTab === key
+                  ? 'bg-red-600 text-white'
+                  : 'bg-white/5 text-slate-400 hover:bg-white/10'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
       {/* Standings table */}
+      {activeTab === 'standings' && (
       <div className="mx-auto max-w-sm px-4 pt-2">
         {standings.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
@@ -314,9 +336,11 @@ export default function StandingsPage() {
           </div>
         )}
       </div>
+      )}
+      
       {/* League Rules */}
+      {activeTab === 'rules' && (
         <section className="mt-6">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">League Rules</p>
           <div className="space-y-2">
             {LEAGUE_RULES.map((rule) => (
               <details key={rule.section} className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -341,6 +365,7 @@ export default function StandingsPage() {
             Source: 2026 MSBL Official League Rules
           </p>
         </section>
+      )}
       <BottomNav active="standings" />
     </main>
   )
