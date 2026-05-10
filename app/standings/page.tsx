@@ -20,6 +20,7 @@ type StandingRow = {
   ties: number
   runs_for: number
   runs_against: number
+  win_pct: number
 }
 
 function calcPct(wins: number, losses: number, ties: number): string {
@@ -226,7 +227,7 @@ export default function StandingsPage() {
       try {
         const supabase = createClient()
         const { data } = await supabase
-          .from('standings')
+          .from('computed_standings')
           .select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against')
         setStandings((data ?? []) as StandingRow[])
       } catch (err) {
