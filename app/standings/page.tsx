@@ -315,7 +315,7 @@ export default function StandingsPage() {
       </div>
 
       {/* Internal tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex justify-center gap-2 mb-4">
           {([
             { key: 'standings', label: 'Standings' },
             { key: 'results', label: 'Results' },
