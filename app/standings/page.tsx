@@ -319,7 +319,7 @@ export default function StandingsPage() {
           {([
             { key: 'standings', label: 'Standings' },
             { key: 'results', label: 'Results' },
-            { key: 'rules', label: 'Rules' },
+            { key: 'rules', label: 'MSBL Rules' },
           ] as const).map(({ key, label }) => (
             <button
               key={key}
