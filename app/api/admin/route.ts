@@ -8,6 +8,27 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// Map opponent names to MSBL team_ids
+const OPPONENT_TO_TEAM_ID: Record<string, string> = {
+  'Chicago Bandits - Navy': '23ef26f2-afa5-4853-bca1-63d1badb7e8c',
+  'Chicago Bandits - Green': '69506e8b-0cf1-4afc-9929-e070fded2235',
+  'Dunham Bulls': '661a07a3-5b70-4875-9176-71ec06ed76d6',
+  'Dunham Bulls - White': '661a07a3-5b70-4875-9176-71ec06ed76d6',
+  'Lake County Raiders': 'fb3e14ed-3093-46db-9554-106f11dd7172',
+  'LC Raiders': 'fb3e14ed-3093-46db-9554-106f11dd7172',
+  'JHEY - American': '63cfd7e4-f161-4927-b41d-613c1c2abe2c',
+  'JHey - American': '63cfd7e4-f161-4927-b41d-613c1c2abe2c',
+  'West Englewood Tigers': '16a0be35-4e31-471c-b678-cf8002e44cc1',
+  'W. Englewood Tigers': '16a0be35-4e31-471c-b678-cf8002e44cc1',
+  '5-Star Bandits - Navy': '23ef26f2-afa5-4853-bca1-63d1badb7e8c',
+  '5-Star Bandits - Green': '69506e8b-0cf1-4afc-9929-e070fded2235',
+}
+
+function getMsblTeamId(opponent: string | null): string | null {
+  if (!opponent) return null
+  return OPPONENT_TO_TEAM_ID[opponent] ?? null
+}
+
 const TEAM_ID = '4beb0750-1883-4b56-a386-db280675036c'
 
 export async function POST(req: NextRequest) {
@@ -74,37 +95,87 @@ export async function POST(req: NextRequest) {
       if (eventUpdate.error) {
         return NextResponse.json({ error: `Failed saving event totals: ${eventUpdate.error.message}` }, { status: 500 })
       }
-      return NextResponse.json({ ok: true, teamScore: usTotal, opponentScore: themTotal, result })
-    }
+      // Sync to league_games if this event is linked
+const { data: eventData } = await supabase
+  .from('events')
+  .select('league_game_id')
+  .eq('id', eventId)
+  .single()
+
+if (eventData?.league_game_id) {
+  const homeScore = isHome ? usTotal : themTotal
+  const awayScore = isHome ? themTotal : usTotal
+  await supabase
+    .from('league_games')
+    .update({
+      home_score: homeScore,
+      away_score: awayScore,
+      status: 'final',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventData.league_game_id)
+}
+
+return NextResponse.json({ ok: true, teamScore: usTotal, opponentScore: themTotal, result })
 
     // ── Create a new game/tournament event ──────────────────────────────────
-    if (action === 'create_event') {
-      const { title, opponent, eventType, startsAt, fieldId, isHome, travelMinutes, travelMiles, notes, gearNotes } = body
-      if (!title || !startsAt) {
-        return NextResponse.json({ error: 'Title and start time are required' }, { status: 400 })
-      }
-      const { data, error } = await supabase
-        .from('events')
-        .insert({
-          team_id: TEAM_ID,
-          title,
-          opponent: opponent || null,
-          event_type: eventType ?? 'game',
-          starts_at: startsAt,
-          field_id: fieldId || null,
-          is_home: isHome ?? false,
-          travel_minutes: travelMinutes ?? null,
-          travel_miles: travelMiles ?? null,
-          notes: notes || null,
-          gear_notes: gearNotes || null,
-          status: 'confirmed',
-        })
-        .select('id')
-        .single()
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ ok: true, id: data.id })
+if (action === 'create_event') {
+  const { title, opponent, eventType, startsAt, fieldId, isHome, travelMinutes, travelMiles, notes, gearNotes } = body
+  if (!title || !startsAt) {
+    return NextResponse.json({ error: 'Title and start time are required' }, { status: 400 })
+  }
+  
+  // Check if this is an MSBL game (opponent matches a division team)
+  const opponentTeamId = eventType === 'game' ? getMsblTeamId(opponent) : null
+  let leagueGameId: string | null = null
+  
+  if (opponentTeamId) {
+    // Create a corresponding league_games row
+    const eliteId = '4beb0750-1883-4b56-a386-db280675036c'
+    const homeId = isHome ? eliteId : opponentTeamId
+    const awayId = isHome ? opponentTeamId : eliteId
+    
+    const { data: lgData, error: lgError } = await supabase
+      .from('league_games')
+      .insert({
+        home_team_id: homeId,
+        away_team_id: awayId,
+        played_at: startsAt,
+        status: 'scheduled',
+        field_id: fieldId || null,
+        entered_by: 'Admin (auto)',
+      })
+      .select('id')
+      .single()
+    
+    if (lgError) {
+      return NextResponse.json({ error: `Failed creating league game: ${lgError.message}` }, { status: 500 })
     }
-
+    leagueGameId = lgData?.id ?? null
+  }
+  
+  const { data, error } = await supabase
+    .from('events')
+    .insert({
+      team_id: TEAM_ID,
+      title,
+      opponent: opponent || null,
+      event_type: eventType ?? 'game',
+      starts_at: startsAt,
+      field_id: fieldId || null,
+      is_home: isHome ?? false,
+      travel_minutes: travelMinutes ?? null,
+      travel_miles: travelMiles ?? null,
+      notes: notes || null,
+      gear_notes: gearNotes || null,
+      status: 'confirmed',
+      league_game_id: leagueGameId,
+    })
+    .select('id')
+    .single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true, id: data.id })
+}
     // ── Update display status (and write to log) atomically ────────────────
     if (action === 'update_game_status') {
       const { eventId, displayStatus, message, changedBy } = body
@@ -188,40 +259,112 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Update event metadata (NOT scores — those go through save_game) ────
-    if (action === 'update_event') {
-      const { eventId, title, opponent, eventType, startsAt, fieldId, isHome, travelMinutes, travelMiles, notes, gearNotes, status } = body
-      if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
-      const { error } = await supabase
-        .from('events')
-        .update({
-          title,
-          opponent: opponent || null,
-          event_type: eventType,
-          starts_at: startsAt,
-          field_id: fieldId || null,
-          is_home: isHome ?? false,
-          travel_minutes: travelMinutes ?? null,
-          travel_miles: travelMiles ?? null,
-          notes: notes || null,
-          gear_notes: gearNotes || null,
-          status: status ?? 'confirmed',
-        })
-        .eq('id', eventId)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ ok: true })
+if (action === 'update_event') {
+  const { eventId, title, opponent, eventType, startsAt, fieldId, isHome, travelMinutes, travelMiles, notes, gearNotes, status } = body
+  if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
+  
+  // Get current event state to know if a league_game already exists
+  const { data: existingEvent } = await supabase
+    .from('events')
+    .select('league_game_id, opponent')
+    .eq('id', eventId)
+    .single()
+  
+  const { error } = await supabase
+    .from('events')
+    .update({
+      title,
+      opponent: opponent || null,
+      event_type: eventType,
+      starts_at: startsAt,
+      field_id: fieldId || null,
+      is_home: isHome ?? false,
+      travel_minutes: travelMinutes ?? null,
+      travel_miles: travelMiles ?? null,
+      notes: notes || null,
+      gear_notes: gearNotes || null,
+      status: status ?? 'confirmed',
+    })
+    .eq('id', eventId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  
+  // Sync to linked league_game if exists
+  const opponentTeamId = eventType === 'game' ? getMsblTeamId(opponent) : null
+  
+  if (existingEvent?.league_game_id && opponentTeamId) {
+    // Update the existing league_game with new metadata
+    const eliteId = '4beb0750-1883-4b56-a386-db280675036c'
+    const homeId = isHome ? eliteId : opponentTeamId
+    const awayId = isHome ? opponentTeamId : eliteId
+    
+    await supabase
+      .from('league_games')
+      .update({
+        home_team_id: homeId,
+        away_team_id: awayId,
+        played_at: startsAt,
+        field_id: fieldId || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingEvent.league_game_id)
+  } else if (existingEvent?.league_game_id && !opponentTeamId) {
+    // Event no longer matches MSBL team — unlink and delete league_game
+    await supabase.from('events').update({ league_game_id: null }).eq('id', eventId)
+    await supabase.from('league_games').delete().eq('id', existingEvent.league_game_id)
+  } else if (!existingEvent?.league_game_id && opponentTeamId) {
+    // Event newly matches MSBL team — create a league_game and link it
+    const eliteId = '4beb0750-1883-4b56-a386-db280675036c'
+    const homeId = isHome ? eliteId : opponentTeamId
+    const awayId = isHome ? opponentTeamId : eliteId
+    
+    const { data: lgData } = await supabase
+      .from('league_games')
+      .insert({
+        home_team_id: homeId,
+        away_team_id: awayId,
+        played_at: startsAt,
+        status: 'scheduled',
+        field_id: fieldId || null,
+        entered_by: 'Admin (auto)',
+      })
+      .select('id')
+      .single()
+    
+    if (lgData?.id) {
+      await supabase.from('events').update({ league_game_id: lgData.id }).eq('id', eventId)
     }
+  }
+  
+  return NextResponse.json({ ok: true })
+}
 
     // ── Delete event (cascades to box_scores and player_stats via FK) ───────
-    if (action === 'delete_event') {
-      const { eventId } = body
-      if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
-      // Delete child rows first to be safe (in case ON DELETE isn't set)
-      await supabase.from('box_scores').delete().eq('event_id', eventId)
-      await supabase.from('player_stats').delete().eq('event_id', eventId)
-      const { error } = await supabase.from('events').delete().eq('id', eventId)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ ok: true })
-    }
+if (action === 'delete_event') {
+  const { eventId } = body
+  if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
+  
+  // Check if linked to a league_game
+  const { data: existingEvent } = await supabase
+    .from('events')
+    .select('league_game_id')
+    .eq('id', eventId)
+    .single()
+  
+  // Delete child rows first
+  await supabase.from('box_scores').delete().eq('event_id', eventId)
+  await supabase.from('player_stats').delete().eq('event_id', eventId)
+  
+  // Delete the event
+  const { error } = await supabase.from('events').delete().eq('id', eventId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  
+  // Also delete the linked league_game if exists
+  if (existingEvent?.league_game_id) {
+    await supabase.from('league_games').delete().eq('id', existingEvent.league_game_id)
+  }
+  
+  return NextResponse.json({ ok: true })
+}
 
     // ── Player stats ────────────────────────────────────────────────────────
     if (action === 'update_player_stats') {
