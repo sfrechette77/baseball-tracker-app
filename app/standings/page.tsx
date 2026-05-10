@@ -266,7 +266,7 @@ export default function StandingsPage() {
       {/* Page title */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
-        <h1 className="text-3xl font-extrabold text-white mt-1">MSBL Standings</h1>
+        <h1 className="text-3xl font-extrabold text-white mt-1">Mid Suburban Baseball League</h1>
         <p className="text-sm text-slate-400 mt-1">11U American Division</p>
       </div>
 
