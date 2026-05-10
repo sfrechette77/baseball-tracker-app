@@ -57,11 +57,28 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'status' |'score' | 'stats' | 'events' | 'standings'
+type Tab = 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
 
 type Field = {
   id: string
   name: string
+}
+
+type TeamRow = {
+  id: string
+  name: string
+}
+
+type LeagueGameAdminRow = {
+  id: string
+  played_at: string
+  home_team_id: string
+  away_team_id: string
+  home_score: number | null
+  away_score: number | null
+  status: string
+  home_team: { name: string } | null
+  away_team: { name: string } | null
 }
 
 type EventListRow = {
@@ -169,6 +186,19 @@ export default function AdminPage() {
   const [statusSaving, setStatusSaving] = useState(false)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
+  // League tab
+const [allTeams, setAllTeams] = useState<TeamRow[]>([])
+const [allLeagueGames, setAllLeagueGames] = useState<LeagueGameAdminRow[]>([])
+const [leagueEditingId, setLeagueEditingId] = useState<string | null>(null)
+const [leagueHomeTeamId, setLeagueHomeTeamId] = useState('')
+const [leagueAwayTeamId, setLeagueAwayTeamId] = useState('')
+const [leaguePlayedAt, setLeaguePlayedAt] = useState('')
+const [leagueHomeScore, setLeagueHomeScore] = useState('')
+const [leagueAwayScore, setLeagueAwayScore] = useState('')
+const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('final')
+const [leagueSaving, setLeagueSaving] = useState(false)
+const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
+
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
   const [fields, setFields] = useState<Field[]>([])
@@ -265,6 +295,38 @@ export default function AdminPage() {
     }
     load()
   }, [statusEventId, password])
+
+  // Load all teams and all league games when League tab is active
+useEffect(() => {
+  if (!password) return
+  const load = async () => {
+    const supabase = createClient()
+    
+    const { data: teamsData } = await supabase
+      .from('teams')
+      .select('id, name')
+      .order('name')
+    if (teamsData) setAllTeams(teamsData)
+    
+    const { data: gamesData } = await supabase
+      .from('league_games')
+      .select(`
+        id, played_at, home_team_id, away_team_id, home_score, away_score, status,
+        home_team:home_team_id (name),
+        away_team:away_team_id (name)
+      `)
+      .order('played_at', { ascending: false })
+    if (gamesData) {
+      const normalized = gamesData.map((g: any) => ({
+        ...g,
+        home_team: Array.isArray(g.home_team) ? g.home_team[0] : g.home_team,
+        away_team: Array.isArray(g.away_team) ? g.away_team[0] : g.away_team,
+      }))
+      setAllLeagueGames(normalized as LeagueGameAdminRow[])
+    }
+  }
+  load()
+}, [password])
 
   // Load existing stats when stats event changes
   useEffect(() => {
@@ -392,6 +454,96 @@ export default function AdminPage() {
     })
   }
 
+  const resetLeagueForm = () => {
+  setLeagueEditingId(null)
+  setLeagueHomeTeamId('')
+  setLeagueAwayTeamId('')
+  setLeaguePlayedAt('')
+  setLeagueHomeScore('')
+  setLeagueAwayScore('')
+  setLeagueStatus('final')
+  setLeagueMsg(null)
+}
+
+const loadLeagueGameForEdit = (game: LeagueGameAdminRow) => {
+  setLeagueEditingId(game.id)
+  setLeagueHomeTeamId(game.home_team_id)
+  setLeagueAwayTeamId(game.away_team_id)
+  // Convert ISO timestamp to datetime-local format
+  const date = new Date(game.played_at)
+  const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  setLeaguePlayedAt(localDateTime)
+  setLeagueHomeScore(game.home_score?.toString() ?? '')
+  setLeagueAwayScore(game.away_score?.toString() ?? '')
+  setLeagueStatus(game.status as any)
+  setLeagueMsg(null)
+}
+
+const saveLeagueGame = async () => {
+  if (!leagueHomeTeamId || !leagueAwayTeamId || !leaguePlayedAt) {
+    setLeagueMsg('❌ Please fill in both teams and date/time')
+    return
+  }
+  if (leagueHomeTeamId === leagueAwayTeamId) {
+    setLeagueMsg('❌ Home and away teams must be different')
+    return
+  }
+  setLeagueSaving(true)
+  setLeagueMsg(null)
+  
+  const action = leagueEditingId ? 'update_league_game' : 'create_league_game'
+  const res = await api({
+    action,
+    leagueGameId: leagueEditingId,
+    homeTeamId: leagueHomeTeamId,
+    awayTeamId: leagueAwayTeamId,
+    playedAt: new Date(leaguePlayedAt).toISOString(),
+    homeScore: leagueHomeScore ? Number(leagueHomeScore) : null,
+    awayScore: leagueAwayScore ? Number(leagueAwayScore) : null,
+    status: leagueStatus,
+  })
+  setLeagueSaving(false)
+  if (res?.error) {
+    setLeagueMsg(`❌ ${res.error}`)
+  } else if (res?.ok) {
+    setLeagueMsg(leagueEditingId ? '✅ Game updated' : '✅ Game created')
+    resetLeagueForm()
+    // Reload list
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('league_games')
+      .select(`
+        id, played_at, home_team_id, away_team_id, home_score, away_score, status,
+        home_team:home_team_id (name),
+        away_team:away_team_id (name)
+      `)
+      .order('played_at', { ascending: false })
+    if (data) {
+      const normalized = data.map((g: any) => ({
+        ...g,
+        home_team: Array.isArray(g.home_team) ? g.home_team[0] : g.home_team,
+        away_team: Array.isArray(g.away_team) ? g.away_team[0] : g.away_team,
+      }))
+      setAllLeagueGames(normalized as LeagueGameAdminRow[])
+    }
+  } else {
+    setLeagueMsg('❌ Save failed')
+  }
+}
+
+const deleteLeagueGame = async () => {
+  if (!leagueEditingId) return
+  if (!confirm('Delete this league game? This cannot be undone.')) return
+  const res = await api({ action: 'delete_league_game', leagueGameId: leagueEditingId })
+  if (res?.error) {
+    setLeagueMsg(`❌ ${res.error}`)
+  } else if (res?.ok) {
+    setAllLeagueGames(prev => prev.filter(g => g.id !== leagueEditingId))
+    resetLeagueForm()
+    setLeagueMsg('✅ Deleted')
+  }
+}
+
   const startNewPractice = () => {
     setEditingEventId(null)
     setFormMode('practice')
@@ -514,12 +666,13 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-5 gap-1">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-6 gap-1">
           {([
             { key: 'status', label: '📡 Status' },
             { key: 'score', label: '🏆 Score' },
             { key: 'stats', label: '📊 Stats' },
-            { key: 'events', label: '📅 Events' },      
+            { key: 'events', label: '📅 Events' },
+            { key: 'league', label: '⚾ League' },
             { key: 'standings', label: '📋 Standings' },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -1000,6 +1153,139 @@ export default function AdminPage() {
             </div>
           </>
         )}
+
+        {/* ── League Tab ─────────────────────────────────────────────────────── */}
+{tab === 'league' && (
+  <>
+    {/* Form */}
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+          {leagueEditingId ? 'Edit League Game' : 'New League Game'}
+        </p>
+        {leagueEditingId && (
+          <button onClick={resetLeagueForm}
+            className="text-xs text-slate-400 hover:text-white">
+            + New
+          </button>
+        )}
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-400">Away Team</label>
+        <select value={leagueAwayTeamId} onChange={e => setLeagueAwayTeamId(e.target.value)}
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          <option value="">— Pick a team —</option>
+          {allTeams.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-400">Home Team</label>
+        <select value={leagueHomeTeamId} onChange={e => setLeagueHomeTeamId(e.target.value)}
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          <option value="">— Pick a team —</option>
+          {allTeams.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-400">Date & Time</label>
+        <input type="datetime-local" value={leaguePlayedAt}
+          onChange={e => setLeaguePlayedAt(e.target.value)}
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-400">Status</label>
+        <select value={leagueStatus} onChange={e => setLeagueStatus(e.target.value as any)}
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          <option value="final">Final</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="forfeit">Forfeit</option>
+          <option value="postponed">Postponed</option>
+          <option value="canceled">Canceled</option>
+        </select>
+      </div>
+
+      {leagueStatus === 'final' && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-slate-400">Away Score</label>
+            <input type="number" value={leagueAwayScore} min={0}
+              onChange={e => setLeagueAwayScore(e.target.value)}
+              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400">Home Score</label>
+            <input type="number" value={leagueHomeScore} min={0}
+              onChange={e => setLeagueHomeScore(e.target.value)}
+              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 pt-2">
+        <button onClick={saveLeagueGame} disabled={leagueSaving}
+          className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+          {leagueSaving ? 'Saving...' : leagueEditingId ? 'Save Changes' : 'Create Game'}
+        </button>
+        {leagueEditingId && (
+          <button onClick={deleteLeagueGame}
+            className="rounded-xl bg-red-900/40 border border-red-500/40 px-4 py-3 text-sm font-bold text-red-300 hover:bg-red-900/60 transition">
+            Delete
+          </button>
+        )}
+      </div>
+      {leagueMsg && <p className="text-sm text-center">{leagueMsg}</p>}
+    </div>
+
+    {/* List */}
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">
+        All League Games ({allLeagueGames.length})
+      </p>
+      {allLeagueGames.length === 0 ? (
+        <p className="text-sm text-slate-500">No league games yet</p>
+      ) : (
+        <div className="space-y-2">
+          {allLeagueGames.map(g => {
+            const date = new Date(g.played_at)
+            const dateLabel = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Chicago',
+              month: 'numeric', day: 'numeric',
+            }).format(date)
+            const isFinal = g.status === 'final' && g.home_score !== null && g.away_score !== null
+            return (
+              <button key={g.id} onClick={() => loadLeagueGameForEdit(g)}
+                className={`w-full text-left rounded-xl border px-3 py-2 transition ${
+                  leagueEditingId === g.id
+                    ? 'border-red-500/40 bg-red-500/10'
+                    : 'border-white/10 bg-white/5 hover:bg-white/10'
+                }`}>
+                <p className="text-xs text-slate-500">{dateLabel}</p>
+                <p className="text-sm text-white">
+                  {g.away_team?.name} @ {g.home_team?.name}
+                </p>
+                {isFinal ? (
+                  <p className="text-xs text-slate-400 tabular-nums">
+                    {g.away_score} – {g.home_score}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">{g.status}</p>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  </>
+)}
 
         {/* ── Standings Tab ──────────────────────────────────────────────── */}
         {tab === 'standings' && (
