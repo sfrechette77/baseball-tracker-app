@@ -117,7 +117,7 @@ if (eventData?.league_game_id) {
 }
 
 return NextResponse.json({ ok: true, teamScore: usTotal, opponentScore: themTotal, result })
-
+    }
     // ── Create a new game/tournament event ──────────────────────────────────
 if (action === 'create_event') {
   const { title, opponent, eventType, startsAt, fieldId, isHome, travelMinutes, travelMiles, notes, gearNotes } = body
