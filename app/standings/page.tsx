@@ -316,24 +316,24 @@ export default function StandingsPage() {
 
       {/* Internal tabs */}
         <div className="grid grid-cols-3 gap-2 mb-4">
-          {([
-            { key: 'standings', label: 'Standings' },
-            { key: 'results', label: 'Results' },
-            { key: 'rules', label: 'MSBL Rules' },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`rounded-xl py-2 px-3 text-sm font-bold transition ${
-                activeTab === key
-                  ? 'bg-red-600 text-white'
-                  : 'bg-white/5 text-slate-400 hover:bg-white/10'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+  {([
+    { key: 'standings', label: 'Standings' },
+    { key: 'results', label: 'Results' },
+    { key: 'rules', label: 'MSBL Rules' },
+  ] as const).map(({ key, label }) => (
+    <button
+      key={key}
+      onClick={() => setActiveTab(key)}
+      className={`rounded-xl py-2 px-3 text-sm font-bold transition ${
+        activeTab === key
+          ? 'bg-red-600 text-white'
+          : 'bg-white/5 text-slate-400 hover:bg-white/10'
+      }`}
+    >
+      {label}
+    </button>
+  ))}
+</div>
 
       {/* Standings table */}
       {activeTab === 'standings' && (
