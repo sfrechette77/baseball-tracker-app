@@ -342,21 +342,6 @@ function EventCard({ event, weather, now, featured = false }: {
         )}
       </div>
 
-      {!isCompleted && event.travel_minutes !== null && (
-        <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-3">
-          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Travel</p>
-          <p className="mt-1 text-sm text-slate-300">
-            🚗 {event.travel_minutes} min{event.travel_miles !== null ? ` • ${event.travel_miles} mi` : ''}
-          </p>
-          {urgency.leaveTime && (
-            <>
-              <p className="text-sm font-semibold text-white">🕒 Leave by {formatChicagoTime(urgency.leaveTime)}</p>
-              {urgency.text && <p className={`mt-1 text-sm font-semibold ${urgency.className}`}>{urgency.text}</p>}
-            </>
-          )}
-        </div>
-      )}
-
       <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-3">
         <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Field</p>
         <p className="mt-1 text-sm font-semibold text-white">{field?.name ?? 'TBD'}</p>
@@ -600,11 +585,6 @@ export default function HomePage() {
                         <span className="text-xs text-slate-400">🌡 {weather.temperature}°F</span>
                       )}
                     </div>
-                    {event.travel_minutes !== null && score === null && (
-                      <p className="mt-1 text-xs text-slate-400">
-                        🚗 {event.travel_minutes} min{event.travel_miles !== null ? ` • ${event.travel_miles} mi` : ''}
-                      </p>
-                    )}
                   </div>
                 )
               })}
