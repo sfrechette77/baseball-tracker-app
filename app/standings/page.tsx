@@ -389,71 +389,104 @@ export default function StandingsPage() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
         <p className="text-slate-400 text-sm">No league games yet.</p>
       </div>
-    ) : (
-      <div className="space-y-2">
-        {leagueGames.map((game) => {
-          const eventId = game.events?.[0]?.id ?? null
-          const homeName = game.home_team?.name ?? 'Unknown'
-          const awayName = game.away_team?.name ?? 'Unknown'
-          const playedDate = new Date(game.played_at)
-          const dateLabel = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Chicago',
-            month: 'short', day: 'numeric',
-          }).format(playedDate)
-          
-          const isFinal = game.status === 'final' && game.home_score !== null && game.away_score !== null
-          const homeWon = isFinal && (game.home_score ?? 0) > (game.away_score ?? 0)
-          const awayWon = isFinal && (game.away_score ?? 0) > (game.home_score ?? 0)
+    ) : (() => {
+      const completed = leagueGames.filter(g => 
+        g.status === 'final' && g.home_score !== null && g.away_score !== null
+      )
+      const upcoming = leagueGames.filter(g => 
+        g.status !== 'final' || g.home_score === null || g.away_score === null
+      ).sort((a, b) => new Date(a.played_at).getTime() - new Date(b.played_at).getTime())
+      
+      const renderGameCard = (game: LeagueGameRow) => {
+        const eventId = game.events?.[0]?.id ?? null
+        const homeName = game.home_team?.name ?? 'Unknown'
+        const awayName = game.away_team?.name ?? 'Unknown'
+        const playedDate = new Date(game.played_at)
+        const dateLabel = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Chicago',
+          month: 'short', day: 'numeric',
+        }).format(playedDate)
+        const timeLabel = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Chicago',
+          hour: 'numeric', minute: '2-digit',
+        }).format(playedDate)
+        
+        const isFinal = game.status === 'final' && game.home_score !== null && game.away_score !== null
+        const homeWon = isFinal && (game.home_score ?? 0) > (game.away_score ?? 0)
+        const awayWon = isFinal && (game.away_score ?? 0) > (game.home_score ?? 0)
 
-          const cardContent = (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{dateLabel}</p>
-              <div className="mt-2 space-y-1">
-                {/* Away team */}
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm ${awayWon ? 'font-bold text-white' : 'text-slate-400'}`}>
-                    {awayName}
-                  </p>
-                  {isFinal && (
-                    <p className={`text-sm tabular-nums ${awayWon ? 'font-bold text-white' : 'text-slate-400'}`}>
-                      {game.away_score}
-                    </p>
-                  )}
-                </div>
-                {/* Home team */}
-                <div className="flex items-center justify-between">
-                  <p className={`text-sm ${homeWon ? 'font-bold text-white' : 'text-slate-400'}`}>
-                    {homeName}
-                  </p>
-                  {isFinal && (
-                    <p className={`text-sm tabular-nums ${homeWon ? 'font-bold text-white' : 'text-slate-400'}`}>
-                      {game.home_score}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {!isFinal && (
-                <p className="mt-2 text-xs text-slate-500 italic">
-                  {game.status === 'scheduled' ? 'Scheduled' : 
-                   game.status === 'postponed' ? 'Postponed' :
-                   game.status === 'forfeit' ? 'Forfeit' :
-                   game.status === 'canceled' ? 'Canceled' : game.status}
+        const cardContent = (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition">
+            <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
+              {dateLabel}{!isFinal && ` · ${timeLabel}`}
+            </p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <p className={`text-sm ${awayWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                  {awayName}
                 </p>
-              )}
+                {isFinal && (
+                  <p className={`text-sm tabular-nums ${awayWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                    {game.away_score}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <p className={`text-sm ${homeWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                  {homeName}
+                </p>
+                {isFinal && (
+                  <p className={`text-sm tabular-nums ${homeWon ? 'font-bold text-white' : 'text-slate-400'}`}>
+                    {game.home_score}
+                  </p>
+                )}
+              </div>
             </div>
-          )
+            {!isFinal && game.status !== 'scheduled' && (
+              <p className="mt-2 text-xs text-slate-500 italic">
+                {game.status === 'postponed' ? 'Postponed' :
+                 game.status === 'forfeit' ? 'Forfeit' :
+                 game.status === 'canceled' ? 'Canceled' : game.status}
+              </p>
+            )}
+          </div>
+        )
+        
+        return eventId ? (
+          <Link key={game.id} href={`/event/${eventId}`}>
+            {cardContent}
+          </Link>
+        ) : (
+          <div key={game.id}>{cardContent}</div>
+        )
+      }
+      
+      return (
+        <div className="space-y-6">
+          {completed.length > 0 && (
+            <section>
+              <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">
+                Recent Results
+              </p>
+              <div className="space-y-2">
+                {completed.map(renderGameCard)}
+              </div>
+            </section>
+          )}
           
-          // If linked to an event, make it tappable to event detail
-          return eventId ? (
-            <Link key={game.id} href={`/event/${eventId}`}>
-              {cardContent}
-            </Link>
-          ) : (
-            <div key={game.id}>{cardContent}</div>
-          )
-        })}
-      </div>
-    )}
+          {upcoming.length > 0 && (
+            <section>
+              <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">
+                Upcoming Games
+              </p>
+              <div className="space-y-2">
+                {upcoming.map(renderGameCard)}
+              </div>
+            </section>
+          )}
+        </div>
+      )
+    })()}
   </div>
 )}
       
