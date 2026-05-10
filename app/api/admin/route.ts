@@ -74,76 +74,6 @@ export async function POST(req: NextRequest) {
       if (eventUpdate.error) {
         return NextResponse.json({ error: `Failed saving event totals: ${eventUpdate.error.message}` }, { status: 500 })
       }
-
-    // ── Create a league game ────────────────────────────────────────────────
-if (action === 'create_league_game') {
-  const { homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status } = body
-  if (!homeTeamId || !awayTeamId || !playedAt) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
-  if (homeTeamId === awayTeamId) {
-    return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
-  }
-  const { error } = await supabase
-    .from('league_games')
-    .insert({
-      home_team_id: homeTeamId,
-      away_team_id: awayTeamId,
-      played_at: playedAt,
-      home_score: homeScore,
-      away_score: awayScore,
-      status: status ?? 'final',
-      entered_by: 'Admin',
-    })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
-}
-
-// ── Update a league game ────────────────────────────────────────────────
-if (action === 'update_league_game') {
-  const { leagueGameId, homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status } = body
-  if (!leagueGameId) {
-    return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
-  }
-  if (homeTeamId === awayTeamId) {
-    return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
-  }
-  const { error } = await supabase
-    .from('league_games')
-    .update({
-      home_team_id: homeTeamId,
-      away_team_id: awayTeamId,
-      played_at: playedAt,
-      home_score: homeScore,
-      away_score: awayScore,
-      status: status ?? 'final',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', leagueGameId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
-}
-
-// ── Delete a league game ────────────────────────────────────────────────
-if (action === 'delete_league_game') {
-  const { leagueGameId } = body
-  if (!leagueGameId) {
-    return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
-  }
-  // Cascade will delete linked box_scores
-  // Also unlink any events that pointed to this league game
-  await supabase
-    .from('events')
-    .update({ league_game_id: null })
-    .eq('league_game_id', leagueGameId)
-  const { error } = await supabase
-    .from('league_games')
-    .delete()
-    .eq('id', leagueGameId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
-}  
-
       return NextResponse.json({ ok: true, teamScore: usTotal, opponentScore: themTotal, result })
     }
 
@@ -194,7 +124,6 @@ if (action === 'delete_league_game') {
       if (readError) {
         return NextResponse.json({ error: `Could not read event: ${readError.message}` }, { status: 500 })
       }
-
       const now = new Date().toISOString()
 
       // Update event
@@ -229,7 +158,6 @@ if (action === 'delete_league_game') {
           })
         }
       }
-
       return NextResponse.json({ ok: true })
     }
 
@@ -327,6 +255,75 @@ if (action === 'delete_league_game') {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
     }
+
+        // ── Create a league game ────────────────────────────────────────────────
+if (action === 'create_league_game') {
+  const { homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status } = body
+  if (!homeTeamId || !awayTeamId || !playedAt) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+  if (homeTeamId === awayTeamId) {
+    return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
+  }
+  const { error } = await supabase
+    .from('league_games')
+    .insert({
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      played_at: playedAt,
+      home_score: homeScore,
+      away_score: awayScore,
+      status: status ?? 'final',
+      entered_by: 'Admin',
+    })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
+// ── Update a league game ────────────────────────────────────────────────
+if (action === 'update_league_game') {
+  const { leagueGameId, homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status } = body
+  if (!leagueGameId) {
+    return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
+  }
+  if (homeTeamId === awayTeamId) {
+    return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
+  }
+  const { error } = await supabase
+    .from('league_games')
+    .update({
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      played_at: playedAt,
+      home_score: homeScore,
+      away_score: awayScore,
+      status: status ?? 'final',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', leagueGameId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
+// ── Delete a league game ────────────────────────────────────────────────
+if (action === 'delete_league_game') {
+  const { leagueGameId } = body
+  if (!leagueGameId) {
+    return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
+  }
+  // Cascade will delete linked box_scores
+  // Also unlink any events that pointed to this league game
+  await supabase
+    .from('events')
+    .update({ league_game_id: null })
+    .eq('league_game_id', leagueGameId)
+  const { error } = await supabase
+    .from('league_games')
+    .delete()
+    .eq('id', leagueGameId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err) {
