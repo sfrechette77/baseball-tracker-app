@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -301,15 +300,6 @@ export default function EventPage() {
               className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition">
               ← Schedule
             </Link>
-            <div className="flex items-center gap-3">
-              <Link href={`/edit-event/${event.id}`}
-                className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/20 transition">
-                Edit
-              </Link>
-              <div className="relative h-10 w-10">
-                <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" />
-              </div>
-            </div>
           </div>
 
           <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">
