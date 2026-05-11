@@ -486,17 +486,6 @@ export default function EventPage() {
           )}
         </div>
 
-        {/* Travel */}
-        {event.travel_minutes !== null && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Travel</p>
-            <p className="mt-2 text-sm text-slate-300">
-              🚗 {event.travel_minutes} min
-              {event.travel_miles !== null ? ` • ${event.travel_miles} miles` : ''}
-            </p>
-          </div>
-        )}
-
         {/* Gear */}
         {gearList.length > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
