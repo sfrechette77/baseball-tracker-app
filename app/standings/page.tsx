@@ -29,8 +29,8 @@ type LeagueGameRow = {
   home_score: number | null
   away_score: number | null
   status: string
-  home_team: { id: string; name: string } | null
-  away_team: { id: string; name: string } | null
+  home_team: { id: string; name: string; division: string | null } | null
+  away_team: { id: string; name: string; division: string | null } | null
   events: { id: string }[] | null  // linked event if exists
 }
 
@@ -226,7 +226,8 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const OUR_TEAM = 'Elite Baseball - Moore'
+const CURRENT_DIVISION = '11U American Division'
+const OUR_TEAM = 'Elite 11U - Moore'
 
 export default function StandingsPage() {
   const [standings, setStandings] = useState<StandingRow[]>([])
@@ -241,6 +242,7 @@ export default function StandingsPage() {
         const { data } = await supabase
           .from('computed_standings')
           .select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against')
+          .eq('division', CURRENT_DIVISION)
         setStandings((data ?? []) as StandingRow[])
       } catch (err) {
         console.error(err)
@@ -258,8 +260,8 @@ export default function StandingsPage() {
       .from('league_games')
       .select(`
         id, played_at, home_score, away_score, status,
-        home_team:home_team_id (id, name),
-        away_team:away_team_id (id, name),
+        home_team:home_team_id (id, name, division),
+        away_team:away_team_id (id, name, division),
         events!events_league_game_id_fkey (id)
       `)
       .order('played_at', { ascending: false })
@@ -270,13 +272,18 @@ export default function StandingsPage() {
     }
     
     if (data) {
-      // Normalize home_team and away_team — Supabase returns them as arrays sometimes
-      const normalized = data.map((g: any) => ({
-        ...g,
-        home_team: Array.isArray(g.home_team) ? g.home_team[0] : g.home_team,
-        away_team: Array.isArray(g.away_team) ? g.away_team[0] : g.away_team,
-      }))
-      setLeagueGames(normalized as LeagueGameRow[])
+  const normalized = data.map((g: any) => ({
+    ...g,
+    home_team: Array.isArray(g.home_team) ? g.home_team[0] : g.home_team,
+    away_team: Array.isArray(g.away_team) ? g.away_team[0] : g.away_team,
+  }))
+  // Filter to games where at least one team is in our division
+  const filtered = normalized.filter((g: any) =>
+    g.home_team?.division === CURRENT_DIVISION ||
+    g.away_team?.division === CURRENT_DIVISION
+  )
+  setLeagueGames(filtered as LeagueGameRow[])
+}
     }
   }
   loadLeagueGames()
