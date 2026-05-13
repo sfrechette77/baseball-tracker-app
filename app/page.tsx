@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { EmptyState } from '@/components/EmptyState'
-import { EventCardSkeleton, RowSkeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -530,19 +529,14 @@ export default function HomePage() {
 
   if (loading) {
   return (
-    <main className="min-h-screen bg-black pb-32 text-white">
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
-        <EventCardSkeleton featured />
-        <div className="space-y-2 pt-2">
-          <RowSkeleton />
-          <RowSkeleton />
-        </div>
+    <main className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
+        <p className="text-slate-400 text-sm">Loading...</p>
       </div>
-      <BottomNav active="home" />
     </main>
   )
 }
-
 
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
