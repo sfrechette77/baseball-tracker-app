@@ -1,14 +1,24 @@
 'use client'
-
 import { createClient } from '@/lib/supabase/client'
 import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+
+// Only allow same-origin relative paths. Rejects:
+//   - Anything not starting with '/'
+//   - Protocol-relative URLs ('//evil.com')
+//   - Backslash tricks ('/\evil.com')
+function safeNext(value: string | null): string {
+  if (!value) return '/'
+  if (!value.startsWith('/')) return '/'
+  if (value.startsWith('//') || value.startsWith('/\\')) return '/'
+  return value
+}
 
 function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? '/'
+  const next = safeNext(searchParams.get('next'))
 
   async function signInWithGoogle() {
     setLoading(true)
