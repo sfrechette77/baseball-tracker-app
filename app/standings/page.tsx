@@ -283,7 +283,6 @@ export default function StandingsPage() {
     g.away_team?.division === CURRENT_DIVISION
   )
   setLeagueGames(filtered as LeagueGameRow[])
-}
     }
   }
   loadLeagueGames()
