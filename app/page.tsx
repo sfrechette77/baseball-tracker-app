@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
+import { EmptyState } from '@/components/EmptyState'
+import { EventCardSkeleton, RowSkeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -426,6 +428,7 @@ export default function HomePage() {
   const [pastGames, setPastGames] = useState<EventRow[]>([])
   const [weatherByEvent, setWeatherByEvent] = useState<WeatherByEvent>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
@@ -436,10 +439,11 @@ export default function HomePage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        setError(null)
         const supabase = createClient()
         const nowIso = new Date().toISOString()
 
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
             travel_minutes, travel_miles, team_score, opponent_score, result,
@@ -450,7 +454,12 @@ export default function HomePage() {
           .order('starts_at', { ascending: true })
           .limit(3)
 
-        if (error || !data) { setLoading(false); return }
+        if (fetchError) {
+          setError("Couldn't load your schedule.")
+          setLoading(false)
+          return
+        }
+        if (!data) { setLoading(false); return }
 
         const normalizedEvents = (data as RawEventRow[]).map(normalizeEvent)
         setEvents(normalizedEvents)
@@ -508,6 +517,7 @@ export default function HomePage() {
         setWeatherByEvent(weatherMap)
       } catch (err) {
         console.error('Unexpected error:', err)
+        setError('Something went wrong loading the schedule.')
       } finally {
         setLoading(false)
       }
@@ -519,15 +529,20 @@ export default function HomePage() {
   const otherEvents = useMemo(() => events.slice(1), [events])
 
   if (loading) {
-    return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading...</p>
+  return (
+    <main className="min-h-screen bg-black pb-32 text-white">
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
+        <EventCardSkeleton featured />
+        <div className="space-y-2 pt-2">
+          <RowSkeleton />
+          <RowSkeleton />
         </div>
-      </main>
-    )
-  }
+      </div>
+      <BottomNav active="home" />
+    </main>
+  )
+}
+
 
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
@@ -540,19 +555,37 @@ export default function HomePage() {
 
         {/* Next Up */}
         {featuredEvent ? (
-          <section>
-            <EventCard
-              event={featuredEvent}
-              weather={weatherByEvent[featuredEvent.id]}
-              now={now}
-              featured
-            />
-          </section>
-        ) : (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-400">No upcoming events scheduled.</p>
-          </div>
-        )}
+  <section>
+    <EventCard
+      event={featuredEvent}
+      weather={weatherByEvent[featuredEvent.id]}
+      now={now}
+      featured
+    />
+  </section>
+) : error ? (
+  <EmptyState
+    variant="error"
+    icon="⚠️"
+    title={error}
+    description="Pull down to refresh, or check back in a minute."
+    action={
+      <button
+        onClick={() => window.location.reload()}
+        className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20 transition"
+      >
+        Try again
+      </button>
+    }
+  />
+) : (
+  <EmptyState
+    icon="⚾"
+    title="No upcoming events"
+    description="Check back soon — new games and practices will appear here once they're scheduled."
+  />
+)}
+
 
         {/* Coming Up */}
         {otherEvents.length > 0 && (
