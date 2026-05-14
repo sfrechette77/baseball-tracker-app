@@ -66,7 +66,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black min-h-screen`}
       >
-        <<TeamProvider>
+        <TeamProvider>
           <Header userMenu={<UserMenu />} />
           <main>{children}</main>
         </TeamProvider>
