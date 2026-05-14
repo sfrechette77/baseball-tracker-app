@@ -165,9 +165,8 @@ export default function PlayerPage() {
       rbi: acc.rbi + s.rbi,
       runs: acc.runs + s.runs,
       walks: acc.walks + (s.walks ?? 0),
-      strikeouts: acc.strikeouts + s.strikeouts,
     }),
-    { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0 }
+    { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0 }
   ), [stats])
 
   const obp = useMemo(() => {
@@ -278,7 +277,7 @@ export default function PlayerPage() {
               <p className="text-[10px] uppercase tracking-wide text-slate-400">RBI</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{seasonBatting.at_runs}</p>
+              <p className="text-2xl font-extrabold text-white">{seasonBatting.runs}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">R</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
