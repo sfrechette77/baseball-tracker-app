@@ -291,11 +291,11 @@ export default function PlayerPage() {
         {seasonPitching.innings_pitched > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Pitching</p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2 mb-2">
               {[
                 { label: 'IP', value: seasonPitching.innings_pitched },
                 { label: 'K', value: seasonPitching.strikeouts_pitching },
-                { label: 'Pitches', value: seasonPitching.pitch_count },
+                { label: 'H', value: seasonPitching.hits_allowed },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
                   <p className="text-2xl font-extrabold text-red-400">{value}</p>
@@ -305,7 +305,7 @@ export default function PlayerPage() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'H', value: seasonPitching.hits_allowed },
+                { label: 'Pitches', value: seasonPitching.pitch_count },
                 { label: 'BB', value: seasonPitching.walks_allowed },
                 { label: 'ER', value: seasonPitching.earned_runs },
               ].map(({ label, value }) => (
