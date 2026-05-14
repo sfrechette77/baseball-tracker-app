@@ -255,11 +255,11 @@ export default function PlayerPage() {
           <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Batting</p>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-red-400">{calcAvg(seasonBatting.hits, seasonBatting.at_bats)}</p>
+              <p className="text-2xl font-extrabold text-white-400">{calcAvg(seasonBatting.hits, seasonBatting.at_bats)}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">AVG</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-red-400">{obp}</p>
+              <p className="text-2xl font-extrabold text-white-400">{obp}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">OBP</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
@@ -298,7 +298,7 @@ export default function PlayerPage() {
                 { label: 'H', value: seasonPitching.hits_allowed },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-                  <p className="text-2xl font-extrabold text-red-400">{value}</p>
+                  <p className="text-2xl font-extrabold text-white-400">{value}</p>
                   <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
                 </div>
               ))}
