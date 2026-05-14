@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TeamProvider } from "@/components/team-context";
 import { Header } from "@/components/header";
+import { UserMenu } from "@/components/user-menu";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -65,8 +66,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black min-h-screen`}
       >
-        <TeamProvider>
-          <Header />
+        <<TeamProvider>
+          <Header userMenu={<UserMenu />} />
           <main>{children}</main>
         </TeamProvider>
       </body>
