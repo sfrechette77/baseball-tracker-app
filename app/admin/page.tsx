@@ -208,7 +208,7 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [formMode, setFormMode] = useState<'none' | 'game' | 'practice'>('none')
   const [eventForm, setEventForm] = useState({
-    title: '', opponent: '', opponentTeamID: '', eventType: 'game' as 'game' | 'tournament' | 'practice',
+    title: '', opponent: '', opponentTeamId: '', eventType: 'game' as 'game' | 'tournament' | 'practice',
     startsAt: '', fieldId: '', isHome: false,
     travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
   })
