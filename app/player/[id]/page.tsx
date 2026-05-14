@@ -187,7 +187,7 @@ export default function PlayerPage() {
         hits_allowed: acc.hits_allowed + (s.hits_allowed ?? 0),
         earned_runs: acc.earned_runs + (s.earned_runs ?? 0),
       }),
-      { pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
+      { pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
     )
     return {
       ...totals,
