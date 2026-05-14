@@ -267,27 +267,23 @@ export default function PlayerPage() {
               <p className="text-2xl font-extrabold text-white">{seasonBatting.hits}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">Hits</p>
             </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{seasonBatting.at_bats}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">AB</p>
-            </div>
           </div>
           <div className="grid grid-cols-4 gap-2">
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{seasonBatting.rbi}</p>
+              <p className="text-xl font-extrabold text-white">{seasonBatting.at_bats}</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">AB</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
+              <p className="text-xl font-extrabold text-white">{seasonBatting.rbi}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">RBI</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{seasonBatting.runs}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Runs</p>
+              <p className="text-2xl font-extrabold text-white">{seasonBatting.at_runs}</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">R</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-xl font-extrabold text-white">{seasonBatting.walks}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">BB</p>
-            </div>
-            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
-              <p className="text-2xl font-extrabold text-white">{seasonBatting.strikeouts}</p>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">K</p>
             </div>
           </div>
         </div>
