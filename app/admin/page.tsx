@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { useCurrentTeam } from '@/components/team-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -153,6 +154,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
 export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('status')
+  const { currentTeam } = useCurrentTeam()
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -222,8 +224,10 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
     const supabase = createClient()
     const [{ data: eventsForScore }, { data: allEventsData }] = await Promise.all([
       supabase.from('events').select('id, title, opponent, starts_at, event_type, team_score, opponent_score, result')
+        .eq('team_id', currentTeam.id)
         .neq('event_type', 'practice').order('starts_at', { ascending: false }),
       supabase.from('events').select('id, title, opponent, event_type, starts_at, field_id, is_home, travel_minutes, travel_miles, notes, gear_notes, status, team_score')
+        .eq('team_id', currentTeam.id)
         .order('starts_at', { ascending: false }),
     ])
     setEvents((eventsForScore ?? []) as EventRow[])
@@ -235,7 +239,7 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
     const load = async () => {
       const supabase = createClient()
       const [{ data: playersData }, { data: standingsData }, { data: fieldsData }] = await Promise.all([
-        supabase.from('players').select('id, name, jersey_number').order('jersey_number', { ascending: true }),
+        supabase.from('players').select('id, name, jersey_number').eq('team_id', currentTeam.id).order('jersey_number', { ascending: true }),
         supabase.from('standings').select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against'),
         supabase.from('fields').select('id, name').order('name', { ascending: true }),
       ])
@@ -250,7 +254,7 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password])
+  }, [password, currentTeam.id])
 
   // Load existing box scores AND is_home when score event changes
   useEffect(() => {
@@ -351,7 +355,7 @@ useEffect(() => {
     const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, password })
+      body: JSON.stringify({ ...body, password, teamId: currentTeam.id })
     })
     if (res.status === 401) { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }
     return res.json()
