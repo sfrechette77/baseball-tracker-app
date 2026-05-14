@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { useCurrentTeam } from '@/components/team-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -226,14 +227,12 @@ function BottomNav({ active }: { active: 'home' | 'schedule' | 'standings' | 'st
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const CURRENT_DIVISION = '11U American Division'
-const OUR_TEAM = 'Elite 11U - Moore'
-
 export default function StandingsPage() {
   const [standings, setStandings] = useState<StandingRow[]>([])
   const [leagueGames, setLeagueGames] = useState<LeagueGameRow[]>([])
   const [activeTab, setActiveTab] = useState<'standings' | 'results' | 'rules'>('standings')
   const [loading, setLoading] = useState(true)
+  const { currentTeam } = useCurrentTeam()
 
   useEffect(() => {
     const load = async () => {
@@ -242,7 +241,7 @@ export default function StandingsPage() {
         const { data } = await supabase
           .from('computed_standings')
           .select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against')
-          .eq('division', CURRENT_DIVISION)
+          .eq('division', currentTeam.division)
         setStandings((data ?? []) as StandingRow[])
       } catch (err) {
         console.error(err)
@@ -251,7 +250,7 @@ export default function StandingsPage() {
       }
     }
     load()
-  }, [])
+  }, [currentTeam.division])
 
   useEffect(() => {
   const loadLeagueGames = async () => {
@@ -279,14 +278,14 @@ export default function StandingsPage() {
   }))
   // Filter to games where at least one team is in our division
   const filtered = normalized.filter((g: any) =>
-    g.home_team?.division === CURRENT_DIVISION ||
-    g.away_team?.division === CURRENT_DIVISION
+    g.home_team?.division === currentTeam.division ||
+    g.away_team?.division === currentTeam.division
   )
   setLeagueGames(filtered as LeagueGameRow[])
     }
   }
   loadLeagueGames()
-}, [])
+}, [currentTeam.division])
 
   const sorted = useMemo(() => {
     return [...standings].sort((a, b) => {
@@ -317,7 +316,7 @@ export default function StandingsPage() {
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-xl font-extrabold text-white mt-1">Mid Suburban Baseball League</h1>
-        <p className="text-sm text-slate-400 mt-1">11U American Division</p>
+        <p className="text-sm text-slate-400 mt-1">{current.Team.division}</p>
       </div>
 
       {/* Internal tabs */}
@@ -360,7 +359,7 @@ export default function StandingsPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {sorted.map((team) => {
-                  const isUs = team.team_name === OUR_TEAM
+                  const isUs = team.team_name === currentTeam.id
                   const diff = team.runs_for - team.runs_against
                   return (
                     <tr key={team.id} className={isUs ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
