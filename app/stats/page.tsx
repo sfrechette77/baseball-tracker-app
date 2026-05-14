@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { useCurrentTeam } from '@/components/team-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -117,13 +118,14 @@ export default function StatsPage() {
   const [stats, setStats] = useState<StatRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'avg' | 'hits' | 'rbi' | 'runs'>('avg')
+  const { currentTeam } = useCurrentTeam()
 
   useEffect(() => {
     const load = async () => {
       try {
         const supabase = createClient()
         const [{ data: playerData }, { data: statData }] = await Promise.all([
-          supabase.from('players').select('id, name, jersey_number, position').order('jersey_number', { ascending: true }),
+          supabase.from('players').select('id, name, jersey_number, position').eq('team_id', currentTeam.id).order('jersey_number', { ascending: true }),
           supabase.from('player_stats').select('player_id, at_bats, hits, rbi, runs, strikeouts')
         ])
         setPlayers((playerData ?? []) as Player[])
@@ -135,7 +137,7 @@ export default function StatsPage() {
       }
     }
     load()
-  }, [])
+  }, [currentTeam.id])
 
   const playersWithStats = useMemo((): PlayerWithStats[] => {
     return players.map(player => {
