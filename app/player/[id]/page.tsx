@@ -167,7 +167,7 @@ export default function PlayerPage() {
       walks: acc.walks + (s.walks ?? 0),
       strikeouts: acc.strikeouts + s.strikeouts,
     }),
-    { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0 }
+    { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0 }
   ), [stats])
 
   const obp = useMemo(() => {
