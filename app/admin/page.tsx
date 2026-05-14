@@ -208,7 +208,7 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [formMode, setFormMode] = useState<'none' | 'game' | 'practice'>('none')
   const [eventForm, setEventForm] = useState({
-    title: '', opponent: '', eventType: 'game' as 'game' | 'tournament' | 'practice',
+    title: '', opponent: '', opponentTeamID: '', eventType: 'game' as 'game' | 'tournament' | 'practice',
     startsAt: '', fieldId: '', isHome: false,
     travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
   })
@@ -453,7 +453,7 @@ useEffect(() => {
     setFormMode('game')
     setEventMsg(null)
     setEventForm({
-      title: '', opponent: '', eventType: 'game', startsAt: '', fieldId: '',
+      title: '', opponent: '', opponentTeamID: '', eventType: 'game', startsAt: '', fieldId: '',
       isHome: false, travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
     })
   }
@@ -553,7 +553,7 @@ const deleteLeagueGame = async () => {
     setFormMode('practice')
     setEventMsg(null)
     setEventForm({
-      title: 'Practice', opponent: '', eventType: 'practice', startsAt: '', fieldId: '',
+      title: 'Practice', opponent: '', opponentTeamID: '', eventType: 'practice', startsAt: '', fieldId: '',
       isHome: false, travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
     })
   }
@@ -562,9 +562,13 @@ const deleteLeagueGame = async () => {
     setEditingEventId(ev.id)
     setFormMode(ev.event_type === 'practice' ? 'practice' : 'game')
     setEventMsg(null)
+    // Try to match the stored opponent name to a team in allTeams.
+    // If it matches, pre-fill the dropdown; if not, the form falls back gracefully.
+    const matchedTeam = allTeams.find(t => t.name === ev.opponent)
     setEventForm({
       title: ev.title,
       opponent: ev.opponent ?? '',
+      opponentTeamId: matchedTeam?.id ?? '',
       eventType: (ev.event_type as 'game' | 'tournament' | 'practice') ?? 'game',
       startsAt: toDatetimeLocal(ev.starts_at),
       fieldId: ev.field_id ?? '',
@@ -593,6 +597,9 @@ const deleteLeagueGame = async () => {
     const payload = {
       title: eventForm.title,
       opponent: formMode === 'practice' ? null : eventForm.opponent,
+      opponentTeamId: (formMode === 'game' && eventForm.eventType === 'game')
+        ? (eventForm.opponentTeamId || null)
+        : null,
       eventType: formMode === 'practice' ? 'practice' : eventForm.eventType,
       startsAt: startsAtIso,
       fieldId: eventForm.fieldId || null,
@@ -1030,20 +1037,47 @@ const deleteLeagueGame = async () => {
                 {formMode === 'game' && (
                   <>
                     <div className="space-y-2">
-                      <label className="text-xs text-slate-400">Opponent</label>
-                      <input type="text" value={eventForm.opponent}
-                        onChange={e => setEventForm({ ...eventForm, opponent: e.target.value })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
-                    </div>
-
-                    <div className="space-y-2">
                       <label className="text-xs text-slate-400">Type</label>
                       <select value={eventForm.eventType}
-                        onChange={e => setEventForm({ ...eventForm, eventType: e.target.value as 'game' | 'tournament' })}
+                        onChange={e => setEventForm({ ...eventForm, eventType: e.target.value as 'game' | 'tournament', opponent: '', opponentTeamId: '' })}
                         className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
                         <option value="game">Game</option>
                         <option value="tournament">Tournament</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Opponent</label>
+                      {eventForm.eventType === 'game' ? (
+                        <select
+                          value={eventForm.opponentTeamId}
+                          onChange={e => {
+                            const id = e.target.value
+                            const team = allTeams.find(t => t.id === id)
+                            setEventForm({
+                              ...eventForm,
+                              opponentTeamId: id,
+                              opponent: team?.name ?? '',
+                            })
+                          }}
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                        >
+                          <option value="">— Pick an MSBL team —</option>
+                          {allTeams
+                            .filter(t => t.id !== currentTeam.id)
+                            .map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={eventForm.opponent}
+                          onChange={e => setEventForm({ ...eventForm, opponent: e.target.value })}
+                          placeholder="Tournament opponent name"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-2">
