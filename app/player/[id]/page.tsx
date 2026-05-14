@@ -293,7 +293,7 @@ export default function PlayerPage() {
         </div>
 
         {/* Season Pitching Summary — only if pitched */}
-        {seasonPitching > 0 && (
+        {seasonPitching.innings_pitched > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Pitching</p>
             <div className="grid grid-cols-4 gap-2">
