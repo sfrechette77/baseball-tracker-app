@@ -199,7 +199,7 @@ export default function PlayerPage() {
       .sort((a, b) => {
         const aDate = a.events?.starts_at ?? ''
         const bDate = b.events?.starts_at ?? ''
-        return bDate.localeCompare(bDate) // newest first
+        return bDate.localeCompare(aDate) // newest first
       }), [stats])
 
   if (loading) {
@@ -252,7 +252,7 @@ export default function PlayerPage() {
 
         {/* Season Batting Summary */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Batting</p>
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3 text-center">Season Batting</p>
           <div className="grid grid-cols-3 gap-3 mb-3">
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-white-400">{calcAvg(seasonBatting.hits, seasonBatting.at_bats)}</p>
@@ -290,7 +290,7 @@ export default function PlayerPage() {
         {/* Season Pitching Summary — only if pitched */}
         {seasonPitching.innings_pitched > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Pitching</p>
+            <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3 text-center">Season Pitching</p>
             <div className="grid grid-cols-3 gap-2 mb-2">
               {[
                 { label: 'IP', value: seasonPitching.innings_pitched },
@@ -322,7 +322,7 @@ export default function PlayerPage() {
         {gamesWithStats.length > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
             <div className="px-4 py-3 border-b border-white/10">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Game Log</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold text-center">Game Log</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[380px] text-sm">
@@ -364,7 +364,7 @@ export default function PlayerPage() {
                           )}
                         </td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.at_bats}</td>
-                        <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
+                        <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.hits}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks ?? 0}</td>
