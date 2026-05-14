@@ -101,7 +101,6 @@ export default function RosterPage() {
         const { data } = await supabase
           .from('players')
           .select('id, name, jersey_number, position')
-          .eq('team_id', currentTeam.id)
         setPlayers((data ?? []) as Player[])
       } catch (err) {
         console.error(err)
@@ -110,7 +109,7 @@ export default function RosterPage() {
       }
     }
     load()
-  }, [currentTeam.id])
+  }, [])
 
   // Sort by jersey number numerically. "00" sorts as 0 but after "0".
   const sortedPlayers = useMemo(() => {
