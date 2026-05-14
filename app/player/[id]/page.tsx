@@ -291,7 +291,7 @@ export default function PlayerPage() {
         {seasonPitching.innings_pitched > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Pitching</p>
-            <div className="grid grid-cols-4 gap-2 mb-2">
+            <div className="grid grid-cols-3 gap-2 mb-2">
               {[
                 { label: 'IP', value: seasonPitching.innings_pitched },
                 { label: 'K', value: seasonPitching.strikeouts_pitching },
