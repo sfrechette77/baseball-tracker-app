@@ -316,7 +316,7 @@ export default function StandingsPage() {
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-xl font-extrabold text-white mt-1">Mid Suburban Baseball League</h1>
-        <p className="text-sm text-slate-400 mt-1">{current.Team.division}</p>
+        <p className="text-sm text-slate-400 mt-1">{currentTeam.division}</p>
       </div>
 
       {/* Internal tabs */}
