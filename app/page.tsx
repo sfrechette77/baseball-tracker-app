@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { EmptyState } from '@/components/EmptyState'
+import { useCurrentTeam } from '@/components/team-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -429,6 +430,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
+  const { currentTeam } = useCurrentTeam()
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -449,6 +451,7 @@ export default function HomePage() {
             display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code),
             team:team_id (arrival_buffer_minutes)`)
+          .eq('team_id', currentTeam.id)
           .gte('starts_at', nowIso)
           .order('starts_at', { ascending: true })
           .limit(3)
@@ -469,6 +472,7 @@ export default function HomePage() {
             travel_minutes, travel_miles, team_score, opponent_score, result,
             display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code)`)
+          .eq('team_id', currentTeam.id)
           .lt('starts_at', nowIso)
           .neq('event_type', 'practice')
           .order('starts_at', { ascending: false })
@@ -522,7 +526,7 @@ export default function HomePage() {
       }
     }
     loadData()
-  }, [])
+  }, [currentTeam.id])
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
