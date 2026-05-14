@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -30,10 +29,13 @@ type StatRow = {
   rbi: number
   runs: number
   strikeouts: number
+  walks: number
   pitch_count: number
   innings_pitched: number
   strikeouts_pitching: number
-  walks: number
+  walks_allowed: number
+  hits_allowed: number
+  earned_runs: number
   events: {
     title: string
     opponent: string | null
@@ -139,8 +141,8 @@ export default function PlayerPage() {
         const [{ data: playerData }, { data: statsData }] = await Promise.all([
           supabase.from('players').select('id, name, jersey_number, position').eq('id', playerId).single(),
           supabase.from('player_stats')
-            .select(`id, event_id, at_bats, hits, rbi, runs, strikeouts,
-              pitch_count, innings_pitched, strikeouts_pitching, walks,
+            .select(`id, event_id, at_bats, hits, rbi, runs, strikeouts, walks,
+              pitch_count, innings_pitched, strikeouts_pitching, walks_allowed, hits_allowed, earned_runs,
               events (title, opponent, starts_at, result)`)
             .eq('player_id', playerId)
             .order('event_id', { ascending: true })
@@ -162,10 +164,18 @@ export default function PlayerPage() {
       hits: acc.hits + s.hits,
       rbi: acc.rbi + s.rbi,
       runs: acc.runs + s.runs,
+      walks: acc.walks + (s.walks ?? 0),
       strikeouts: acc.strikeouts + s.strikeouts,
     }),
     { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0 }
   ), [stats])
+
+  const obp = useMemo(() => {
+    const plateAppearances = seasonBatting.at_bats + seasonBatting.walks
+    if (plateAppearances === 0) return '.000'
+    const val = (seasonBatting.hits + seasonBatting.walks) / plateAppearances
+    return val >= 1 ? '1.000' : '.' + val.toFixed(3).split('.')[1]
+  }, [seasonBatting])
 
   const seasonPitching = useMemo(() => {
     const totals = stats.reduce(
@@ -173,7 +183,9 @@ export default function PlayerPage() {
         pitch_count: acc.pitch_count + (s.pitch_count ?? 0),
         innings_pitched: acc.innings_pitched + (s.innings_pitched ?? 0),
         strikeouts_pitching: acc.strikeouts_pitching + (s.strikeouts_pitching ?? 0),
-        walks: acc.walks + (s.walks ?? 0),
+        walks_allowed: acc.walks_allowed + (s.walks_allowed ?? 0),
+        hits_allowed: acc.hits_allowed + (s.hits_allowed ?? 0),
+        earned_runs: acc.earned_runs + (s.earned_runs ?? 0),
       }),
       { pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks: 0 }
     )
@@ -188,7 +200,7 @@ export default function PlayerPage() {
       .sort((a, b) => {
         const aDate = a.events?.starts_at ?? ''
         const bDate = b.events?.starts_at ?? ''
-        return aDate.localeCompare(bDate)
+        return bDate.localeCompare(bDate) // newest first
       }), [stats])
 
   if (loading) {
@@ -248,6 +260,10 @@ export default function PlayerPage() {
               <p className="text-[10px] uppercase tracking-wide text-slate-400">AVG</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
+              <p className="text-2xl font-extrabold text-red-400">{obp}</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">OBP</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-white">{seasonBatting.hits}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">Hits</p>
             </div>
@@ -256,7 +272,7 @@ export default function PlayerPage() {
               <p className="text-[10px] uppercase tracking-wide text-slate-400">AB</p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-white">{seasonBatting.rbi}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">RBI</p>
@@ -266,6 +282,10 @@ export default function PlayerPage() {
               <p className="text-[10px] uppercase tracking-wide text-slate-400">Runs</p>
             </div>
             <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
+              <p className="text-xl font-extrabold text-white">{seasonBatting.walks}</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">BB</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
               <p className="text-2xl font-extrabold text-white">{seasonBatting.strikeouts}</p>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">K</p>
             </div>
@@ -273,19 +293,30 @@ export default function PlayerPage() {
         </div>
 
         {/* Season Pitching Summary — only if pitched */}
-        {seasonPitching !== null && (
+        {seasonPitching > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-3">Season Pitching</p>
             <div className="grid grid-cols-4 gap-2">
               {[
-                { label: 'Pitches', value: seasonPitching.pitch_count },
                 { label: 'IP', value: seasonPitching.innings_pitched },
                 { label: 'K', value: seasonPitching.strikeouts_pitching },
-                { label: 'BB', value: seasonPitching.walks },
+                { label: 'Pitches', value: seasonPitching.pitch_count },
               ].map(({ label, value }) => (
-                <div key={label} className="rounded-xl bg-white/10 p-2 text-center border border-white/10">
+                <div key={label} className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
+                  <p className="text-2xl font-extrabold text-red-400">{value}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'H', value: seasonPitching.hits_allowed },
+                { label: 'BB', value: seasonPitching.walks_allowed },
+                { label: 'ER', value: seasonPitching.earned_runs },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl bg-white/10 p-3 text-center border border-white/10">
                   <p className="text-xl font-extrabold text-white">{value}</p>
-                  <p className="text-[9px] uppercase tracking-wide text-slate-400">{label}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
                 </div>
               ))}
             </div>
@@ -307,6 +338,7 @@ export default function PlayerPage() {
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">H</th>
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">RBI</th>
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">R</th>
+                    <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">BB</th>
                     <th className="py-2 px-2 text-center text-[10px] uppercase tracking-wide text-slate-500 font-semibold">K</th>
                   </tr>
                 </thead>
@@ -340,6 +372,7 @@ export default function PlayerPage() {
                         <td className="py-3 px-2 text-center tabular-nums text-white font-semibold">{s.hits}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.rbi}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.runs}</td>
+                        <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.walks ?? 0}</td>
                         <td className="py-3 px-2 text-center tabular-nums text-slate-400">{s.strikeouts}</td>
                       </tr>
                     )
