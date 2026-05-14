@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { UserMenu } from '@/components/user-menu'
+import { useEffect, useRef, useState, ReactNode } from 'react'
 import { useCurrentTeam } from '@/components/team-context'
 
 function ChevronDownIcon() {
@@ -19,7 +18,7 @@ function ChevronDownIcon() {
   )
 }
 
-export function Header() {
+export function Header({ userMenu }: { userMenu: ReactNode }) {
   const { currentTeam, setCurrentTeamId, availableTeams } = useCurrentTeam()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -109,7 +108,7 @@ export function Header() {
           )}
         </div>
 
-        <UserMenu />
+        {UserMenu}
       </div>
     </header>
   )
