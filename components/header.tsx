@@ -108,7 +108,7 @@ export function Header({ userMenu }: { userMenu: ReactNode }) {
           )}
         </div>
 
-        {UserMenu}
+        {userMenu}
       </div>
     </header>
   )
