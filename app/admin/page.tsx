@@ -453,7 +453,7 @@ useEffect(() => {
     setFormMode('game')
     setEventMsg(null)
     setEventForm({
-      title: '', opponent: '', opponentTeamID: '', eventType: 'game', startsAt: '', fieldId: '',
+      title: '', opponent: '', opponentTeamId: '', eventType: 'game', startsAt: '', fieldId: '',
       isHome: false, travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
     })
   }
@@ -553,7 +553,7 @@ const deleteLeagueGame = async () => {
     setFormMode('practice')
     setEventMsg(null)
     setEventForm({
-      title: 'Practice', opponent: '', opponentTeamID: '', eventType: 'practice', startsAt: '', fieldId: '',
+      title: 'Practice', opponent: '', opponentTeamId: '', eventType: 'practice', startsAt: '', fieldId: '',
       isHome: false, travelMinutes: '', travelMiles: '', notes: '', gearNotes: '',
     })
   }
