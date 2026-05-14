@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
+import { useCurrentTeam } from '@/components/team-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -146,6 +147,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>('upcoming')
+  const { currentTeam } = useCurrentTeam()
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -155,6 +157,7 @@ export default function SchedulePage() {
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status,
             team_score, opponent_score, result, display_status, is_home, fields (name)`)
+          .eq('team_id', currentTeam.id)
           .order('starts_at', { ascending: true })
         if (error) setErrorMessage(error.message)
         else setEvents(((data ?? []) as RawEventRow[]).map(normalizeEvent))
@@ -165,7 +168,7 @@ export default function SchedulePage() {
       }
     }
     loadEvents()
-  }, [])
+  }, [currentTeam.id])
 
   const filteredEvents = useMemo(() => {
     const startOfToday = getStartOfTodayChicago()
