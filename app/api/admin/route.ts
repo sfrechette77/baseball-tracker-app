@@ -8,29 +8,6 @@ function getSupabase() {
   return createClient(url, key)
 }
 
-// Legacy map — used only as a fallback for old hardcoded opponent names.
-// Going forward (Wave 2), opponent selection becomes a dropdown of MSBL teams
-// and the team_id is passed from the client instead of being looked up.
-const OPPONENT_TO_TEAM_ID: Record<string, string> = {
-  'Chicago Bandits - Navy': '23ef26f2-afa5-4853-bca1-63d1badb7e8c',
-  'Chicago Bandits - Green': '69506e8b-0cf1-4afc-9929-e070fded2235',
-  'Dunham Bulls': '661a07a3-5b70-4875-9176-71ec06ed76d6',
-  'Dunham Bulls - White': '661a07a3-5b70-4875-9176-71ec06ed76d6',
-  'Lake County Raiders': 'fb3e14ed-3093-46db-9554-106f11dd7172',
-  'LC Raiders': 'fb3e14ed-3093-46db-9554-106f11dd7172',
-  'JHEY - American': '63cfd7e4-f161-4927-b41d-613c1c2abe2c',
-  'JHey - American': '63cfd7e4-f161-4927-b41d-613c1c2abe2c',
-  'West Englewood Tigers': '16a0be35-4e31-471c-b678-cf8002e44cc1',
-  'W. Englewood Tigers': '16a0be35-4e31-471c-b678-cf8002e44cc1',
-  '5-Star Bandits - Navy': '23ef26f2-afa5-4853-bca1-63d1badb7e8c',
-  '5-Star Bandits - Green': '69506e8b-0cf1-4afc-9929-e070fded2235',
-}
-
-function getMsblTeamId(opponent: string | null): string | null {
-  if (!opponent) return null
-  return OPPONENT_TO_TEAM_ID[opponent] ?? null
-}
-
 export async function POST(req: NextRequest) {
   const adminPassword = process.env.ADMIN_PASSWORD
   const body = await req.json()
@@ -146,14 +123,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing teamId' }, { status: 400 })
       }
 
-      // Check if this is an MSBL game (opponent matches a division team)
-      const opponentTeamId = eventType === 'game' ? getMsblTeamId(opponent) : null
-      let leagueGameId: string | null = null
+      // Check if this is an MSBL game with an opponent team selected
+        const opponentTeamId = eventType === 'game' ? (body.opponentTeamId ?? null) : null
+        let leagueGameId: string | null = null
 
-      if (opponentTeamId) {
-        // Create a corresponding league_games row using the current team
-        const homeId = isHome ? teamId : opponentTeamId
-        const awayId = isHome ? opponentTeamId : teamId
+        if (opponentTeamId) {
+          // Create a corresponding league_games row using the current team
+          const homeId = isHome ? teamId : opponentTeamId
+          const awayId = isHome ? opponentTeamId : teamId
 
         const { data: lgData, error: lgError } = await supabase
           .from('league_games')
@@ -319,7 +296,8 @@ export async function POST(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
       // Sync to linked league_game if exists
-      const opponentTeamId = eventType === 'game' ? getMsblTeamId(opponent) : null
+      // Sync to linked league_game if exists
+      const opponentTeamId = eventType === 'game' ? (body.opponentTeamId ?? null) : null
 
       if (existingEvent?.league_game_id && opponentTeamId) {
         // Update the existing league_game with new metadata
