@@ -50,7 +50,7 @@ type EventRow = {
   result: string | null
   is_home: boolean | null
   team_id: string | null
-  team: { id: string; name: string } | { id: string; name: string }[] | null
+  team: { id: string; name: string } | null
   fields: FieldRow[] | null
 }
 
