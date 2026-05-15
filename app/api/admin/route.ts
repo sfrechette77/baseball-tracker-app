@@ -44,6 +44,34 @@ export async function POST(req: NextRequest) {
       const ownershipError = await verifyEventOwnership(eventId)
       if (ownershipError) return NextResponse.json({ error: ownershipError }, { status: 403 })
 
+      // Look up the event's team_id and the opponent's team_id (if any)
+      const { data: eventInfo } = await supabase
+        .from('events')
+        .select('team_id, opponent, league_game_id')
+        .eq('id', eventId)
+        .single()
+
+      let opponentTeamId: string | null = null
+      if (eventInfo?.league_game_id) {
+        // Get opponent from linked league_game
+        const { data: lg } = await supabase
+          .from('league_games')
+          .select('home_team_id, away_team_id')
+          .eq('id', eventInfo.league_game_id)
+          .single()
+        if (lg) {
+          opponentTeamId = lg.home_team_id === eventInfo.team_id ? lg.away_team_id : lg.home_team_id
+        }
+      } else if (eventInfo?.opponent) {
+        // Fallback: look up by name
+        const { data: opp } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('name', eventInfo.opponent)
+          .maybeSingle()
+        opponentTeamId = opp?.id ?? null
+      }
+
       const usTotal = usInnings.reduce((sum: number, n: number) => sum + (Number(n) || 0), 0)
       const themTotal = themInnings.reduce((sum: number, n: number) => sum + (Number(n) || 0), 0)
       const result =
@@ -53,7 +81,7 @@ export async function POST(req: NextRequest) {
       const usUpsert = await supabase
         .from('box_scores')
         .upsert({
-          event_id: eventId, team: 'us',
+          event_id: eventId, team: 'them', team_id: opponentTeamId,
           inning_1: usInnings[0] ?? 0, inning_2: usInnings[1] ?? 0,
           inning_3: usInnings[2] ?? 0, inning_4: usInnings[3] ?? 0,
           inning_5: usInnings[4] ?? 0, inning_6: usInnings[5] ?? 0,
@@ -66,7 +94,7 @@ export async function POST(req: NextRequest) {
       const themUpsert = await supabase
         .from('box_scores')
         .upsert({
-          event_id: eventId, team: 'them',
+          event_id: eventId, team: 'them', team_id: opponentTeamId,
           inning_1: themInnings[0] ?? 0, inning_2: themInnings[1] ?? 0,
           inning_3: themInnings[2] ?? 0, inning_4: themInnings[3] ?? 0,
           inning_5: themInnings[4] ?? 0, inning_6: themInnings[5] ?? 0,
