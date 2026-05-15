@@ -40,15 +40,19 @@ type EventRow = {
   opponent_score: number | null
   result: string | null
   is_home: boolean | null
+  team_id: string | null
+  team: { id: string; name: string } | { id: string; name: string }[] | null
   fields: FieldRow[] | null
 }
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
   fields: FieldRow | FieldRow[] | null
+  team: { id: string; name: string } | { id: string; name: string }[] | null
 }
 
 type BoxScoreRow = {
   team: string
+  team_id: string | null
   inning_1: number
   inning_2: number
   inning_3: number
@@ -79,6 +83,7 @@ type PlayerStatRow = {
 }
 
 function normalizeEvent(event: RawEventRow): EventRow {
+  const team = Array.isArray(event.team) ? event.team[0] : event.team
   return { ...event, fields: normalizeFieldRelation(event.fields) }
 }
 
@@ -220,7 +225,9 @@ export default function EventPage() {
           supabase.from('events').select(`
             id, title, opponent, event_type, starts_at, status,
             notes, gear_notes, travel_minutes, travel_miles,
-            team_score, opponent_score, result, is_home,
+            team_score, opponent_score, result, is_home, 
+            team_id,
+            team:team_id (id, name),
             fields (id, name, address_line, city, state, postal_code)
           `).eq('id', eventId).single(),
           supabase.from('box_scores').select('*').eq('event_id', eventId),
@@ -283,8 +290,10 @@ export default function EventPage() {
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
 
-  const usRow = boxScores.find(r => r.team === 'us')
-  const themRow = boxScores.find(r => r.team === 'them')
+  const usRow = boxScores.find(r => r.team_id === event.team_id)
+  const themRow = boxScores.find(r => r.team_id !== event.team_id && r.team_id !== null)
+    // Fallback for tournament games where opponent has no team_id: use the old 'them' label
+     || boxScores.find(r => r.team === 'them') 
   const hasBoxScore = usRow || themRow
 
   const playersWithStats = playerStats.filter(s => s.at_bats > 0 || (s.pitch_count ?? 0) > 0)
