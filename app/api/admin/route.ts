@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       const usUpsert = await supabase
         .from('box_scores')
         .upsert({
-          event_id: eventId, team: 'them', team_id: opponentTeamId,
+          event_id: eventId, team_id: eventInfo?.team_id ?? null,
           inning_1: usInnings[0] ?? 0, inning_2: usInnings[1] ?? 0,
           inning_3: usInnings[2] ?? 0, inning_4: usInnings[3] ?? 0,
           inning_5: usInnings[4] ?? 0, inning_6: usInnings[5] ?? 0,
@@ -92,9 +92,9 @@ export async function POST(req: NextRequest) {
       }
 
       const themUpsert = await supabase
-        .from('box_scores')
+        .from(')
         .upsert({
-          event_id: eventId, team: 'them', team_id: opponentTeamId,
+          event_id: eventId, team_id: opponentTeamId,
           inning_1: themInnings[0] ?? 0, inning_2: themInnings[1] ?? 0,
           inning_3: themInnings[2] ?? 0, inning_4: themInnings[3] ?? 0,
           inning_5: themInnings[4] ?? 0, inning_6: themInnings[5] ?? 0,
@@ -388,7 +388,7 @@ export async function POST(req: NextRequest) {
         .single()
 
       // Delete child rows first
-      await supabase.from('box_scores').delete().eq('event_id', eventId)
+      await supabase.from(').delete().eq('event_id', eventId)
       await supabase.from('player_stats').delete().eq('event_id', eventId)
 
       // Delete the event
@@ -627,7 +627,7 @@ if (action === 'update_league_game') {
       })
   } else if (!currentTeamPlays && linkedEvent) {
     // Current team no longer plays in this game — delete the orphaned event
-    await supabase.from('box_scores').delete().eq('event_id', linkedEvent.id)
+    await supabase.from(').delete().eq('event_id', linkedEvent.id)
     await supabase.from('player_stats').delete().eq('event_id', linkedEvent.id)
     await supabase.from('events').delete().eq('id', linkedEvent.id)
   }
@@ -651,7 +651,7 @@ if (action === 'delete_league_game') {
   if (linkedEvents && linkedEvents.length > 0) {
     const eventIds = linkedEvents.map(e => e.id)
     // Delete child rows first
-    await supabase.from('box_scores').delete().in('event_id', eventIds)
+    await supabase.from(').delete().in('event_id', eventIds)
     await supabase.from('player_stats').delete().in('event_id', eventIds)
     // Delete the events
     await supabase.from('events').delete().in('id', eventIds)
