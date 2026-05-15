@@ -388,7 +388,7 @@ export async function POST(req: NextRequest) {
         .single()
 
       // Delete child rows first
-      await supabase.from(').delete().eq('event_id', eventId)
+      await supabase.from('box_scores').delete().eq('event_id', eventId)
       await supabase.from('player_stats').delete().eq('event_id', eventId)
 
       // Delete the event
@@ -627,7 +627,7 @@ if (action === 'update_league_game') {
       })
   } else if (!currentTeamPlays && linkedEvent) {
     // Current team no longer plays in this game — delete the orphaned event
-    await supabase.from(').delete().eq('event_id', linkedEvent.id)
+    await supabase.from('box_scores').delete().eq('event_id', linkedEvent.id)
     await supabase.from('player_stats').delete().eq('event_id', linkedEvent.id)
     await supabase.from('events').delete().eq('id', linkedEvent.id)
   }
@@ -651,7 +651,7 @@ if (action === 'delete_league_game') {
   if (linkedEvents && linkedEvents.length > 0) {
     const eventIds = linkedEvents.map(e => e.id)
     // Delete child rows first
-    await supabase.from(').delete().in('event_id', eventIds)
+    await supabase.from('box_scores').delete().in('event_id', eventIds)
     await supabase.from('player_stats').delete().in('event_id', eventIds)
     // Delete the events
     await supabase.from('events').delete().in('id', eventIds)
