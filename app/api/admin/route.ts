@@ -412,59 +412,232 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // ── League games (cross-team, no ownership check) ───────────────────────
-    if (action === 'create_league_game') {
-      const { homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status } = body
-      if (!homeTeamId || !awayTeamId || !playedAt) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-      }
-      if (homeTeamId === awayTeamId) {
-        return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
-      }
-      const { error } = await supabase
-        .from('league_games')
-        .insert({
-          home_team_id: homeTeamId,
-          away_team_id: awayTeamId,
-          played_at: playedAt,
-          home_score: homeScore,
-          away_score: awayScore,
-          status: status ?? 'final',
-          entered_by: 'Admin',
-        })
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ ok: true })
+    // ── Create a league game (and auto-create matching event if current team plays) ───
+if (action === 'create_league_game') {
+  const { homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status, fieldId } = body
+  if (!homeTeamId || !awayTeamId || !playedAt) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+  if (homeTeamId === awayTeamId) {
+    return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
+  }
+ 
+  // Create the league_game
+  const { data: lgData, error: lgError } = await supabase
+    .from('league_games')
+    .insert({
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      played_at: playedAt,
+      home_score: homeScore,
+      away_score: awayScore,
+      status: status ?? 'final',
+      field_id: fieldId || null,
+      entered_by: 'Admin',
+    })
+    .select('id')
+    .single()
+  if (lgError) return NextResponse.json({ error: lgError.message }, { status: 500 })
+ 
+  // Determine if the current team is one of the participating teams.
+  // If yes, also create a matching event so it appears on schedule/home.
+  const currentTeamPlays = teamId && (homeTeamId === teamId || awayTeamId === teamId)
+  if (currentTeamPlays && lgData?.id) {
+    const isHome = homeTeamId === teamId
+    const opponentTeamId = isHome ? awayTeamId : homeTeamId
+ 
+    // Look up the opponent's name from the teams table
+    const { data: opponentTeam } = await supabase
+      .from('teams')
+      .select('name')
+      .eq('id', opponentTeamId)
+      .single()
+    const opponentName = opponentTeam?.name ?? 'Unknown'
+ 
+    // Determine event scores from the league_game perspective
+    const isFinal = status === 'final' && homeScore !== null && awayScore !== null && homeScore !== undefined && awayScore !== undefined
+    const teamScore = isFinal ? (isHome ? homeScore : awayScore) : null
+    const opponentScore = isFinal ? (isHome ? awayScore : homeScore) : null
+    let result: 'win' | 'loss' | 'tie' | null = null
+    if (isFinal && teamScore !== null && opponentScore !== null) {
+      if (teamScore > opponentScore) result = 'win'
+      else if (teamScore < opponentScore) result = 'loss'
+      else result = 'tie'
     }
-
-    if (action === 'update_league_game') {
-      const { leagueGameId, homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status } = body
-      if (!leagueGameId) {
-        return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
-      }
-      if (homeTeamId === awayTeamId) {
-        return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
-      }
-      const { error } = await supabase
-        .from('league_games')
-        .update({
-          home_team_id: homeTeamId,
-          away_team_id: awayTeamId,
-          played_at: playedAt,
-          home_score: homeScore,
-          away_score: awayScore,
-          status: status ?? 'final',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', leagueGameId)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ ok: true })
+ 
+    // Create the event linked to this league_game
+    await supabase
+      .from('events')
+      .insert({
+        team_id: teamId,
+        title: `Chicago Elite vs ${opponentName}`,
+        opponent: opponentName,
+        event_type: 'game',
+        starts_at: playedAt,
+        field_id: fieldId || null,
+        is_home: isHome,
+        status: isFinal ? 'final' : 'confirmed',
+        team_score: teamScore,
+        opponent_score: opponentScore,
+        result,
+        league_game_id: lgData.id,
+      })
+  }
+ 
+  return NextResponse.json({ ok: true })
+}
+ 
+// ── Update a league game (and sync linked event if exists) ───────────────────────
+if (action === 'update_league_game') {
+  const { leagueGameId, homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status, fieldId } = body
+  if (!leagueGameId) {
+    return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
+  }
+  if (homeTeamId === awayTeamId) {
+    return NextResponse.json({ error: 'Home and away teams must be different' }, { status: 400 })
+  }
+ 
+  // Update the league_game
+  const { error: lgError } = await supabase
+    .from('league_games')
+    .update({
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      played_at: playedAt,
+      home_score: homeScore,
+      away_score: awayScore,
+      status: status ?? 'final',
+      field_id: fieldId || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', leagueGameId)
+  if (lgError) return NextResponse.json({ error: lgError.message }, { status: 500 })
+ 
+  // Check if any event is linked to this league_game (for the current team)
+  const { data: linkedEvent } = await supabase
+    .from('events')
+    .select('id, team_id')
+    .eq('league_game_id', leagueGameId)
+    .maybeSingle()
+ 
+  // Determine if the current team is now one of the participating teams
+  const currentTeamPlays = teamId && (homeTeamId === teamId || awayTeamId === teamId)
+ 
+  if (currentTeamPlays && linkedEvent) {
+    // Update the existing event to match the league_game
+    const isHome = homeTeamId === teamId
+    const opponentTeamId = isHome ? awayTeamId : homeTeamId
+ 
+    const { data: opponentTeam } = await supabase
+      .from('teams')
+      .select('name')
+      .eq('id', opponentTeamId)
+      .single()
+    const opponentName = opponentTeam?.name ?? 'Unknown'
+ 
+    const isFinal = status === 'final' && homeScore !== null && awayScore !== null && homeScore !== undefined && awayScore !== undefined
+    const teamScore = isFinal ? (isHome ? homeScore : awayScore) : null
+    const opponentScore = isFinal ? (isHome ? awayScore : homeScore) : null
+    let result: 'win' | 'loss' | 'tie' | null = null
+    if (isFinal && teamScore !== null && opponentScore !== null) {
+      if (teamScore > opponentScore) result = 'win'
+      else if (teamScore < opponentScore) result = 'loss'
+      else result = 'tie'
     }
-
-    if (action === 'delete_league_game') {
-      const { leagueGameId } = body
-      if (!leagueGameId) {
-        return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
-      }
+ 
+    await supabase
+      .from('events')
+      .update({
+        title: `Chicago Elite vs ${opponentName}`,
+        opponent: opponentName,
+        starts_at: playedAt,
+        field_id: fieldId || null,
+        is_home: isHome,
+        status: isFinal ? 'final' : 'confirmed',
+        team_score: teamScore,
+        opponent_score: opponentScore,
+        result,
+      })
+      .eq('id', linkedEvent.id)
+  } else if (currentTeamPlays && !linkedEvent) {
+    // Current team just got added to a game it wasn't in before — create event
+    const isHome = homeTeamId === teamId
+    const opponentTeamId = isHome ? awayTeamId : homeTeamId
+ 
+    const { data: opponentTeam } = await supabase
+      .from('teams')
+      .select('name')
+      .eq('id', opponentTeamId)
+      .single()
+    const opponentName = opponentTeam?.name ?? 'Unknown'
+ 
+    const isFinal = status === 'final' && homeScore !== null && awayScore !== null && homeScore !== undefined && awayScore !== undefined
+    const teamScore = isFinal ? (isHome ? homeScore : awayScore) : null
+    const opponentScore = isFinal ? (isHome ? awayScore : homeScore) : null
+    let result: 'win' | 'loss' | 'tie' | null = null
+    if (isFinal && teamScore !== null && opponentScore !== null) {
+      if (teamScore > opponentScore) result = 'win'
+      else if (teamScore < opponentScore) result = 'loss'
+      else result = 'tie'
+    }
+ 
+    await supabase
+      .from('events')
+      .insert({
+        team_id: teamId,
+        title: `Chicago Elite vs ${opponentName}`,
+        opponent: opponentName,
+        event_type: 'game',
+        starts_at: playedAt,
+        field_id: fieldId || null,
+        is_home: isHome,
+        status: isFinal ? 'final' : 'confirmed',
+        team_score: teamScore,
+        opponent_score: opponentScore,
+        result,
+        league_game_id: leagueGameId,
+      })
+  } else if (!currentTeamPlays && linkedEvent) {
+    // Current team no longer plays in this game — delete the orphaned event
+    await supabase.from('box_scores').delete().eq('event_id', linkedEvent.id)
+    await supabase.from('player_stats').delete().eq('event_id', linkedEvent.id)
+    await supabase.from('events').delete().eq('id', linkedEvent.id)
+  }
+ 
+  return NextResponse.json({ ok: true })
+}
+ 
+// ── Delete a league game (cascade to linked event) ───────────────────────────────
+if (action === 'delete_league_game') {
+  const { leagueGameId } = body
+  if (!leagueGameId) {
+    return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
+  }
+ 
+  // Find any linked event to clean up its child rows
+  const { data: linkedEvents } = await supabase
+    .from('events')
+    .select('id')
+    .eq('league_game_id', leagueGameId)
+ 
+  if (linkedEvents && linkedEvents.length > 0) {
+    const eventIds = linkedEvents.map(e => e.id)
+    // Delete child rows first
+    await supabase.from('box_scores').delete().in('event_id', eventIds)
+    await supabase.from('player_stats').delete().in('event_id', eventIds)
+    // Delete the events
+    await supabase.from('events').delete().in('id', eventIds)
+  }
+ 
+  // Delete the league_game itself
+  const { error } = await supabase
+    .from('league_games')
+    .delete()
+    .eq('id', leagueGameId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+ 
+  return NextResponse.json({ ok: true })
+}
       await supabase
         .from('events')
         .update({ league_game_id: null })
