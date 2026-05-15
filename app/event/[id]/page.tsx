@@ -60,7 +60,6 @@ type RawEventRow = Omit<EventRow, 'fields'> & {
 }
 
 type BoxScoreRow = {
-  team: string
   team_id: string | null
   inning_1: number
   inning_2: number
@@ -300,7 +299,7 @@ export default function EventPage() {
     : []
 
   const usRow = boxScores.find(r => r.team_id === event.team_id)
-  const themRow = boxScores.find(r => r.team_id !== event.team_id && r.team_id !== null)
+  const themRow = boxScores.find(r => r.team_id !== event.team_id)
     // Fallback for tournament games where opponent has no team_id: use the old 'them' label
      || boxScores.find(r => r.team === 'them') 
   const hasBoxScore = usRow || themRow
