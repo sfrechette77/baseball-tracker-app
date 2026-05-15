@@ -299,9 +299,7 @@ export default function EventPage() {
     : []
 
   const usRow = boxScores.find(r => r.team_id === event.team_id)
-  const themRow = boxScores.find(r => r.team_id !== event.team_id)
-    // Fallback for tournament games where opponent has no team_id: use the old 'them' label
-     || boxScores.find(r => r.team === 'them') 
+  const themRow = boxScores.find(r => r.team_id !== event.team_id) 
   const hasBoxScore = usRow || themRow
 
   const playersWithStats = playerStats.filter(s => s.at_bats > 0 || (s.pitch_count ?? 0) > 0)
