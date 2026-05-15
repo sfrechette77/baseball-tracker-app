@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
+import { PICKABLE_TEAMS } from '@/lib/teams'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -15,6 +16,14 @@ function createClient() {
 
 const APP_TIME_ZONE = 'America/Chicago'
 const INNINGS = [1, 2, 3, 4, 5, 6, 7]
+
+// Get the short team label for box score display.
+// Falls back to the team's actual name if not in PICKABLE_TEAMS.
+function getTeamLabel(team: { id: string; name: string } | null): string {
+  if (!team) return 'Elite'
+  const pickable = PICKABLE_TEAMS.find(t => t.id === team.id)
+  return pickable?.label ?? team.name
+}
 
 type FieldRow = {
   id: string
@@ -362,7 +371,7 @@ export default function EventPage() {
                           <tr className={topIsUs ? 'bg-red-600/5' : ''}>
                             <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[80px]">
                               {topIsUs
-                                ? <span className="font-bold text-white">Elite</span>
+                                ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
                                 : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
                             </td>
                             {INNINGS.map(i => (
@@ -379,7 +388,7 @@ export default function EventPage() {
                           <tr className={bottomIsUs ? 'bg-red-600/5' : ''}>
                             <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[80px]">
                               {bottomIsUs
-                                ? <span className="font-bold text-white">Elite</span>
+                                ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
                                 : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
                             </td>
                             {INNINGS.map(i => (
