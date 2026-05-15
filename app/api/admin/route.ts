@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
           inning_3: usInnings[2] ?? 0, inning_4: usInnings[3] ?? 0,
           inning_5: usInnings[4] ?? 0, inning_6: usInnings[5] ?? 0,
           inning_7: usInnings[6] ?? 0,
-        }, { onConflict: 'event_id,team' })
+        }, { onConflict: 'event_id,team_id' })
       if (usUpsert.error) {
         return NextResponse.json({ error: `Failed saving us box score: ${usUpsert.error.message}` }, { status: 500 })
       }
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
           inning_3: themInnings[2] ?? 0, inning_4: themInnings[3] ?? 0,
           inning_5: themInnings[4] ?? 0, inning_6: themInnings[5] ?? 0,
           inning_7: themInnings[6] ?? 0,
-        }, { onConflict: 'event_id,team' })
+        }, { onConflict: 'event_id,team_id' })
       if (themUpsert.error) {
         return NextResponse.json({ error: `Failed saving them box score: ${themUpsert.error.message}` }, { status: 500 })
       }
