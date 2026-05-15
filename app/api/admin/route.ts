@@ -638,18 +638,7 @@ if (action === 'delete_league_game') {
  
   return NextResponse.json({ ok: true })
 }
-      await supabase
-        .from('events')
-        .update({ league_game_id: null })
-        .eq('league_game_id', leagueGameId)
-      const { error } = await supabase
-        .from('league_games')
-        .delete()
-        .eq('id', leagueGameId)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json({ ok: true })
-    }
-
+    
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
