@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       }
 
       const themUpsert = await supabase
-        .from(')
+        .from('box_scores')
         .upsert({
           event_id: eventId, team_id: opponentTeamId,
           inning_1: themInnings[0] ?? 0, inning_2: themInnings[1] ?? 0,
