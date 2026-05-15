@@ -78,32 +78,49 @@ export async function POST(req: NextRequest) {
         usTotal > themTotal ? 'win' :
         usTotal < themTotal ? 'loss' : 'tie'
 
-      const usUpsert = await supabase
+      // Manual upsert for us box score (one row per event_id + team_id, NULL allowed)
+      const { data: existingUs } = await supabase
         .from('box_scores')
-        .upsert({
-          event_id: eventId, team_id: eventInfo?.team_id ?? null,
-          inning_1: usInnings[0] ?? 0, inning_2: usInnings[1] ?? 0,
-          inning_3: usInnings[2] ?? 0, inning_4: usInnings[3] ?? 0,
-          inning_5: usInnings[4] ?? 0, inning_6: usInnings[5] ?? 0,
-          inning_7: usInnings[6] ?? 0,
-        }, { onConflict: 'event_id,team_id' })
-      if (usUpsert.error) {
-        return NextResponse.json({ error: `Failed saving us box score: ${usUpsert.error.message}` }, { status: 500 })
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('team_id', eventInfo?.team_id ?? null)
+        .maybeSingle() 
+      
+      const usData = {
+        event_id: eventId,
+        team_id: eventInfo?.team_id ?? null,
+        inning_1: usInnings[0] ?? 0, inning_2: usInnings[1] ?? 0,
+        inning_3: usInnings[2] ?? 0, inning_4: usInnings[3] ?? 0,
+        inning_5: usInnings[4] ?? 0, inning_6: usInnings[5] ?? 0,
+        inning_7: usInnings[6] ?? 0,
       }
-
-      const themUpsert = await supabase
+      
+      // Manual upsert for them box score
+      const themQuery = supabase
         .from('box_scores')
-        .upsert({
-          event_id: eventId, team_id: opponentTeamId,
-          inning_1: themInnings[0] ?? 0, inning_2: themInnings[1] ?? 0,
-          inning_3: themInnings[2] ?? 0, inning_4: themInnings[3] ?? 0,
-          inning_5: themInnings[4] ?? 0, inning_6: themInnings[5] ?? 0,
-          inning_7: themInnings[6] ?? 0,
-        }, { onConflict: 'event_id,team_id' })
+        .select('id')
+        .eq('event_id', eventId)
+      
+      const { data: existingThem } = opponentTeamId
+        ? await themQuery.eq('team_id', opponentTeamId).maybeSingle()
+        : await themQuery.is('team_id', null).maybeSingle()
+      
+      const themData = {
+        event_id: eventId,
+        team_id: opponentTeamId,
+        inning_1: themInnings[0] ?? 0, inning_2: themInnings[1] ?? 0,
+        inning_3: themInnings[2] ?? 0, inning_4: themInnings[3] ?? 0,
+        inning_5: themInnings[4] ?? 0, inning_6: themInnings[5] ?? 0,
+        inning_7: themInnings[6] ?? 0,
+      }
+      
+      const themUpsert = existingThem
+        ? await supabase.from('box_scores').update(themData).eq('id', existingThem.id)
+        : await supabase.from('box_scores').insert(themData)
+      
       if (themUpsert.error) {
         return NextResponse.json({ error: `Failed saving them box score: ${themUpsert.error.message}` }, { status: 500 })
       }
-
       const eventUpdate = await supabase
         .from('events')
         .update({
