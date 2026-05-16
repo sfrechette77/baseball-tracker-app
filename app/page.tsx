@@ -91,15 +91,6 @@ function formatAddress(field: FieldRow | null) {
     .filter(Boolean).join(', ')
 }
 
-function getDirectionsUrl(address: string): string {
-  if (typeof window === 'undefined') return ''
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-  if (isIOS) {
-    return `comgooglemaps://?q=${encodeURIComponent(address)}&directionsmode=driving`
-  }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
-}
-
 function formatChicagoDateTime(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: APP_TIME_ZONE,
@@ -278,7 +269,6 @@ function EventCard({ event, weather, now, featured = false }: {
   const eventTime = new Date(event.starts_at)
   const field = getPrimaryField(event.fields)
   const address = formatAddress(field)
-  const directionsUrl = address
   const directionsUrl = address ? getDirectionsUrl(address) : ''
   const gearList = event.gear_notes
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
