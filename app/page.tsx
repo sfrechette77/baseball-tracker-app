@@ -18,6 +18,15 @@ const APP_TIME_ZONE = 'America/Chicago'
 const FORECAST_MATCH_WINDOW_MS = 9 * 60 * 60 * 1000
 const FORECAST_LOOKAHEAD_MS = 5 * 24 * 60 * 60 * 1000
 
+function getDirectionsUrl(address: string): string {
+  if (typeof window === 'undefined') return ''
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  if (isIOS) {
+    return `comgooglemaps://?q=${encodeURIComponent(address)}&directionsmode=driving`
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+}
+
 type FieldRow = {
   id: string
   name: string | null
@@ -80,6 +89,15 @@ function normalizeEvent(event: RawEventRow): EventRow {
 function formatAddress(field: FieldRow | null) {
   return [field?.address_line, field?.city, field?.state, field?.postal_code]
     .filter(Boolean).join(', ')
+}
+
+function getDirectionsUrl(address: string): string {
+  if (typeof window === 'undefined') return ''
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  if (isIOS) {
+    return `comgooglemaps://?q=${encodeURIComponent(address)}&directionsmode=driving`
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 }
 
 function formatChicagoDateTime(date: Date) {
@@ -261,8 +279,7 @@ function EventCard({ event, weather, now, featured = false }: {
   const field = getPrimaryField(event.fields)
   const address = formatAddress(field)
   const directionsUrl = address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
-    : ''
+  const directionsUrl = address ? getDirectionsUrl(address) : ''
   const gearList = event.gear_notes
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
