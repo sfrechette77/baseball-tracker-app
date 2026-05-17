@@ -94,6 +94,14 @@ export async function POST(req: NextRequest) {
         inning_5: usInnings[4] ?? 0, inning_6: usInnings[5] ?? 0,
         inning_7: usInnings[6] ?? 0,
       }
+
+      const usUpsert = existingUs
+        ? await supabase.from('box_scores').update(usData).eq('id', existingUs.id)
+        : await supabase.from('box_scores').insert(usData)
+
+      if (usUpsert.error) {
+        return NextResponse.json({ error: `Failed saving us box score: ${usUpsert.error.message}` }, { status: 500 })
+      }
       
       // Manual upsert for them box score
       const themQuery = supabase
