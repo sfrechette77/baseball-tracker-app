@@ -52,6 +52,9 @@ type EventRow = {
   team_id: string | null
   team: { id: string; name: string } | null
   fields: FieldRow[] | null
+  display_status: string | null
+  status_message: string | null
+  status_updated_at: string | null
 }
 
 type RawEventRow = Omit<EventRow, 'fields'> & {
@@ -115,6 +118,17 @@ function formatChicagoDateTime(date: Date) {
     weekday: 'long', month: 'long', day: 'numeric',
     year: 'numeric', hour: 'numeric', minute: '2-digit'
   }).format(date)
+}
+
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin} min ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  return `${diffDay}d ago`
 }
 
 function formatStatus(status: string) {
@@ -242,7 +256,8 @@ export default function EventPage() {
           supabase.from('events').select(`
             id, title, opponent, event_type, starts_at, status,
             notes, gear_notes, travel_minutes, travel_miles,
-            team_score, opponent_score, result, is_home, 
+            team_score, opponent_score, result, is_home,
+            display_status, status_message, status_updated_at,
             team_id,
             team:team_id (id, name),
             fields (id, name, address_line, city, state, postal_code)
@@ -344,6 +359,29 @@ export default function EventPage() {
       </div>
 
       <div className="mx-auto max-w-sm space-y-3 px-4 pt-4">
+
+        {/* Broadcast status banner — shown when set */}
+        {event.display_status && (() => {
+          const config = {
+            on: { label: '🟢 Game On', cls: 'border-green-500/40 bg-green-500/10 text-green-400' },
+            watching: { label: '🟡 Watching', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
+            off: { label: '🔴 Game Off', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
+          }[event.display_status as 'on' | 'watching' | 'off']
+          if (!config) return null
+          return (
+            <div className={`rounded-2xl border-2 p-4 ${config.cls.split(' ').slice(0, 2).join(' ')}`}>
+              <p className={`font-bold ${config.cls.split(' ').slice(2).join(' ')}`}>{config.label}</p>
+              {event.status_message && (
+                <p className="mt-1 text-sm text-slate-300">{event.status_message}</p>
+              )}
+              {event.status_updated_at && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Updated {formatRelativeTime(new Date(event.status_updated_at))}
+                </p>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Box Score */}
         {isGame && hasBoxScore && (
