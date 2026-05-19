@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { EmptyState } from '@/components/EmptyState'
 import { useCurrentTeam } from '@/components/team-context'
+import { PushSubscribeButton } from '@/components/push-subscribe-button'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -557,6 +558,9 @@ export default function HomePage() {
 
         {/* Status banner — appears only if a broadcast has been set */}
         {featuredEvent && <StatusBanner event={featuredEvent} />}
+
+        {/* Push notification subscribe button */}
+        <PushSubscribeButton />
 
         {/* Next Up */}
         {featuredEvent ? (
