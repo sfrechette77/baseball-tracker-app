@@ -1,11 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import webpush from 'web-push'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_KEY
   if (!url || !key) throw new Error('Missing Supabase env vars')
   return createClient(url, key)
+}
+
+function configureWebPush() {
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+  if (!publicKey || !privateKey) {
+    throw new Error('Missing VAPID keys')
+  }
+  webpush.setVapidDetails(
+    'mailto:steve.frechette@gmail.com',
+    publicKey,
+    privateKey
+  )
+}
+
+// Send a push notification to all subscribers for a given team.
+// Best-effort: failures are logged, not thrown.
+async function sendPushToTeam(
+  supabase: ReturnType<typeof getSupabase>,
+  teamId: string,
+  title: string,
+  message: string,
+  url: string
+): Promise<{ sent: number; failed: number }> {
+  try {
+    configureWebPush()
+  } catch (err) {
+    console.error('Push config failed:', err)
+    return { sent: 0, failed: 0 }
+  }
+
+  const { data: subs } = await supabase
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh, auth')
+    .eq('team_id', teamId)
+
+  if (!subs || subs.length === 0) {
+    return { sent: 0, failed: 0 }
+  }
+
+  const payload = JSON.stringify({
+    title,
+    body: message,
+    url,
+    tag: 'broadcast',
+  })
+
+  const expiredIds: string[] = []
+  let sent = 0
+  let failed = 0
+
+  await Promise.all(
+    subs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
+          },
+          payload
+        )
+        sent++
+      } catch (err: any) {
+        failed++
+        if (err?.statusCode === 404 || err?.statusCode === 410) {
+          expiredIds.push(sub.id)
+        }
+        console.error('Push failed for', sub.id, err?.statusCode)
+      }
+    })
+  )
+
+  if (expiredIds.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('id', expiredIds)
+  }
+
+  return { sent, failed }
 }
 
 export async function POST(req: NextRequest) {
@@ -283,6 +361,40 @@ export async function POST(req: NextRequest) {
           })
         }
       }
+
+      // Send push if the status enum changed (on/watching/off transitions only)
+      // Skip pushes when clearing (new status is null) or when status didn't change
+      const oldStatus = current?.display_status ?? null
+      const statusChanged = oldStatus !== displayStatus
+      if (statusChanged && displayStatus !== null) {
+        // Fetch event details for the push payload
+        const { data: eventDetails } = await supabase
+          .from('events')
+          .select('team_id, opponent')
+          .eq('id', eventId)
+          .single()
+
+        if (eventDetails?.team_id) {
+          const statusLabel = displayStatus === 'on' ? '🟢 Game On'
+            : displayStatus === 'watching' ? '🟡 Watching'
+            : '🔴 Game Off'
+          const opponentSuffix = eventDetails.opponent ? ` vs ${eventDetails.opponent}` : ''
+          const title = `${statusLabel}${opponentSuffix}`
+          const pushMessage = message || ''
+          const url = `/event/${eventId}`
+
+          // Best-effort: don't block on push failures
+          const pushResult = await sendPushToTeam(
+            supabase,
+            eventDetails.team_id,
+            title,
+            pushMessage,
+            url
+          )
+          console.log(`Push for status change: sent=${pushResult.sent}, failed=${pushResult.failed}`)
+        }
+      }
+      
       return NextResponse.json({ ok: true })
     }
 
