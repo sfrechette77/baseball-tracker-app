@@ -17,7 +17,7 @@ function configureWebPush() {
   }
   webpush.setVapidDetails(
     // Subject: contact info for push service operators. Convention is mailto: or https://
-    'mailto:admin@chicagoelite11u.example',
+    'mailto:steve,frechette@gmail.com',
     publicKey,
     privateKey
   )
