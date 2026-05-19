@@ -43,14 +43,15 @@ export function PushSubscribeButton() {
 
       // Feature detection
       if (typeof window === 'undefined') return
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setState('unsupported')
-        return
-      }
       if (isIOSWithoutPWA()) {
         setState('needs_pwa')
         return
       }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setState('unsupported')
+        return
+      }
+      
 
       // Permission state
       if (Notification.permission === 'denied') {
