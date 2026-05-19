@@ -788,6 +788,39 @@ const deleteLeagueGame = async () => {
                     {statusSaving ? 'Broadcasting...' : 'Save & Broadcast'}
                   </button>
                   {statusMsg && <p className="text-sm text-center">{statusMsg}</p>}
+                   {/* Test push notification — temporary tool to verify push send works */}
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                      <p className="text-[10px] uppercase tracking-wide text-amber-400 font-semibold">🧪 Test Push (dev tool)</p>
+                      <p className="text-xs text-slate-400">
+                        Sends a test notification to all subscribers of the currently selected team.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          setStatusMsg(null)
+                          try {
+                            const res = await fetch('/api/push/send', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                password,
+                                teamId: currentTeam.id,
+                                title: 'Test from Admin',
+                                message: 'If you see this, push is working ✅',
+                                url: '/',
+                              })
+                            })
+                            const data = await res.json()
+                            setStatusMsg(data.ok
+                              ? `✅ Sent: ${data.sent} · Failed: ${data.failed ?? 0} · Cleaned: ${data.cleanedUp ?? 0}`
+                              : `❌ ${data.error ?? 'unknown error'}`)
+                          } catch (err) {
+                            setStatusMsg(`❌ ${err instanceof Error ? err.message : 'unknown'}`)
+                          }
+                        }}
+                        className="w-full rounded-xl bg-amber-600/80 py-2 text-sm font-bold text-white hover:bg-amber-700 transition"
+                      >
+                        Send Test Push
+                      </button>
                 </div>
               </>
             )}
