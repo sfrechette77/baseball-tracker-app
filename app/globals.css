@@ -18,3 +18,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Dark-mode styling for native <select> dropdown options.
+   Browsers limit CSS on <option>, but bg-color and color are honored
+   on Chrome, Edge, and Firefox (desktop + Android). Safari/iOS may
+   still show the system picker — that's a browser limitation. */
+select option {
+  background-color: #0a0a0a;
+  color: #ededed;
+}
