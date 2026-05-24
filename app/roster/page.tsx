@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
+import { useTeamSeason } from '@/lib/org/useTeamSeason'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -93,15 +94,26 @@ export default function RosterPage() {
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const { currentTeam } = useCurrentTeam()
+  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
 
   useEffect(() => {
+    // Wait until team_season is resolved — don't enter the try/finally
+    // because finally would clear the loading state and flash empty UI
+    if (teamSeasonLoading) {
+      setLoading(true)
+      return
+    }
     const load = async () => {
       try {
+        if (teamSeasonNotFound || !teamSeasonId) {
+          setPlayers([])
+          return
+        }
         const supabase = createClient()
         const { data } = await supabase
           .from('players')
           .select('id, name, jersey_number, position')
-          .eq('team_id', currentTeam.id)
+          .eq('team_season_id', teamSeasonId)
         setPlayers((data ?? []) as Player[])
       } catch (err) {
         console.error(err)
@@ -110,7 +122,7 @@ export default function RosterPage() {
       }
     }
     load()
-  }, [currentTeam.id])
+  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound])
 
   // Sort by jersey number numerically. "00" sorts as 0 but after "0".
   const sortedPlayers = useMemo(() => {
@@ -149,6 +161,15 @@ export default function RosterPage() {
 
       {/* Player list */}
       <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
+        {teamSeasonNotFound && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-300">
+            <p className="font-bold">Team not found in current season</p>
+            <p className="mt-1 text-sm">
+              {currentTeam.label}: no team_seasons row exists for the current season.
+              Admin should create one.
+            </p>
+          </div>
+        )}
         {sortedPlayers.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
             <p className="text-slate-400 text-sm">No players added yet.</p>
