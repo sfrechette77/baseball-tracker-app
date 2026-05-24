@@ -259,8 +259,14 @@ export default function StandingsPage() {
       .from('league_games')
       .select(`
         id, played_at, home_score, away_score, status,
-        home_team:home_team_id (id, name, division),
-        away_team:away_team_id (id, name, division),
+        home_team_season:home_team_season_id (
+          id,
+          teams:team_id ( id, name, division )
+        ),
+        away_team_season:away_team_season_id (
+          id,
+          teams:team_id ( id, name, division )
+        ),
         events!events_league_game_id_fkey (id)
       `)
       .order('played_at', { ascending: false })
@@ -271,17 +277,26 @@ export default function StandingsPage() {
     }
     
     if (data) {
-  const normalized = data.map((g: any) => ({
-    ...g,
-    home_team: Array.isArray(g.home_team) ? g.home_team[0] : g.home_team,
-    away_team: Array.isArray(g.away_team) ? g.away_team[0] : g.away_team,
-  }))
-  // Filter to games where at least one team is in our division
-  const filtered = normalized.filter((g: any) =>
-    g.home_team?.division === currentTeam.division ||
-    g.away_team?.division === currentTeam.division
-  )
-  setLeagueGames(filtered as LeagueGameRow[])
+      // Unwrap the nested team_season → teams structure into a flat home_team/away_team
+      const normalized = data.map((g: any) => {
+        const homeTs = Array.isArray(g.home_team_season) ? g.home_team_season[0] : g.home_team_season
+        const awayTs = Array.isArray(g.away_team_season) ? g.away_team_season[0] : g.away_team_season
+        return {
+          ...g,
+          home_team: homeTs?.teams
+            ? (Array.isArray(homeTs.teams) ? homeTs.teams[0] : homeTs.teams)
+            : null,
+          away_team: awayTs?.teams
+            ? (Array.isArray(awayTs.teams) ? awayTs.teams[0] : awayTs.teams)
+            : null,
+        }
+      })
+      // Filter to games where at least one team is in our division
+      const filtered = normalized.filter((g: any) =>
+        g.home_team?.division === currentTeam.division ||
+        g.away_team?.division === currentTeam.division
+      )
+      setLeagueGames(filtered as LeagueGameRow[])
     }
   }
   loadLeagueGames()
@@ -359,7 +374,7 @@ export default function StandingsPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {sorted.map((team) => {
-                  const isUs = team.team_name === currentTeam.id
+                  const isUs = team.id === currentTeam.id
                   const diff = team.runs_for - team.runs_against
                   return (
                     <tr key={team.id} className={isUs ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
