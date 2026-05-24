@@ -50,20 +50,20 @@ type EventRow = {
   result: string | null
   is_home: boolean | null
   team_id: string | null
+  team_season_id: string | null
   team: { id: string; name: string } | null
   fields: FieldRow[] | null
   display_status: string | null
   status_message: string | null
   status_updated_at: string | null
 }
-
-type RawEventRow = Omit<EventRow, 'fields'> & {
+type RawEventRow = Omit<EventRow, 'fields' | 'team'> & {
   fields: FieldRow | FieldRow[] | null
-  team: { id: string; name: string } | { id: string; name: string }[] | null
+  team_season: { id: string; teams: { id: string; name: string } | { id: string; name: string }[] } | { id: string; teams: { id: string; name: string } | { id: string; name: string }[] }[] | null
 }
-
 type BoxScoreRow = {
   team_id: string | null
+  team_season_id: string | null
   inning_1: number
   inning_2: number
   inning_3: number
@@ -94,8 +94,17 @@ type PlayerStatRow = {
 }
 
 function normalizeEvent(event: RawEventRow): EventRow {
-  const team = Array.isArray(event.team) ? event.team[0] : event.team
-  return { ...event, fields: normalizeFieldRelation(event.fields) }
+  // Unwrap nested: event.team_season → team_season.teams → { id, name }
+  const ts = Array.isArray(event.team_season) ? event.team_season[0] : event.team_season
+  const teamRaw = ts?.teams
+  const team = teamRaw
+    ? (Array.isArray(teamRaw) ? teamRaw[0] : teamRaw)
+    : null
+  return {
+    ...event,
+    team,
+    fields: normalizeFieldRelation(event.fields),
+  }
 }
 
 function formatAddress(field: FieldRow | null) {
@@ -259,7 +268,11 @@ export default function EventPage() {
             team_score, opponent_score, result, is_home,
             display_status, status_message, status_updated_at,
             team_id,
-            team:team_id (id, name),
+            team_season_id,
+            team_season:team_season_id (
+              id,
+              teams:team_id ( id, name )
+            ),
             fields (id, name, address_line, city, state, postal_code)
           `).eq('id', eventId).single(),
           supabase.from('box_scores').select('*').eq('event_id', eventId),
@@ -320,8 +333,8 @@ export default function EventPage() {
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
 
-  const usRow = boxScores.find(r => r.team_id === event.team_id)
-  const themRow = boxScores.find(r => r.team_id !== event.team_id) 
+ const usRow = boxScores.find(r => r.team_season_id === event.team_season_id)
+  const themRow = boxScores.find(r => r.team_season_id !== event.team_season_id) 
   const hasBoxScore = usRow || themRow
 
   const playersWithStats = playerStats.filter(s => s.at_bats > 0 || (s.pitch_count ?? 0) > 0)
