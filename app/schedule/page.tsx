@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { useCurrentTeam } from '@/components/team-context'
+import { useTeamSeason } from '@/lib/org/useTeamSeason'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -148,16 +149,24 @@ export default function SchedulePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>('upcoming')
   const { currentTeam } = useCurrentTeam()
+  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
 
   useEffect(() => {
     const loadEvents = async () => {
       try {
         const supabase = createClient()
+        // Wait until team_season is resolved
+        if (teamSeasonLoading) return
+        if (teamSeasonNotFound || !teamSeasonId) {
+          setEvents([])
+          setLoading(false)
+          return
+        }
         const { data, error } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status,
             team_score, opponent_score, result, display_status, is_home, fields (name)`)
-          .eq('team_id', currentTeam.id)
+          .eq('team_season_id', teamSeasonId)
           .order('starts_at', { ascending: true })
         if (error) setErrorMessage(error.message)
         else setEvents(((data ?? []) as RawEventRow[]).map(normalizeEvent))
@@ -168,7 +177,7 @@ export default function SchedulePage() {
       }
     }
     loadEvents()
-  }, [currentTeam.id])
+  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound])
 
   const filteredEvents = useMemo(() => {
     const startOfToday = getStartOfTodayChicago()
@@ -305,7 +314,15 @@ export default function SchedulePage() {
 
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
-
+        {teamSeasonNotFound && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-300">
+            <p className="font-bold">Team not found in current season</p>
+            <p className="mt-1 text-sm">
+              {currentTeam.label}: no team_seasons row exists for the current season.
+              Admin should create one.
+            </p>
+          </div>
+        )}
         {/* Filter chips */}
         <div className="flex gap-2">
           {filters.map(f => {
