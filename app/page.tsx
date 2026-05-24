@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { EmptyState } from '@/components/EmptyState'
 import { useCurrentTeam } from '@/components/team-context'
+import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { PushSubscribeButton } from '@/components/push-subscribe-button'
 
 function createClient() {
@@ -60,7 +61,6 @@ type EventRow = {
 
 type RawEventRow = Omit<EventRow, 'fields' | 'arrival_buffer_minutes'> & {
   fields: FieldRow | FieldRow[] | null
-  team: { arrival_buffer_minutes: number | null } | { arrival_buffer_minutes: number | null }[] | null
 }
 
 type WeatherForecastRow = {
@@ -77,13 +77,11 @@ type WeatherSummary = {
 
 type WeatherByEvent = Record<string, WeatherSummary>
 
-function normalizeEvent(event: RawEventRow): EventRow {
-  const bufferMinutes = Array.isArray(event.team) ? event.team[0]?.arrival_buffer_minutes : 
-                        event.team?.arrival_buffer_minutes ?? null
-  return { 
-    ...event, 
+function normalizeEvent(event: RawEventRow, arrivalBufferMinutes: number | null): EventRow {
+  return {
+    ...event,
     fields: normalizeFieldRelation(event.fields),
-    arrival_buffer_minutes: bufferMinutes
+    arrival_buffer_minutes: arrivalBufferMinutes
   }
 }
 
@@ -439,6 +437,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
   const { currentTeam } = useCurrentTeam()
+  const { teamSeasonId, arrivalBufferMinutes, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -451,15 +450,22 @@ export default function HomePage() {
         setError(null)
         const supabase = createClient()
         const nowIso = new Date().toISOString()
+        // Wait until team_season is resolved before querying
+        if (teamSeasonLoading) return
+        if (teamSeasonNotFound || !teamSeasonId) {
+          setEvents([])
+          setPastGames([])
+          setLoading(false)
+          return
+        }
 
         const { data, error: fetchError } = await supabase
           .from('events')
           .select(`id, title, opponent, event_type, starts_at, status, notes, gear_notes,
             travel_minutes, travel_miles, team_score, opponent_score, result,
             display_status, status_message, status_updated_at,
-            fields (id, name, address_line, city, state, postal_code),
-            team:team_id (arrival_buffer_minutes)`)
-          .eq('team_id', currentTeam.id)
+            fields (id, name, address_line, city, state, postal_code)`)
+          .eq('team_season_id', teamSeasonId)
           .gte('starts_at', nowIso)
           .order('starts_at', { ascending: true })
           .limit(3)
@@ -471,7 +477,7 @@ export default function HomePage() {
         }
         if (!data) { setLoading(false); return }
 
-        const normalizedEvents = (data as RawEventRow[]).map(normalizeEvent)
+        const normalizedEvents = (data as RawEventRow[]).map(e => normalizeEvent(e, arrivalBufferMinutes))
         setEvents(normalizedEvents)
 
         const { data: pastData } = await supabase
@@ -480,13 +486,13 @@ export default function HomePage() {
             travel_minutes, travel_miles, team_score, opponent_score, result,
             display_status, status_message, status_updated_at,
             fields (id, name, address_line, city, state, postal_code)`)
-          .eq('team_id', currentTeam.id)
+          .eq('team_season_id', teamSeasonId)
           .lt('starts_at', nowIso)
           .neq('event_type', 'practice')
           .order('starts_at', { ascending: false })
           .limit(5)
 
-        if (pastData) setPastGames((pastData as RawEventRow[]).map(normalizeEvent))
+        if (pastData) setPastGames((pastData as RawEventRow[]).map(e => normalizeEvent(e, arrivalBufferMinutes)))
 
         // Weather
         const uniqueFieldIds = Array.from(new Set(
@@ -534,7 +540,7 @@ export default function HomePage() {
       }
     }
     loadData()
-  }, [currentTeam.id])
+  }, [teamSeasonId])
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
@@ -563,6 +569,15 @@ export default function HomePage() {
         <PushSubscribeButton />
 
         {/* Next Up */}
+        {teamSeasonNotFound && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-300">
+            <p className="font-bold">Team not found in current season</p>
+            <p className="mt-1 text-sm">
+              {currentTeam.label}: no team_seasons row exists for the current season.
+              Admin should create one.
+            </p>
+          </div>
+        )}
         {featuredEvent ? (
   <section>
     <EventCard
