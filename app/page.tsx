@@ -445,13 +445,17 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
+    // Wait until team_season is resolved — don't enter the try/finally
+    // because finally would clear the loading state and flash empty UI
+    if (teamSeasonLoading) {
+      setLoading(true)
+      return
+    }
     const loadData = async () => {
       try {
         setError(null)
         const supabase = createClient()
         const nowIso = new Date().toISOString()
-        // Wait until team_season is resolved before querying
-        if (teamSeasonLoading) return
         if (teamSeasonNotFound || !teamSeasonId) {
           setEvents([])
           setPastGames([])

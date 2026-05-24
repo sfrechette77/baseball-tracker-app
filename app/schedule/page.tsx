@@ -152,11 +152,15 @@ export default function SchedulePage() {
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
 
   useEffect(() => {
+    // Wait until team_season is resolved — don't enter the try/finally
+    // because finally would clear the loading state and flash empty UI
+    if (teamSeasonLoading) {
+      setLoading(true)
+      return
+    }
     const loadEvents = async () => {
       try {
         const supabase = createClient()
-        // Wait until team_season is resolved
-        if (teamSeasonLoading) return
         if (teamSeasonNotFound || !teamSeasonId) {
           setEvents([])
           setLoading(false)
