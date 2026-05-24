@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
+import { useTeamSeason } from '@/lib/org/useTeamSeason'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -119,14 +120,26 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'avg' | 'hits' | 'rbi' | 'runs'>('avg')
   const { currentTeam } = useCurrentTeam()
+  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
 
   useEffect(() => {
+    // Wait until team_season is resolved — don't enter the try/finally
+    // because finally would clear the loading state and flash empty UI
+    if (teamSeasonLoading) {
+      setLoading(true)
+      return
+    }
     const load = async () => {
       try {
+        if (teamSeasonNotFound || !teamSeasonId) {
+          setPlayers([])
+          setStats([])
+          return
+        }
         const supabase = createClient()
         const [{ data: playerData }, { data: statData }] = await Promise.all([
-          supabase.from('players').select('id, name, jersey_number, position').eq('team_id', currentTeam.id).order('jersey_number', { ascending: true }),
-          supabase.from('player_stats').select('player_id, at_bats, hits, rbi, runs, strikeouts')
+          supabase.from('players').select('id, name, jersey_number, position').eq('team_season_id', teamSeasonId).order('jersey_number', { ascending: true }),
+          supabase.from('player_stats').select('player_id, at_bats, hits, rbi, runs, strikeouts').eq('team_season_id', teamSeasonId)
         ])
         setPlayers((playerData ?? []) as Player[])
         setStats((statData ?? []) as StatRow[])
@@ -137,7 +150,7 @@ export default function StatsPage() {
       }
     }
     load()
-  }, [currentTeam.id])
+  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound])
 
   const playersWithStats = useMemo((): PlayerWithStats[] => {
     return players.map(player => {
@@ -191,7 +204,15 @@ export default function StatsPage() {
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
-
+        {teamSeasonNotFound && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-300">
+            <p className="font-bold">Team not found in current season</p>
+            <p className="mt-1 text-sm">
+              {currentTeam.label}: no team_seasons row exists for the current season.
+              Admin should create one.
+            </p>
+          </div>
+        )}
         {/* Sort controls */}
         <div className="flex gap-2">
           {(['avg', 'hits', 'rbi', 'runs'] as const).map(key => (
