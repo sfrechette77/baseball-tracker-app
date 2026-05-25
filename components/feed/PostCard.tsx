@@ -17,17 +17,20 @@ export function PostCard({ post, currentMembershipId, isOrgAdmin, onDeleted, onR
   const [confirming, setConfirming] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [imageError, setImageError] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const isAuthor = post.author_membership_id === currentMembershipId
   const canDelete = isAuthor || isOrgAdmin
 
   const handleDelete = () => {
+    setDeleteError(null)
     startTransition(async () => {
       const result = await deletePost(post.id)
       if (result.ok) {
         onDeleted?.()
       } else {
         console.error('Delete failed:', result.error)
+        setDeleteError(result.error)
         setConfirming(false)
       }
     })
@@ -74,6 +77,13 @@ export function PostCard({ post, currentMembershipId, isOrgAdmin, onDeleted, onR
           </div>
         )}
       </div>
+
+      {/* Delete error banner */}
+      {deleteError && (
+        <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2">
+          <p className="text-xs text-red-300">Delete failed: {deleteError}</p>
+        </div>
+      )}
 
       {/* Body */}
       <p className="mt-3 text-sm text-slate-200 whitespace-pre-wrap">
