@@ -1,7 +1,6 @@
 'use client'
-export const dynamic = 'force-dynamic'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -65,6 +64,18 @@ function formatChicagoShortDate(date: Date): string {
 // ─── Main Page ────────────────────────────────────────────────────────────
 
 export default function TeamPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-4xl animate-spin">⚾</div>
+      </main>
+    }>
+      <TeamPageInner />
+    </Suspense>
+  )
+}
+
+function TeamPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
