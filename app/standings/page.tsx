@@ -470,7 +470,7 @@ export default function StandingsPage() {
           </p>
         </section>
       )}
-      <BottomNav active="standings" />
+      <BottomNav active="team" />
     </main>
   )
 }

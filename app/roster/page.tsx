@@ -129,7 +129,7 @@ export default function RosterPage() {
         )}
       </div>
 
-      <BottomNav active="roster" />
+      <BottomNav active="team" />
     </main>
   )
 }
