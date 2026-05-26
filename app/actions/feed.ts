@@ -261,6 +261,7 @@ export async function getFeed(
       team_post_reactions ( emoji, membership_id )
     `)
     .eq('team_id', teamId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(FEED_PAGE_SIZE)
 
