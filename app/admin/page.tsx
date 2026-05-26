@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
+import { getPendingMemberships, getOrgTeams, approveMembership } from '@/app/actions/admin'
+import type { PendingMembership, OrgTeam } from '@/app/actions/admin'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -58,7 +60,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
+type Tab = 'pending' | 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
 
 type Field = {
   id: string
@@ -201,6 +203,16 @@ const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfei
 const [leagueSaving, setLeagueSaving] = useState(false)
 const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
 
+// Pending approvals tab
+  const [pendingList, setPendingList] = useState<PendingMembership[]>([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [pendingMsg, setPendingMsg] = useState<string | null>(null)
+  const [orgTeams, setOrgTeams] = useState<OrgTeam[]>([])
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [approveTeamIds, setApproveTeamIds] = useState<Set<string>>(new Set())
+  const [approveDefaultTeamId, setApproveDefaultTeamId] = useState<string>('')
+  const [approveSaving, setApproveSaving] = useState(false)
+
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
   const [fields, setFields] = useState<Field[]>([])
@@ -255,6 +267,29 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password, currentTeam.id])
+
+  // Load pending memberships + org teams when Pending tab is active
+  useEffect(() => {
+    if (!password || tab !== 'pending') return
+    const load = async () => {
+      setPendingLoading(true)
+      setPendingMsg(null)
+      const [pendingResult, teamsResult] = await Promise.all([
+        getPendingMemberships(),
+        getOrgTeams(),
+      ])
+      if (pendingResult.ok) {
+        setPendingList(pendingResult.pending)
+      } else {
+        setPendingMsg(`❌ ${pendingResult.error}`)
+      }
+      if (teamsResult.ok) {
+        setOrgTeams(teamsResult.teams)
+      }
+      setPendingLoading(false)
+    }
+    load()
+  }, [password, tab])
 
   // Load existing box scores AND is_home when score event changes
   useEffect(() => {
@@ -431,6 +466,59 @@ useEffect(() => {
     }
     setStandingsSaving(false)
     setStandingsMsg('✅ Standings saved!')
+  }
+
+  // Open the approve modal for a specific pending membership.
+  // Default: all org teams checked, the first one selected as default.
+  const startApprove = (membershipId: string) => {
+    setApprovingId(membershipId)
+    setApproveTeamIds(new Set(orgTeams.map(t => t.id)))
+    setApproveDefaultTeamId(orgTeams[0]?.id ?? '')
+    setPendingMsg(null)
+  }
+
+  const cancelApprove = () => {
+    setApprovingId(null)
+    setApproveTeamIds(new Set())
+    setApproveDefaultTeamId('')
+  }
+
+  const toggleApproveTeam = (teamId: string) => {
+    const next = new Set(approveTeamIds)
+    if (next.has(teamId)) {
+      next.delete(teamId)
+      // If the unchecked team was the default, clear default
+      if (approveDefaultTeamId === teamId) {
+        setApproveDefaultTeamId('')
+      }
+    } else {
+      next.add(teamId)
+      // If no default set, this becomes default
+      if (!approveDefaultTeamId) {
+        setApproveDefaultTeamId(teamId)
+      }
+    }
+    setApproveTeamIds(next)
+  }
+
+  const submitApprove = async () => {
+    if (!approvingId) return
+    setApproveSaving(true)
+    setPendingMsg(null)
+    const result = await approveMembership(
+      approvingId,
+      Array.from(approveTeamIds),
+      approveDefaultTeamId
+    )
+    setApproveSaving(false)
+    if (!result.ok) {
+      setPendingMsg(`❌ ${result.error}`)
+      return
+    }
+    setPendingMsg('✅ Approved')
+    // Remove from list and close modal
+    setPendingList(prev => prev.filter(p => p.id !== approvingId))
+    cancelApprove()
   }
 
   const updateStat = (playerId: string, field: keyof StatRow, value: string) => {
@@ -677,8 +765,9 @@ const deleteLeagueGame = async () => {
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-6 gap-1">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-7 gap-1">
           {([
+            { key: 'pending', label: '👋 Pending' },
             { key: 'status', label: '📡 Status' },
             { key: 'score', label: '🏆 Score' },
             { key: 'stats', label: '📊 Stats' },
@@ -695,6 +784,129 @@ const deleteLeagueGame = async () => {
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
+
+        {/* ── Pending Tab ────────────────────────────────────────────────── */}
+        {tab === 'pending' && (
+          <>
+            {pendingLoading && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                <p className="text-slate-400 text-sm">Loading pending approvals…</p>
+              </div>
+            )}
+
+            {!pendingLoading && pendingList.length === 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                <p className="text-slate-400 text-sm">No pending approvals.</p>
+                <p className="text-slate-500 text-xs mt-2">
+                  When a parent signs up, they&apos;ll appear here for review.
+                </p>
+              </div>
+            )}
+
+            {!pendingLoading && pendingList.length > 0 && (
+              <div className="space-y-2">
+                {pendingList.map(p => {
+                  const isApproving = approvingId === p.id
+                  return (
+                    <div key={p.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-bold text-white">
+                          {p.full_name ?? '(no name)'}
+                        </p>
+                        <p className="text-xs text-slate-400">{p.email}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Signed up {new Date(p.created_at).toLocaleString('en-US', {
+                            timeZone: 'America/Chicago',
+                          })}
+                        </p>
+                      </div>
+
+                      {!isApproving && (
+                        <button
+                          onClick={() => startApprove(p.id)}
+                          className="w-full rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition"
+                        >
+                          Approve
+                        </button>
+                      )}
+
+                      {isApproving && (
+                        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-3">
+                          <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                            Assign teams
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Check the teams this parent should see. Pick one as their default.
+                          </p>
+
+                          {orgTeams.length === 0 ? (
+                            <p className="text-xs text-amber-400">No teams found in your org.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {orgTeams.map(t => {
+                                const checked = approveTeamIds.has(t.id)
+                                const isDefault = approveDefaultTeamId === t.id
+                                return (
+                                  <div
+                                    key={t.id}
+                                    className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2"
+                                  >
+                                    <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleApproveTeam(t.id)}
+                                        className="h-4 w-4"
+                                      />
+                                      <span className="text-sm text-white truncate">{t.name}</span>
+                                    </label>
+                                    {checked && (
+                                      <label className="flex items-center gap-1 text-xs cursor-pointer">
+                                        <input
+                                          type="radio"
+                                          name="default-team"
+                                          checked={isDefault}
+                                          onChange={() => setApproveDefaultTeamId(t.id)}
+                                          className="h-3 w-3"
+                                        />
+                                        <span className={isDefault ? 'text-red-400 font-semibold' : 'text-slate-500'}>
+                                          Default
+                                        </span>
+                                      </label>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={submitApprove}
+                              disabled={approveSaving || approveTeamIds.size === 0 || !approveDefaultTeamId}
+                              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {approveSaving ? 'Saving…' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={cancelApprove}
+                              disabled={approveSaving}
+                              className="rounded-xl bg-white/10 border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/20 transition disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {pendingMsg && <p className="text-sm text-center mt-2">{pendingMsg}</p>}
+          </>
+        )}
 
         {/* ── Status Tab ─────────────────────────────────────────────────── */}
         {tab === 'status' && (
