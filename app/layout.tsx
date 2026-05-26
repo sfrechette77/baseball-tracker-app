@@ -4,6 +4,7 @@ import { TeamProvider } from "@/components/team-context";
 import { OrgProvider } from "@/components/org-context";
 import { Header } from "@/components/header";
 import { UserMenu } from "@/components/user-menu";
+import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -69,8 +70,7 @@ export default function RootLayout({
       >
        <OrgProvider>
         <TeamProvider>
-          <Header userMenu={<UserMenu />} />
-          <main>{children}</main>
+          <AppShell>{children}</AppShell>
         </TeamProvider>
        </OrgProvider>
       </body>
