@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { Skeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -204,11 +205,57 @@ export default function PlayerPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading player...</p>
+      <main className="min-h-screen bg-black pb-24 text-white">
+        {/* Header skeleton */}
+        <div className="bg-black px-4 pt-8 pb-6">
+          <div className="mx-auto max-w-sm">
+            <Skeleton className="h-4 w-20 mb-5" />
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 rounded-2xl" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          </div>
         </div>
+        {/* Season Batting summary skeleton */}
+        <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <Skeleton className="h-3 w-28 mx-auto mb-3" />
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="rounded-xl bg-white/10 p-3 border border-white/10">
+                  <Skeleton className="h-7 w-12 mx-auto" />
+                  <Skeleton className="mt-1 h-3 w-8 mx-auto" />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="rounded-xl bg-white/10 p-3 border border-white/10">
+                  <Skeleton className="h-6 w-8 mx-auto" />
+                  <Skeleton className="mt-1 h-3 w-6 mx-auto" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Game log skeleton */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <Skeleton className="h-3 w-20 mx-auto" />
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <BottomNav active="roster" />
       </main>
     )
   }
@@ -218,7 +265,7 @@ export default function PlayerPage() {
       <main className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
           <p className="text-white font-bold">Player not found</p>
-          <Link href="/roster" className="mt-3 inline-block text-sm text-red-400">← Roster</Link>
+          <Link href="/team?view=roster" className="mt-3 inline-block text-sm text-red-400">← Roster</Link>
         </div>
       </main>
     )
@@ -230,7 +277,7 @@ export default function PlayerPage() {
       <div className="relative overflow-hidden bg-black px-4 pt-8 pb-6">
         <div className="relative mx-auto max-w-sm">
           <div className="flex items-center justify-between mb-5">
-            <Link href="/roster" className="text-sm font-semibold text-slate-400 hover:text-white transition">
+            <Link href="/team?view=roster" className="text-sm font-semibold text-slate-400 hover:text-white transition">
               ← Roster
             </Link>
           </div>
