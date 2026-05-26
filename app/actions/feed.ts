@@ -168,13 +168,19 @@ export async function deletePost(postId: string): Promise<SimpleResult> {
   const ctx = await getCurrentMembership()
   if (!ctx.ok) return { ok: false, error: ctx.error }
 
-  // RLS will refuse if user isn't admin of the post's team
-  const { error } = await supabase
+  // RLS will refuse if user isn't admin of the post's team.
+  // Use .select() so we get back the affected rows and can verify the update landed.
+  const { data, error } = await supabase
     .from('team_posts')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', postId)
+    .select('id, deleted_at')
 
   if (error) return { ok: false, error: error.message }
+
+  if (!data || data.length === 0) {
+    return { ok: false, error: 'Delete affected 0 rows — likely RLS or wrong post ID' }
+  }
 
   revalidatePath('/feed')
   return { ok: true }
