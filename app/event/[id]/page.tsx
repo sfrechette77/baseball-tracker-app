@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { PICKABLE_TEAMS } from '@/lib/teams'
+import { Skeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -300,11 +301,35 @@ export default function EventPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading event...</p>
+      <main className="min-h-screen bg-black pb-24 text-white">
+        {/* Header skeleton */}
+        <div className="px-4 pt-8 pb-6">
+          <div className="mx-auto max-w-sm">
+            <Skeleton className="h-4 w-24 mb-5" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-2 h-7 w-3/4" />
+            <Skeleton className="mt-2 h-4 w-1/2" />
+          </div>
         </div>
+        {/* Content panel skeletons */}
+        <div className="mx-auto max-w-sm space-y-3 px-4 pt-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-3 h-4 w-3/4" />
+            <Skeleton className="mt-2 h-3 w-1/3" />
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="mt-3 h-4 w-2/3" />
+            <Skeleton className="mt-2 h-3 w-full" />
+            <Skeleton className="mt-3 h-7 w-24 rounded-full" />
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-3 h-12 w-full" />
+          </div>
+        </div>
+        <BottomNav active="schedule" />
       </main>
     )
   }
