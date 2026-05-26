@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation'
 import { Header } from './header'
-import { UserMenu } from './user-menu'
 
 // Routes that should NOT show the global header (pre-auth flows, signup, etc.)
 function isPublicRoute(pathname: string): boolean {
@@ -13,7 +12,13 @@ function isPublicRoute(pathname: string): boolean {
   return false
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  userMenu,
+  children,
+}: {
+  userMenu: React.ReactNode
+  children: React.ReactNode
+}) {
   const pathname = usePathname()
   const hideChrome = isPublicRoute(pathname)
 
@@ -23,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Header userMenu={<UserMenu />} />
+      <Header userMenu={userMenu} />
       <main>{children}</main>
     </>
   )

@@ -70,7 +70,7 @@ export default function RootLayout({
       >
        <OrgProvider>
         <TeamProvider>
-          <AppShell>{children}</AppShell>
+          <AppShell userMenu={<UserMenu />}>{children}</AppShell>
         </TeamProvider>
        </OrgProvider>
       </body>
