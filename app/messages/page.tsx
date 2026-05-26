@@ -259,11 +259,25 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
     }
   }, [messages.length])
 
-  // Realtime subscription — listen for new messages on this team
+  // Realtime subscription — listen for new messages and reactions on this team.
+  // Reactions are debounced (2s) so a burst of 5 reactions only causes 1 refetch.
   useEffect(() => {
     const supabase = createBrowserSupabase()
+
+    // Debounce timer for reaction events. Reset on each new event; refetch only
+    // fires once the burst has been quiet for 2 seconds.
+    let reactionTimer: ReturnType<typeof setTimeout> | null = null
+    const scheduleReactionRefresh = () => {
+      if (reactionTimer) clearTimeout(reactionTimer)
+      reactionTimer = setTimeout(() => {
+        setRefreshKey(k => k + 1)
+        reactionTimer = null
+      }, 2000)
+    }
+
     const channel = supabase
       .channel(`team_messages:${teamId}`)
+      // Message INSERT — instant refetch (new messages should appear right away)
       .on(
         'postgres_changes',
         {
@@ -273,12 +287,10 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
           filter: `team_id=eq.${teamId}`,
         },
         () => {
-          // Re-fetch when a new message arrives. Simple and reliable; we get
-          // the full normalized shape (with author name + reactions) instead
-          // of trying to assemble it from the raw row.
           setRefreshKey(k => k + 1)
         }
       )
+      // Message DELETE — instant refetch
       .on(
         'postgres_changes',
         {
@@ -291,9 +303,34 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
           setRefreshKey(k => k + 1)
         }
       )
+      // Reaction INSERT — debounced refetch
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'team_message_reactions',
+        },
+        () => {
+          scheduleReactionRefresh()
+        }
+      )
+      // Reaction DELETE — debounced refetch
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'team_message_reactions',
+        },
+        () => {
+          scheduleReactionRefresh()
+        }
+      )
       .subscribe()
 
     return () => {
+      if (reactionTimer) clearTimeout(reactionTimer)
       supabase.removeChannel(channel)
     }
   }, [teamId])
