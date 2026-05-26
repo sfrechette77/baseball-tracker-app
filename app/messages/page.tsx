@@ -170,7 +170,10 @@ function AnnouncementsView({
   const refresh = () => setRefreshKey(k => k + 1)
 
   return (
-    <div className="flex-1 overflow-y-auto mx-auto w-full max-w-sm space-y-4 px-4 pt-4 pb-32 min-h-0">
+    <div
+      className="flex-1 overflow-y-auto mx-auto w-full max-w-sm space-y-4 px-4 pt-4 min-h-0"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px + 24px)' }}
+    >
       {canPost && <Composer teamId={teamId} onPosted={refresh} />}
 
       {loading && (
@@ -297,7 +300,8 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
       {/* Message scroll area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-2 min-h-0"
+        className="flex-1 overflow-y-auto px-4 pt-4 space-y-2 min-h-0"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px + 72px)' }}
       >
         {loading && (
           <div className="space-y-3">
@@ -330,9 +334,14 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
         ))}
       </div>
 
-      {/* Composer at the bottom, above the bottom nav */}
-      <div className="flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+64px)]">
-        <MessageComposer teamId={teamId} onSent={refresh} />
+      {/* Composer pinned above the bottom nav (fixed, like the nav itself) */}
+      <div
+        className="fixed left-0 right-0 z-10 bg-black"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 64px)' }}
+      >
+        <div className="mx-auto w-full max-w-sm">
+          <MessageComposer teamId={teamId} onSent={refresh} />
+        </div>
       </div>
     </div>
   )
