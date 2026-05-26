@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
+import { Skeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -115,11 +116,46 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading stats...</p>
+      <main className="min-h-screen bg-black pb-32 text-white">
+        <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+          <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+          <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
         </div>
+        <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
+          {/* Sort chips */}
+          <div className="flex gap-2">
+            <Skeleton className="h-7 flex-1 rounded-full" />
+            <Skeleton className="h-7 flex-1 rounded-full" />
+            <Skeleton className="h-7 flex-1 rounded-full" />
+            <Skeleton className="h-7 flex-1 rounded-full" />
+          </div>
+          {/* Table */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="py-2 pl-4 pr-2 text-left text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
+                  <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-12">AVG</th>
+                  <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-10">H</th>
+                  <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-10">RBI</th>
+                  <th className="py-2 pl-2 pr-4 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-10">R</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
+                  <tr key={i}>
+                    <td className="py-3 pl-4 pr-2"><Skeleton className="h-4 w-32" /></td>
+                    <td className="py-3 px-2"><Skeleton className="h-4 w-10 mx-auto" /></td>
+                    <td className="py-3 px-2"><Skeleton className="h-4 w-6 mx-auto" /></td>
+                    <td className="py-3 px-2"><Skeleton className="h-4 w-6 mx-auto" /></td>
+                    <td className="py-3 pl-2 pr-4"><Skeleton className="h-4 w-6 mx-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <BottomNav active="stats" />
       </main>
     )
   }
