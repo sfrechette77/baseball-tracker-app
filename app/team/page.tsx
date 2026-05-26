@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
+import { Skeleton, RowSkeleton } from '@/components/Skeleton'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -65,13 +66,31 @@ function formatChicagoShortDate(date: Date): string {
 
 export default function TeamPage() {
   return (
-    <Suspense fallback={
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-4xl animate-spin">⚾</div>
-      </main>
-    }>
+    <Suspense fallback={<TeamPageSkeleton />}>
       <TeamPageInner />
     </Suspense>
+  )
+}
+
+function TeamPageSkeleton() {
+  return (
+    <main className="min-h-screen bg-black pb-32 text-white">
+      <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <h1 className="text-3xl font-extrabold text-white mt-1">Team</h1>
+      </div>
+      <div className="mx-auto max-w-sm px-4 pt-4">
+        <div className="h-9 rounded-full bg-white/5 border border-white/10" />
+      </div>
+      <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
+        <RowSkeleton />
+        <RowSkeleton />
+        <RowSkeleton />
+        <RowSkeleton />
+        <RowSkeleton />
+      </div>
+      <BottomNav active="team" />
+    </main>
   )
 }
 
@@ -197,9 +216,26 @@ function StandingsView({ division, currentTeamId }: { division: string; currentT
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <div className="text-4xl animate-spin">⚾</div>
-      </div>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-white/10">
+            <th className="py-2 pl-4 pr-2 text-left text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Team</th>
+            <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-14">Record</th>
+            <th className="py-2 px-2 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-12">PCT</th>
+            <th className="py-2 pl-2 pr-4 text-center text-[11px] uppercase tracking-wide text-slate-500 font-semibold w-10">RD</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <tr key={i}>
+              <td className="py-3 pl-4 pr-2"><Skeleton className="h-4 w-32" /></td>
+              <td className="py-3 px-2"><Skeleton className="h-4 w-10 mx-auto" /></td>
+              <td className="py-3 px-2"><Skeleton className="h-4 w-8 mx-auto" /></td>
+              <td className="py-3 pl-2 pr-4"><Skeleton className="h-4 w-6 mx-auto" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     )
   }
 
@@ -313,8 +349,27 @@ function ResultsView({ division }: { division: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <div className="text-4xl animate-spin">⚾</div>
+      <div className="space-y-6">
+        <section>
+          <div className="mb-2 h-3 w-24"><Skeleton className="h-3 w-24" /></div>
+          <div className="space-y-2">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <Skeleton className="h-3 w-16" />
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-6" />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-6" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     )
   }
@@ -466,8 +521,16 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <div className="text-4xl animate-spin">⚾</div>
+      <div className="space-y-2">
+        {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
+          <div key={i} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
