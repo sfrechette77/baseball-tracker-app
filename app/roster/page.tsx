@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
+import { RowSkeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -74,11 +75,17 @@ export default function RosterPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading roster...</p>
+      <main className="min-h-screen bg-black pb-32 text-white">
+        <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+          <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+          <h1 className="text-3xl font-extrabold text-white mt-1">Roster</h1>
         </div>
+        <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
+          {[0, 1, 2, 3, 4, 5, 6, 7].map(i => (
+            <RowSkeleton key={i} />
+          ))}
+        </div>
+        <BottomNav active="team" />
       </main>
     )
   }
