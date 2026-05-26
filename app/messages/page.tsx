@@ -221,6 +221,7 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [muted, setMuted] = useState(false)
   const [muteToggling, setMuteToggling] = useState(false)
+  const [muteLoaded, setMuteLoaded] = useState(false)
 
   // Load messages on team change or refresh
   useEffect(() => {
@@ -240,11 +241,13 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
 
   // Load mute state for this team's chat
   useEffect(() => {
+    setMuteLoaded(false)
     const loadMute = async () => {
       const result = await getMutedChats(teamId)
       if (result.ok) {
         setMuted(result.muted)
       }
+      setMuteLoaded(true)
     }
     loadMute()
   }, [teamId])
@@ -328,7 +331,8 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
   return (
     <div className="flex-1 flex flex-col w-full max-w-sm mx-auto overflow-hidden min-h-0">
       {/* Mute toggle bar */}
-      <div className="flex items-center justify-end px-4 pt-2 pb-1">
+      <div className="flex items-center justify-end px-4 pt-2 pb-1 h-8">
+        {muteLoaded && (
         <button
           onClick={handleToggleMute}
           disabled={muteToggling}
@@ -342,6 +346,7 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
           <span>{muted ? '🔕' : '🔔'}</span>
           <span>{muted ? 'Muted' : 'Notifications on'}</span>
         </button>
+        )} 
       </div>
 
       {/* Message scroll area */}
