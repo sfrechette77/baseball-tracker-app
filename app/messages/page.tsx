@@ -92,16 +92,16 @@ function MessagesPageInner() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col">
+    <main className="h-[100dvh] bg-black text-white flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="mx-auto max-w-sm w-full px-4 pt-6 pb-2">
+      <div className="mx-auto max-w-sm w-full px-4 pt-6 pb-2 flex-shrink-0">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Messages</h1>
         <p className="text-sm text-slate-400 mt-1">{currentTeam.fullName}</p>
       </div>
 
       {/* Sub-view toggle */}
-      <div className="mx-auto max-w-sm w-full px-4 pt-4">
+      <div className="mx-auto max-w-sm w-full px-4 pt-4 flex-shrink-0">
         <div className="flex gap-1 rounded-full bg-white/5 border border-white/10 p-1">
           {(['announcements', 'chat'] as const).map((key) => (
             <button
@@ -170,7 +170,7 @@ function AnnouncementsView({
   const refresh = () => setRefreshKey(k => k + 1)
 
   return (
-    <div className="mx-auto max-w-sm w-full space-y-4 px-4 pt-4 pb-32">
+    <div className="flex-1 overflow-y-auto mx-auto w-full max-w-sm space-y-4 px-4 pt-4 pb-32 min-h-0">
       {canPost && <Composer teamId={teamId} onPosted={refresh} />}
 
       {loading && (
@@ -293,12 +293,11 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
   })
 
   return (
-    <div className="flex-1 flex flex-col w-full max-w-sm mx-auto overflow-hidden">
+    <div className="flex-1 flex flex-col w-full max-w-sm mx-auto overflow-hidden min-h-0">
       {/* Message scroll area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-2"
-        style={{ minHeight: '50vh' }}
+        className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-2 min-h-0"
       >
         {loading && (
           <div className="space-y-3">
@@ -332,7 +331,7 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
       </div>
 
       {/* Composer at the bottom, above the bottom nav */}
-      <div className="pb-[calc(env(safe-area-inset-bottom)+64px)]">
+      <div className="flex-shrink-0 pb-[calc(env(safe-area-inset-bottom)+64px)]">
         <MessageComposer teamId={teamId} onSent={refresh} />
       </div>
     </div>
