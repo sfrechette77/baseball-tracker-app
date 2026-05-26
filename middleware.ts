@@ -3,12 +3,15 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that don't require auth
-const PUBLIC_ROUTES = ['/login', '/auth/callback']
+const PUBLIC_ROUTES = ['/login', '/auth/callback', '/signup']
 
 // Routes you might want public later (about, marketing, etc.)
 // Add to PUBLIC_ROUTES array above
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) return true
+  // Org-scoped signup pages: /o/<slug>/signup and /o/<slug>/signup/complete
+  if (/^\/o\/[^/]+\/signup(\/|$)/.test(pathname)) return true
+  return false
 }
 
 export async function middleware(request: NextRequest) {
