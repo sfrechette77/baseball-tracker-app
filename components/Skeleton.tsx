@@ -45,3 +45,27 @@ export function RowSkeleton() {
     </div>
   )
 }
+
+// Composed skeleton that mirrors the PostCard shape — used on feed
+export function PostCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      {/* Header: author + timestamp */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-2 h-3 w-16" />
+        </div>
+      </div>
+      {/* Body */}
+      <Skeleton className="mt-4 h-4 w-full" />
+      <Skeleton className="mt-2 h-4 w-5/6" />
+      <Skeleton className="mt-2 h-4 w-3/4" />
+      {/* Reactions row */}
+      <div className="mt-4 flex gap-2">
+        <Skeleton className="h-7 w-14 rounded-full" />
+        <Skeleton className="h-7 w-14 rounded-full" />
+      </div>
+    </div>
+  )
+}

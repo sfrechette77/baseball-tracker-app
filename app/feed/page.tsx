@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useCurrentTeam } from '@/components/team-context'
 import { useActiveOrg } from '@/components/org-context'
 import { BottomNav } from '@/components/BottomNav'
+import { PostCardSkeleton } from '@/components/Skeleton'
 import { Composer } from '@/components/feed/Composer'
 import { PostCard } from '@/components/feed/PostCard'
 import { getFeed } from '../actions/feed'
@@ -11,13 +12,25 @@ import type { Post } from '../actions/feed'
 
 export default function FeedPage() {
   return (
-    <Suspense fallback={
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-4xl animate-spin">⚾</div>
-      </main>
-    }>
+    <Suspense fallback={<FeedSkeleton />}>
       <FeedPageInner />
     </Suspense>
+  )
+}
+
+function FeedSkeleton() {
+  return (
+    <main className="min-h-screen bg-black pb-32 text-white">
+      <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
+        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <h1 className="text-3xl font-extrabold text-white mt-1">Feed</h1>
+      </div>
+      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+        <PostCardSkeleton />
+        <PostCardSkeleton />
+        <PostCardSkeleton />
+      </div>
+    </main>
   )
 }
 
@@ -53,14 +66,7 @@ function FeedPageInner() {
   const refresh = () => setRefreshKey(k => k + 1)
 
   if (orgLoading || loading) {
-    return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading feed...</p>
-        </div>
-      </main>
-    )
+    return <FeedSkeleton />
   }
 
   if (!membership) {
