@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { Skeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -199,11 +200,26 @@ export default function EditEventPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-          <p className="text-slate-400 text-sm">Loading event...</p>
+      <main className="min-h-screen bg-black pb-24 text-white">
+        {/* Header skeleton */}
+        <div className="bg-black px-4 pt-8 pb-6">
+          <div className="mx-auto max-w-sm">
+            <Skeleton className="h-4 w-16 mb-5" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="mt-2 h-7 w-2/3" />
+          </div>
         </div>
+        {/* Form panel skeletons */}
+        <div className="mx-auto max-w-sm space-y-3 px-4">
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-11 w-full rounded-xl" />
+            </div>
+          ))}
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <BottomNav active="schedule" />
       </main>
     )
   }
