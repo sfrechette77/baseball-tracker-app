@@ -155,7 +155,7 @@ export async function createPost(formData: FormData): Promise<CreatePostResult> 
     await sendPushToTeam(inserted.team_id, {
       title: 'New team post',
       body: preview,
-      url: '/feed',
+      url: '/messages?view=announcements',
       tag: `team-post-${inserted.id}`,
     })
   } catch (err) {

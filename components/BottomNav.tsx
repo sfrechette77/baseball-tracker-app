@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 
-export type BottomNavKey = 'home' | 'schedule' | 'team' | 'stats' | 'feed'
+export type BottomNavKey = 'home' | 'schedule' | 'team' | 'stats' | 'messages'
 
 function HomeIcon({ active }: { active?: boolean }) {
   return (
@@ -44,7 +44,7 @@ function StandingsIcon({ active }: { active?: boolean }) {
   )
 }
 
-function FeedIcon({ active }: { active?: boolean }) {
+function MessagesIcon({ active }: { active?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
       <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -58,7 +58,7 @@ export function BottomNav({ active }: { active: BottomNavKey }) {
     { href: '/schedule', label: 'Schedule', key: 'schedule', Icon: CalendarIcon },
     { href: '/team', label: 'Team', key: 'team', Icon: StandingsIcon },
     { href: '/stats', label: 'Stats', key: 'stats', Icon: ChartIcon },
-    { href: '/feed', label: 'Feed', key: 'feed', Icon: FeedIcon },
+    { href: '/messages', label: 'Messages', key: 'messages', Icon: MessagesIcon },
   ] as const
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
