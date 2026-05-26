@@ -272,9 +272,49 @@ export async function getFeed(
   if (error) return { ok: false, error: error.message }
   if (!data) return { ok: true, posts: [] }
 
-  /// Normalize the data into our Post shape
-  const posts: Post[] = data.map((row: any) => {
+  // Collect unique author membership IDs from this batch of posts
+  const authorMembershipIds = Array.from(
+    new Set(data.map((row: any) => row.author_membership_id).filter(Boolean))
+  )
 
+  // Build a map: author_membership_id → author_name
+  const authorNameByMembershipId: Record<string, string | null> = {}
+
+  if (authorMembershipIds.length > 0) {
+    // Step 1: membership_id → user_id
+    const { data: memberships } = await supabase
+      .from('memberships')
+      .select('id, user_id')
+      .in('id', authorMembershipIds)
+
+    const userIdByMembershipId: Record<string, string> = {}
+    for (const m of memberships ?? []) {
+      userIdByMembershipId[m.id] = m.user_id
+    }
+
+    const userIds = Object.values(userIdByMembershipId)
+
+    // Step 2: user_id → full_name
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+
+      const fullNameByUserId: Record<string, string | null> = {}
+      for (const p of profiles ?? []) {
+        fullNameByUserId[p.id] = p.full_name
+      }
+
+      // Stitch: membership_id → user_id → full_name
+      for (const [membershipId, userId] of Object.entries(userIdByMembershipId)) {
+        authorNameByMembershipId[membershipId] = fullNameByUserId[userId] ?? null
+      }
+    }
+  }
+
+  // Normalize the data into our Post shape
+  const posts: Post[] = data.map((row: any) => {
     // Aggregate reactions by emoji
     const reactionsByEmoji: Record<string, number> = {}
     const myReactionsSet = new Set<string>()
@@ -296,7 +336,7 @@ export async function getFeed(
       image_url: row.image_url,
       image_path: row.image_path,
       created_at: row.created_at,
-      author_name: null, // TODO: fetch separately to get author display name
+      author_name: authorNameByMembershipId[row.author_membership_id] ?? null,
       reactions,
       my_reactions: Array.from(myReactionsSet),
     }
