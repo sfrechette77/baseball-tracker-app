@@ -64,10 +64,11 @@ export async function sendPushToTeam(
   configureWebPush()
   const supabase = getSupabase()
 
-  // Fetch all active subscriptions for this team
+  // Fetch all active subscriptions for this team, joining membership so we can
+  // filter out users who have muted this team's chat.
   const { data: subs, error: fetchError } = await supabase
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth')
+    .select('id, endpoint, p256dh, auth, membership_id, memberships ( muted_chats )')
     .eq('team_id', teamId)
 
   if (fetchError) {
@@ -75,6 +76,18 @@ export async function sendPushToTeam(
   }
 
   if (!subs || subs.length === 0) {
+    return { sent: 0, failed: 0, cleanedUp: 0 }
+  }
+
+  // Filter out subscriptions whose owner has muted this team's chat.
+  // Subscriptions without a membership_id (legacy / no link) pass through unfiltered.
+  const filteredSubs = subs.filter((sub: any) => {
+    const muted = sub.memberships?.muted_chats as string[] | undefined
+    if (!muted) return true
+    return !muted.includes(teamId)
+  })
+
+  if (filteredSubs.length === 0) {
     return { sent: 0, failed: 0, cleanedUp: 0 }
   }
 
@@ -90,7 +103,7 @@ export async function sendPushToTeam(
   let failureCount = 0
 
   await Promise.all(
-    subs.map(async (sub: SubscriptionRow) => {
+    filteredSubs.map(async (sub: SubscriptionRow) => {
       try {
         await webpush.sendNotification(
           {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useCurrentTeam } from '@/components/team-context'
+import { useActiveOrg } from '@/components/org-context'
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported' | 'subscribed' | 'needs_pwa'
 
@@ -32,6 +33,7 @@ function isIOSWithoutPWA(): boolean {
 
 export function PushSubscribeButton() {
   const { currentTeam } = useCurrentTeam()
+  const { membership } = useActiveOrg()
   const [state, setState] = useState<PermissionState>('default')
   const [message, setMessage] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
@@ -116,17 +118,11 @@ export function PushSubscribeButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamId: currentTeam.id,
+          membershipId: membership?.id ?? null,
           subscription: subscription.toJSON(),
           userAgent: navigator.userAgent,
         }),
       })
-
-      if (!response.ok) {
-        const err = await response.json()
-        setMessage(`Failed to register: ${err.error ?? 'unknown'}`)
-        setWorking(false)
-        return
-      }
 
       setState('subscribed')
       setMessage(`Subscribed to ${currentTeam.label} notifications`)

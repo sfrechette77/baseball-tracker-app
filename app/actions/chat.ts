@@ -304,6 +304,74 @@ export async function removeReaction(messageId: string, emoji: string): Promise<
   return { ok: true }
 }
 
+// ─── getMutedChats ─────────────────────────────────────────────────────────
+
+/**
+ * Get the team_ids that the current user has muted in this org.
+ */
+export async function getMutedChats(teamId: string): Promise<
+  { ok: true; muted: boolean } | { ok: false; error: string }
+> {
+  if (!teamId) return { ok: false, error: 'Missing teamId' }
+
+  const supabase = await createClient()
+  const ctx = await getCurrentMembershipForTeam(teamId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+
+  const { data, error } = await supabase
+    .from('memberships')
+    .select('muted_chats')
+    .eq('id', ctx.membership.id)
+    .single()
+
+  if (error) return { ok: false, error: error.message }
+
+  const mutedChats = (data?.muted_chats ?? []) as string[]
+  return { ok: true, muted: mutedChats.includes(teamId) }
+}
+
+// ─── toggleMuteChat ────────────────────────────────────────────────────────
+
+/**
+ * Toggle whether the current user has chat notifications muted for this team.
+ * Returns the new muted state after the toggle.
+ */
+export async function toggleMuteChat(teamId: string): Promise<
+  { ok: true; muted: boolean } | { ok: false; error: string }
+> {
+  if (!teamId) return { ok: false, error: 'Missing teamId' }
+
+  const supabase = await createClient()
+  const ctx = await getCurrentMembershipForTeam(teamId)
+  if (!ctx.ok) return { ok: false, error: ctx.error }
+
+  // Read current state
+  const { data: current, error: readError } = await supabase
+    .from('memberships')
+    .select('muted_chats')
+    .eq('id', ctx.membership.id)
+    .single()
+
+  if (readError) return { ok: false, error: readError.message }
+
+  const mutedChats = (current?.muted_chats ?? []) as string[]
+  const isMuted = mutedChats.includes(teamId)
+
+  // Toggle
+  const newMutedChats = isMuted
+    ? mutedChats.filter(id => id !== teamId)
+    : [...mutedChats, teamId]
+
+  const { error: updateError } = await supabase
+    .from('memberships')
+    .update({ muted_chats: newMutedChats })
+    .eq('id', ctx.membership.id)
+
+  if (updateError) return { ok: false, error: updateError.message }
+
+  return { ok: true, muted: !isMuted }
+}
+
 // ─── getMessages ───────────────────────────────────────────────────────────
 
 export async function getMessages(

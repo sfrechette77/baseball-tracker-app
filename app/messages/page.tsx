@@ -17,7 +17,7 @@ import type { Post } from '../actions/feed'
 // New for Chat
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { MessageComposer } from '@/components/chat/MessageComposer'
-import { getMessages } from '../actions/chat'
+import { getMessages, getMutedChats, toggleMuteChat } from '../actions/chat'
 import type { ChatMessage } from '../actions/chat'
 
 type SubView = 'announcements' | 'chat'
@@ -219,6 +219,8 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const [muted, setMuted] = useState(false)
+  const [muteToggling, setMuteToggling] = useState(false)
 
   // Load messages on team change or refresh
   useEffect(() => {
@@ -235,6 +237,17 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
     }
     load()
   }, [teamId, refreshKey])
+
+  // Load mute state for this team's chat
+  useEffect(() => {
+    const loadMute = async () => {
+      const result = await getMutedChats(teamId)
+      if (result.ok) {
+        setMuted(result.muted)
+      }
+    }
+    loadMute()
+  }, [teamId])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -283,6 +296,23 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
   }, [teamId])
 
   const refresh = () => setRefreshKey(k => k + 1)
+  const handleToggleMute = async () => {
+    if (muteToggling) return
+    setMuteToggling(true)
+    // Optimistic flip
+    const newMuted = !muted
+    setMuted(newMuted)
+    const result = await toggleMuteChat(teamId)
+    if (!result.ok) {
+      // Revert on failure
+      setMuted(!newMuted)
+      console.error('Mute toggle failed:', result.error)
+    } else {
+      // Sync to server's actual returned state in case of any drift
+      setMuted(result.muted)
+    }
+    setMuteToggling(false)
+  }
 
   // Compute showAuthor for each message — suppress avatar/name when previous
   // message was from the same author within 5 minutes.
@@ -297,6 +327,23 @@ function ChatView({ teamId, membershipId }: { teamId: string; membershipId: stri
 
   return (
     <div className="flex-1 flex flex-col w-full max-w-sm mx-auto overflow-hidden min-h-0">
+      {/* Mute toggle bar */}
+      <div className="flex items-center justify-end px-4 pt-2 pb-1">
+        <button
+          onClick={handleToggleMute}
+          disabled={muteToggling}
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+            muted
+              ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/15'
+              : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+          }`}
+          aria-label={muted ? 'Unmute chat notifications' : 'Mute chat notifications'}
+        >
+          <span>{muted ? '🔕' : '🔔'}</span>
+          <span>{muted ? 'Muted' : 'Notifications on'}</span>
+        </button>
+      </div>
+
       {/* Message scroll area */}
       <div
         ref={scrollRef}
