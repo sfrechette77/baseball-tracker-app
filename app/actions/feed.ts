@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendPushToTeam } from '@/lib/push/send'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,23 @@ export async function createPost(formData: FormData): Promise<CreatePostResult> 
 
   // Revalidate the feed page cache
   revalidatePath('/feed')
+
+  // Fire a push notification to all team subscribers.
+  // Wrapped in try/catch so a push failure doesn't fail the post creation —
+  // the post is already saved at this point.
+  try {
+    // Truncate the preview so notifications stay readable on lock screens.
+    const preview = body.length > 100 ? body.slice(0, 97) + '...' : body
+
+    await sendPushToTeam(inserted.team_id, {
+      title: 'New team post',
+      body: preview,
+      url: '/feed',
+      tag: `team-post-${inserted.id}`,
+    })
+  } catch (err) {
+    console.error('Push send failed (post still created):', err)
+  }
 
   return {
     ok: true,
