@@ -9,6 +9,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { PushSubscribeButton } from '@/components/push-subscribe-button'
 import { BottomNav } from '@/components/BottomNav'
+import { EventCardSkeleton, RowSkeleton } from '@/components/Skeleton'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -480,15 +481,19 @@ export default function HomePage() {
   const otherEvents = useMemo(() => events.slice(1), [events])
 
   if (loading) {
-  return (
-    <main className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-4xl mb-3 animate-spin inline-block">⚾</div>
-        <p className="text-slate-400 text-sm">Loading...</p>
-      </div>
-    </main>
-  )
-}
+    return (
+      <main className="min-h-screen bg-black pb-32 text-white">
+        <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
+          <EventCardSkeleton featured />
+          <div className="space-y-2">
+            <RowSkeleton />
+            <RowSkeleton />
+          </div>
+        </div>
+        <BottomNav active="home" />
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
