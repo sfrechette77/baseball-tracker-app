@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { PendingChecker } from './PendingChecker'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -86,6 +87,7 @@ export default async function SignupCompletePage({ params }: Props) {
   // Render the pending screen
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white p-6">
+      <PendingChecker orgId={org.id} />
       <div className="w-full max-w-sm space-y-6 text-center">
         <div className="text-6xl">⏳</div>
         <div>
