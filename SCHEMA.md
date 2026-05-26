@@ -1,6 +1,6 @@
 # On Deck — Database Schema
 
-**Last updated:** End of Chat v1 build session
+**Last updated:** End of realtime-reactions + mute UI + Chunk H session
 **Environment:** Production (`fjrtcxfqculymgyfrato`)
 **Status:** Reflects current production state. Most RLS still dormant until cutover.
 
@@ -133,18 +133,16 @@ Links users to orgs with a role + status. One row per (user, org, role) combinat
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | id | uuid | PK, default gen_random_uuid() | |
-| user_id | uuid | NOT NULL | **No FK to auth.users in prod** |
+| user_id | uuid | NOT NULL | **No FK to auth.users in dev (test relaxation); FK present in prod** |
 | organization_id | uuid | NOT NULL, FK organizations, ON DELETE CASCADE | |
 | role | membership_role | NOT NULL | |
 | status | membership_status | NOT NULL, default 'pending' | |
 | invited_by | uuid | FK auth.users, ON DELETE SET NULL | Audit |
-| approved_by | uuid | FK auth.users, ON DELETE SET NULL | Audit |
+| approved_by | uuid | FK auth.users, ON DELETE SET NULL | Audit. NOT dropped in dev — fake test UUIDs can't be used for this column. |
 | approved_at | timestamptz | nullable | |
 | **muted_chats** | **uuid[]** | **NOT NULL, default array[]::uuid[]** | **Array of team_ids whose chat the user has muted (chat v1)** |
 | created_at | timestamptz | NOT NULL, default now() | |
 | updated_at | timestamptz | NOT NULL, default now() | |
-
-**Note:** The FK `memberships.user_id` → `auth.users(id)` is NOT present in production. Worth investigating before cutover.
 
 **Constraints:** `memberships_unique_role_per_user_org` UNIQUE (user_id, organization_id, role)
 
@@ -179,6 +177,8 @@ User profile data. References Supabase Auth users.
 - SELECT: users can read own profile OR org_admins can read profiles of org members
 - UPDATE: users can update own profile only
 - No INSERT/DELETE policies (managed by Supabase Auth lifecycle)
+
+**Note on signup flow:** Chunk H's signup-complete page upserts profiles using Google-provided metadata (full_name from user_metadata.full_name or .name fields, email from auth.users.email).
 
 ---
 
@@ -257,6 +257,8 @@ Links parent memberships to teams (their kids' teams).
 - SELECT: users can read own parent_team assignments OR org_admins can read all in their org
 - INSERT/UPDATE/DELETE: org_admins of the membership's org
 
+**Write pattern in Chunk H:** approveMembership inserts rows here when an admin approves a pending parent. Always inserts as a batch, with exactly one row having is_default=true.
+
 ---
 
 ## Tables — Tenant Data (Org-Scoped)
@@ -277,8 +279,6 @@ Permanent team identity.
 | owner_user_id | uuid | nullable | Legacy field |
 | created_at | timestamptz | NOT NULL, default now() | |
 
-**Note:** `season_label` was DROPPED in Chunk 3.
-
 **RLS Policies (DORMANT):**
 - SELECT: members can read teams in their orgs
 - INSERT/UPDATE/DELETE: org_admins only
@@ -287,32 +287,26 @@ Permanent team identity.
 
 ### players, events, fields, league_games, standings, box_scores, player_stats, game_status_log, event_imports, weather_forecasts
 
-(Unchanged from prior version. See git history for full per-column detail. All have organization_id NOT NULL with default Chicago Elite UUID, FK organizations, ON DELETE CASCADE. RLS DORMANT.)
+(Unchanged from prior version. All have organization_id NOT NULL with default Chicago Elite UUID, FK organizations, ON DELETE CASCADE. RLS DORMANT.)
 
 **Per-season tables** (players, events, box_scores, player_stats, league_games, standings) link via `team_season_id` to team_seasons. Old `team_id` columns DROPPED in Chunk 3 except on standings, which kept its team_name column.
 
 ---
 
 ### computed_standings (VIEW)
-Aggregated standings view. Reads from underlying standings/league_games data. Rewritten in Chunk 6 to expose `organization_id`.
-
-**Returned columns (approximate):**
-- `id`, `organization_id`, `team_name`, `division`
-- `games_played`, `wins`, `losses`, `ties`
-- `runs_for`, `runs_against`, `win_pct`
-
-**RLS:** Views don't have their own RLS. Access controlled by RLS on underlying tables (when enabled).
+Aggregated standings view. Rewritten in Chunk 6 to expose `organization_id`. Views don't have their own RLS; access is controlled by RLS on underlying tables.
 
 ---
 
 ### push_subscriptions
-Web Push notification subscriptions tied to a team.
+Web Push notification subscriptions tied to a team. **Updated for mute UI:** added `membership_id` column.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | id | uuid | PK, default gen_random_uuid() | |
 | organization_id | uuid | NOT NULL, FK organizations | |
 | team_id | uuid | NOT NULL | |
+| **membership_id** | **uuid** | **nullable, FK memberships, ON DELETE CASCADE** | **Added during mute UI work. Links subscription to a membership so push helper can check muted_chats.** |
 | endpoint | text | NOT NULL | Web Push endpoint URL |
 | p256dh | text | NOT NULL | Push encryption key |
 | auth | text | NOT NULL | Push auth secret |
@@ -320,11 +314,16 @@ Web Push notification subscriptions tied to a team.
 | last_pushed_at | timestamptz | nullable | |
 | created_at | timestamptz | default now() | |
 
+**Indexes:**
+- `idx_push_subscriptions_membership` on membership_id
+
 **RLS state:** ON
 
 **RLS Policies (ACTIVE):**
 - SELECT: members can read push_subscriptions in their orgs
 - INSERT/UPDATE/DELETE: any approved member of the org (permissive; refine when revisiting push flow)
+
+**Note on legacy rows:** Subscriptions created before the membership_id migration have membership_id=null. The `sendPushToTeam` helper treats null as "no mute info, send anyway" — graceful degradation. To get mute working on a legacy device, unsubscribe + re-subscribe in the app (one-time).
 
 ---
 
@@ -353,12 +352,12 @@ Admin announcements with optional images.
 **RLS state:** ON
 
 **RLS Policies (ACTIVE):**
-- SELECT: `can_read_team(team_id) AND (deleted_at IS NULL OR can_admin_team(team_id))` — admins can see their own soft-deleted posts
+- SELECT: `can_read_team(team_id) AND (deleted_at IS NULL OR can_admin_team(team_id))`
 - INSERT: `can_admin_team(team_id)` AND author must be the current user's approved membership
 - UPDATE: `can_admin_team(team_id)`
 - DELETE: `can_admin_team(team_id)`
 
-**App layer note:** getFeed in app/actions/feed.ts adds `.is('deleted_at', null)` to filter soft-deleted posts from non-admin views. Without this, admins (who CAN see soft-deleted via RLS) would see their own deleted posts.
+**App layer note:** getFeed adds `.is('deleted_at', null)` to filter soft-deleted posts from non-admin views.
 
 ---
 
@@ -376,13 +375,10 @@ Emoji reactions to posts.
 
 **Constraints:** `team_post_reactions_unique` UNIQUE (post_id, membership_id, emoji)
 
-**Indexes:**
-- `idx_team_post_reactions_org`, `idx_team_post_reactions_post`, `idx_team_post_reactions_membership`
-
 **RLS state:** ON
 
 **RLS Policies (ACTIVE):**
-- SELECT: if you can read the parent post (via `can_read_team` and post not deleted), you can see its reactions
+- SELECT: if you can read the parent post, you can see its reactions
 - INSERT: you can read the post AND the reaction's membership must be your own approved membership
 - DELETE: you can delete reactions that belong to your own membership
 - No UPDATE policy — reactions are insert/delete only
@@ -406,21 +402,19 @@ Realtime chat messages. Anyone with an approved membership in a team's org who h
 | created_at | timestamptz | NOT NULL, default now() | |
 | updated_at | timestamptz | NOT NULL, default now() | |
 
-**No soft delete** — unlike team_posts, chat is ephemeral. Hard delete only.
+**No soft delete.** Hard delete only.
 
 **Indexes:**
 - `idx_team_messages_org`, `idx_team_messages_team`, `idx_team_messages_author`
-- `idx_team_messages_team_created` on (team_id, created_at desc) — hot index for fetching team chat history
+- `idx_team_messages_team_created` on (team_id, created_at desc)
 
 **RLS state:** ON
 
 **RLS Policies (ACTIVE):**
 - SELECT: `can_read_team(team_id)`
 - INSERT: `can_read_team(team_id)` AND author_membership_id must be the current user's approved membership
-- UPDATE: only the author can edit their own message (no UI in v1, policy is future-proofing)
+- UPDATE: only the author can edit their own message (no UI in v1)
 - DELETE: only the author can delete their own message
-
-**Note:** No admin override on delete. Different from team_posts where org_admins can delete any post. Reasoning: chat is conversation, admin moderation feels overreach.
 
 **Realtime:** added to `supabase_realtime` publication. Clients subscribe via `supabase.channel('team_messages:...').on('postgres_changes', { event: 'INSERT' | 'DELETE', filter: 'team_id=eq.XXX' }, ...)`.
 
@@ -440,9 +434,6 @@ Emoji reactions to chat messages.
 
 **Constraints:** `team_message_reactions_unique` UNIQUE (message_id, membership_id, emoji)
 
-**Indexes:**
-- `idx_team_message_reactions_org`, `idx_team_message_reactions_message`, `idx_team_message_reactions_membership`
-
 **RLS state:** ON
 
 **RLS Policies (ACTIVE):**
@@ -451,7 +442,9 @@ Emoji reactions to chat messages.
 - DELETE: can only delete reactions that belong to your own membership
 - No UPDATE policy
 
-**Realtime:** added to publication but client deliberately does NOT subscribe in v1 (would cause refetch spam on every reaction). UI uses optimistic local updates instead.
+**Realtime (updated):** added to publication. Client now subscribes to INSERT/DELETE events globally (no team_id filter possible — table has no team_id column). UI refetch is debounced (2 seconds) to prevent spam when multiple users react in succession.
+
+**Future scaling note:** at very large scale, the global subscription becomes inefficient. Adding a `team_id` column and filter would localize realtime traffic.
 
 ---
 
@@ -486,8 +479,8 @@ Stores message images for the Chat feature.
 - Path structure: `{organization_id}/{team_id}/{message_id}.{ext}`
 
 **RLS Policies on storage.objects (scoped to bucket_id = 'team-messages'):**
-- INSERT: anyone who `can_read_team` for path[2] can upload (everyone in chat can post — different from Feed which is admin-only)
-- SELECT: same scope (anyone who can read team can view images)
+- INSERT: anyone who `can_read_team` for path[2] can upload (everyone in chat can post)
+- SELECT: same scope
 - UPDATE: same scope
 - DELETE: same scope (controlled at app layer to restrict to authors; chat RLS only allows authors to delete the message row itself)
 
@@ -496,8 +489,8 @@ Stores message images for the Chat feature.
 ## Realtime publication
 
 `supabase_realtime` publication includes:
-- `team_messages` — for live chat updates
-- `team_message_reactions` — included but client doesn't subscribe in v1
+- `team_messages` — for live chat updates (INSERT/DELETE)
+- `team_message_reactions` — for live reaction updates (INSERT/DELETE), debounced client-side
 
 To enable, ran:
 ```sql
@@ -509,7 +502,7 @@ alter publication supabase_realtime add table public.team_message_reactions;
 
 ## RLS pattern summary
 
-When RLS is enabled (currently profiles, push_subscriptions, team_posts, team_post_reactions, team_messages, team_message_reactions; rest at cutover):
+When RLS is enabled:
 
 **Read pattern (SELECT):**
 Approved members can read all data in their orgs. Cross-team visibility within an org is allowed.
@@ -524,15 +517,18 @@ players, events, box_scores, player_stats, team_posts, team_post_reactions
 team_messages, team_message_reactions (anyone in the team's org with access to the team can write)
 
 **Write pattern — Self-managed:**
-profiles (own row only), memberships (own pending row on insert; org_admins can update others), team_messages delete (author only)
+profiles (own row only), memberships (own pending row on insert; org_admins can update others), team_messages delete (author only), team_message_reactions delete (own only)
 
 ---
 
 ## Migration files in repo
 
-- `lib/db/migrations/chat-v1.sql` — Chat v1 schema, RLS, Realtime publication, Storage policies. Includes a defensive `create or replace` for `can_read_team` since it was missing in dev. **Already RUN against dev AND prod.**
+- `lib/db/migrations/chat-v1.sql` — Chat v1 schema, RLS, Realtime publication, Storage policies. **Already RUN against dev AND prod.**
 
-(Earlier migrations were run ad-hoc and not saved to repo.)
+**Other migrations run ad-hoc and not yet saved to repo:**
+- Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
+- Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
+- Test harness: User C linked to Moore via parent_teams (during chat RLS testing).
 
 ---
 
@@ -551,10 +547,10 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 ## Outstanding items before cutover
 
-1. **Add `memberships.user_id` FK to `auth.users(id)`** — currently absent. Either restore or document why omitted.
-2. **Drop redundant `team_id` columns** from per-season tables (Approach A still has them; Chunk 4b will drop them).
-3. **Enable RLS on tenant tables** — 17 tables currently have RLS off.
-4. **Build Chunk H — Signup + admin approval flow** — required before any non-Chicago-Elite org can use the product.
+1. **Drop redundant `team_id` columns** from per-season tables (Approach A still has them; Chunk 4b will drop them).
+2. **Enable RLS on tenant tables** — 17 tables currently have RLS off. This is the cutover.
+3. **Decide on `memberships.user_id` FK to `auth.users(id)`** — present in prod, dropped in dev for test harness. Document or restore.
+4. **Decide on `memberships.approved_by` FK** — present in both prod and dev. Causes test friction in dev (fake UUIDs can't be used for this column). Either drop in dev or always omit in dev tests.
 
 ---
 
