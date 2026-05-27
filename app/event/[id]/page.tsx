@@ -453,7 +453,7 @@ export default function EventPage() {
                       <>
                         {topRow && (
                           <tr className={topIsUs ? 'bg-red-600/5' : ''}>
-                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[140px]">
+                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[180px]">
                               {topIsUs
                                 ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
                                 : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
@@ -470,7 +470,7 @@ export default function EventPage() {
                         )}
                         {bottomRow && (
                           <tr className={bottomIsUs ? 'bg-red-600/5' : ''}>
-                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[140px]">
+                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[180px]">
                               {bottomIsUs
                                 ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
                                 : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
