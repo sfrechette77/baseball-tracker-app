@@ -23,7 +23,7 @@ const INNINGS = [1, 2, 3, 4, 5, 6, 7]
 function getTeamLabel(team: { id: string; name: string } | null): string {
   if (!team) return 'Elite'
   const pickable = PICKABLE_TEAMS.find(t => t.id === team.id)
-  return pickable?.fullName ?? team.name
+  return pickable?.label ?? team.name
 }
 
 type FieldRow = {
@@ -470,7 +470,7 @@ export default function EventPage() {
                         )}
                         {bottomRow && (
                           <tr className={bottomIsUs ? 'bg-red-600/5' : ''}>
-                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[80px]">
+                            <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[140px]">
                               {bottomIsUs
                                 ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
                                 : <span className="font-semibold text-slate-400">{event.opponent ?? 'Opp'}</span>}
