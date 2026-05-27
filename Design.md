@@ -2,47 +2,44 @@
 
 ## Next session starts here
 
-**Top priority:** Cutover — enable RLS on the 17 tenant tables currently OFF in production. This is the last major architectural step before the multi-tenant story is real. RLS policies already exist on these tables (created in Chunk 8); they're dormant. Cutover = flip them on + validate nothing breaks.
+**Cutover is COMPLETE.** All 17 tenant tables are now under RLS in production. The multi-tenant story is real — database enforces isolation, not just application code.
 
-**Risk:** RLS bugs surface as silent data hiding, not loud errors. Cutover needs careful validation per table.
+**Active polish items (pick one):**
 
-**Recommended approach:**
-1. Make a checklist of the 17 tables
-2. Enable RLS one or two at a time, test the app, validate
-3. Track what breaks, fix policy or app code as needed
-4. Lock down only after all tables are green
+1. **Tournament box score bug** — diagnosed during cutover Batch 3. Tournament games show only Elite's row in the line score; opponent row is missing. Confirmed NOT RLS-caused (disabled RLS on box_scores during diagnosis, still broken). Pre-existing data bug. Investigation: figure out whether the tournament opponent box_scores rows are missing entirely OR present with wrong `team_season_id` linkage.
 
-**Tables still dormant (RLS off):**
-organizations, seasons, memberships, teams, team_seasons, team_admins, parent_teams, players, events, fields, league_games, standings, box_scores, player_stats, game_status_log, event_imports, weather_forecasts
+2. **Chunk 4b — drop redundant `team_id` columns from per-season tables.** Now that cutover is done and RLS via team_season_id is verified working, the legacy team_id columns on players, events, box_scores, league_games, standings (where they still exist) can be dropped. Mostly mechanical.
 
-**Active polish items (smaller wins available):**
-- Build admin UI to manage existing members (edit team assignments, delete memberships, change default team). Right now once a parent is approved, the only way to fix their team assignment is direct SQL.
-- Build admin UI to invite team_admin role (bypass pending state, create approved directly). Useful for assistant coaches.
-- Email notifications on approval (would close the "parent doesn't know they were approved" gap; right now they need to refresh or the on-mount checker fires).
+3. **Admin manage-members UI.** After Chunk H, parents come in via signup but admins can't yet edit their team assignments, change defaults, or remove them post-approval without SQL. Build a "Members" tab in /admin.
+
+4. **Admin invite team_admin role.** Currently no UI to add a team_admin (assistant coach) — they'd come in via Chunk H as a parent and need SQL surgery. Build a small invite-by-email flow that skips pending.
+
+5. **Email notifications on approval.** PendingChecker re-check on focus works, but parents would benefit from an email saying "you're approved" instead of refreshing on hope.
 
 ---
 
 ## Where we are now
 
 **Phase status:**
-- ✅ Schema migration complete (Chunks 0-8 deployed to prod, RLS dormant on most tenant tables)
+- ✅ Schema migration complete (Chunks 0-8 deployed to prod)
 - ✅ All 7 app pages migrated to team_season_id (Chunks A-G)
 - ✅ BottomNav extracted to shared component
 - ✅ Team page built — consolidates Standings + Results + Roster sub-views
 - ✅ MSBL Rules moved to dedicated /team/rules route
-- ✅ **Feed v1 fully shipped**
-- ✅ **Chat v1 fully shipped** (schema + actions + UI + realtime + push)
+- ✅ Feed v1 fully shipped
+- ✅ Chat v1 fully shipped (schema + actions + UI + realtime + push)
 - ✅ Messages page consolidates Feed + Chat under one nav button
 - ✅ Skeleton loaders replaced spinning baseball across all pages
-- ✅ **Chunk H shipped** — Signup + admin approval flow with Google OAuth
-- ✅ **Mute UI shipped** — users can mute chat push notifications per team
-- ✅ **Realtime reactions sync shipped** — reactions update across devices with 2s debounce
-- ⬜ Cutover — Enable RLS on tenant tables + validate
+- ✅ Chunk H shipped — Signup + admin approval flow with Google OAuth
+- ✅ Mute UI shipped — users can mute chat push notifications per team
+- ✅ Realtime reactions sync shipped — reactions update across devices with 2s debounce
+- ✅ **Cutover COMPLETE — all 17 tenant tables under RLS in production**
 
 ## Key identifiers (DO NOT LOSE)
 
 - **Chicago Elite org UUID (prod):** `75c11f73-5394-4ffc-bf39-9c708418e07b`
 - **Chicago Elite org UUID (dev):** `25c71684-dcdb-4ccc-9e8b-4f4357c3b8ee`
+- **Northside Knights org UUID (dev, for cross-tenant tests):** `6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`
 - **Steve's auth.users.id:** `6c87af4c-8e23-45ad-8453-6530116b3deb`
 - **Steve's membership_id** (org_admin, Chicago Elite): `7cbfaaa5-e502-4f5f-a576-a0dbd668cf98`
 - **Moore team UUID:** `4beb0750-1883-4b56-a386-db280675036c`
@@ -83,24 +80,24 @@ Scope: realtime team chat, everyone can post, text + image, push on every messag
 
 ### Server Actions (app/actions/chat.ts)
 - sendMessage, deleteMessage, addReaction, removeReaction, getMessages
-- getMutedChats, toggleMuteChat (added during mute UI work)
+- getMutedChats, toggleMuteChat
 - Uses getCurrentMembershipForTeam helper that picks highest-priority role when user has multiple memberships (org_admin > team_admin > parent)
-- deleteMessage uses 0-rows-affected check (`.select('id')` after delete) to catch silent RLS failures
+- deleteMessage uses 0-rows-affected check to catch silent RLS failures
 - Push notification fires after sendMessage. Tag is per-team (`team-chat-${teamId}`) so newest message replaces older on iOS lock screens.
 
 ### UI
 - components/chat/{MessageReactionBar, MessageBubble, MessageComposer}.tsx
 - Rendered inside /messages?view=chat
-- MessageBubble: own messages right-aligned red, others left-aligned with avatar/initials. Tap bubble to reveal React/Delete actions.
+- MessageBubble: own messages right-aligned red, others left-aligned with avatar/initials. Tap bubble for React/Delete actions.
 - MessageComposer: text + image picker + send button. Enter sends, Shift+Enter newline. Auto-resizing textarea (max 120px).
 - Author grouping: consecutive messages from same author within 5 minutes share one avatar/timestamp header.
 - Mute toggle at top right of chat tab (🔔 Notifications on / 🔕 Muted) — flips memberships.muted_chats for current team.
 - Anti-flicker: mute toggle hidden until server confirms initial state.
 
-### Realtime (shipped + extended)
-- Initial v1: subscribed to team_messages INSERT/DELETE only. Reactions deferred.
-- Now: also subscribed to team_message_reactions INSERT/DELETE with 2-second debounce on refetch (prevents spam when 5 people react in quick succession).
-- Reaction subscription is global (no team_id filter — team_message_reactions doesn't have a team_id column; reaches team via message_id join). For 12-family teams this is invisible. At scale would want to add team_id column to reactions table and filter.
+### Realtime
+- Subscribed to team_messages INSERT/DELETE for instant message sync.
+- Subscribed to team_message_reactions INSERT/DELETE with 2-second debounce on refetch (prevents spam when multiple users react in quick succession).
+- Reaction subscription is global (no team_id filter — team_message_reactions has no team_id column).
 
 ### Reusable push helper (lib/push/send.ts)
 - sendPushToTeam(teamId, payload)
@@ -108,18 +105,13 @@ Scope: realtime team chat, everyone can post, text + image, push on every messag
 - Subscriptions without membership_id (legacy/no link) pass through unfiltered
 - Used by both Feed createPost and Chat sendMessage
 
-### Layout fix (mid-session bug)
-- Chat composer was getting pushed off-screen on mobile due to flex height math.
-- Fixed: composer is now `fixed bottom-0` above the bottom nav (z-10, bg-black, max-w-sm centered). Scroll area gets explicit bottom padding to clear composer + nav + safe-area.
-
 ## /messages page
 
 - Combined home for Feed + Chat
 - Sub-tabs at top: Announcements | Chat (URL search param `?view=`)
-- Defaults to Announcements (matches old Feed behavior)
+- Defaults to Announcements
 - Bottom nav: Home | Schedule | Team | Stats | **Messages** (chat-bubble icon, replaced Feed)
-- /feed route redirects to /messages?view=announcements (backward compat for bookmarks / old push URLs)
-- Feed push URL updated to /messages?view=announcements (skips redirect step)
+- /feed route redirects to /messages?view=announcements
 
 ## Chunk H — Signup + Admin Approval — SHIPPED
 
@@ -134,19 +126,15 @@ Scope: org-scoped self-registration for parents, admin approval queue with team 
 
 ### Public route handling
 - middleware.ts whitelists /o/[slug]/signup and /o/[slug]/signup/complete (regex match)
-- AppShell component (components/app-shell.tsx) hides the global Header on pre-auth routes (login, auth callback, signup). Renders just `<main>{children}</main>` for those.
+- AppShell component (components/app-shell.tsx) hides the global Header on pre-auth routes. Renders just `<main>{children}</main>` for those.
 - Public routes are duplicated in both middleware.ts AND app-shell.tsx — must stay in sync if changing.
 
 ### Admin approval
-- Added 7th tab to /admin: "👋 Pending"
+- /admin Pending tab (7th tab)
 - app/actions/admin.ts — Server Actions: getPendingMemberships, getOrgTeams, approveMembership
-- requireOrgAdmin() helper guards each action; checks for an approved org_admin membership for the calling user
-- approveMembership: validates target membership belongs to admin's org, validates all team IDs belong to admin's org, flips status to approved, creates parent_teams rows, marks one as default
-- UI: per-row Approve button → modal with team checkboxes (defaulting to all checked) + "default team" radio. Submit shows ✅ and removes row.
-
-### Tradeoff: admin password remains for now
-- The rest of /admin still uses the password-gated /api/admin route. The Pending tab uses Supabase-authenticated Server Actions instead.
-- Long-term: kill the password gate entirely and rely on Supabase Auth + org_admin role. Refactor for future session.
+- requireOrgAdmin() helper guards each action
+- approveMembership validates target membership belongs to admin's org, validates all team IDs belong to admin's org, flips status to approved, creates parent_teams rows, marks one as default
+- UI: per-row Approve button → modal with team checkboxes (defaulting to all checked) + "default team" radio.
 
 ## Mute UI — SHIPPED
 
@@ -165,8 +153,45 @@ Scope: per-team chat mute via memberships.muted_chats. Required adding membershi
 ### Legacy subscriptions
 - Subscriptions created BEFORE the migration have membership_id = null. They pass through the filter (treated as "no mute info available, send anyway"). One-time cleanup deleted 2 stale rows in prod.
 
-### Anti-flicker fix
-- ChatView shows the mute toggle button only after the initial getMutedChats response. Without this, the button briefly showed "🔔 Notifications on" before updating to the user's actual state.
+## Cutover — SHIPPED (all 17 tables under RLS)
+
+Goal: enable RLS on every tenant table so the database enforces multi-tenant isolation, not just application code.
+
+### What changed
+For each of these 17 tables, ran `alter table public.<name> enable row level security`. All policies were already created during Chunk 8 and dormant. Cutover = flipping the master switch.
+
+### Batches and order
+- **Batch 1** (lowest risk, infrastructure-ish): fields, weather_forecasts, event_imports, game_status_log
+- **Batch 2** (core read tables): teams, team_seasons, players, events
+- **Batch 3** (tenant data with writes): box_scores, player_stats, league_games, standings
+- **Batch 4** (control plane, circular deps with helpers): organizations, seasons, team_admins, parent_teams, memberships (memberships last because every helper function reads from it)
+
+### Validation method
+For each batch:
+1. **Audit policies in dev** — list every policy, read the `using` and `with_check` expressions carefully.
+2. **Flip RLS in dev** — `alter table ... enable row level security`.
+3. **Impersonation tests in dev** using the fake user UUIDs:
+   - User C (parent in chicago-elite, linked to Moore) sees expected counts
+   - User B (org_admin in northside-knights, different org) sees ZERO chicago-elite data
+   - Helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_team`, `can_admin_team`) return correct results
+4. **Verify base data with superuser** — if a count is 0, confirm whether it's an RLS filter or sparse seed data.
+5. **Sanity check policies in prod** — read prod's policy expressions, compare to dev's. Policy names sometimes differed (e.g., "Org admins" vs "org_admins") but expressions matched.
+6. **Flip prod one table at a time** with manual app testing between each.
+
+### Key insight: SECURITY DEFINER helpers survive RLS
+The four helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_team`, `can_admin_team_season`) are defined with `SECURITY DEFINER`, which means they execute as the function owner — bypassing the caller's RLS. This is what makes the cutover safe even on `memberships`: the helpers can see all the membership rows they need to evaluate permissions, even when the caller's view is RLS-restricted.
+
+### Bugs/observations found during cutover
+- **Tournament box scores bug** (logged separately): on a tournament game in prod, the line score shows only Elite's row, not the opponent's. Diagnosed during Batch 3 by toggling box_scores RLS off — bug persisted with RLS off, so it's NOT RLS-caused. Pre-existing data issue. Logged in "Next session" list.
+- **fields has NOT NULL team_id**: discovered when trying a synthetic INSERT during dev validation. Legacy from pre-multi-tenant schema. Not blocking cutover. Will be cleaned up in Chunk 4b.
+- **Empty-table check**: in dev, several tables had 0 rows (event_imports, weather_forecasts, box_scores, etc). Always verified with superuser SELECT to distinguish "RLS filtered everything" from "table is just empty". Important habit.
+- **Prod policy names ≠ dev policy names** for some tables (case + naming convention differences) but the policy expressions matched. Verify expressions, not names.
+
+### Cron / service-key safety
+Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
+
+### Cross-tenant test seed in dev
+Northside Knights is seeded in dev with 1 team + 1 team_season + 4 players + 1 event + 1 league_game. This lets us prove cross-tenant isolation by impersonating User B (NK org_admin) and confirming they see ONLY northside-knights data, never chicago-elite.
 
 ## Context
 
@@ -174,7 +199,7 @@ Converting baseball-tracker-app from a single-tenant app (Chicago Elite) into a 
 
 ## Schema
 
-See SCHEMA.md for current state of tables, columns, constraints, and RLS policies.
+See SCHEMA.md for current state of tables, columns, constraints, and RLS policies. RLS is now ON across all 17 tenant tables in production.
 
 ## Project naming
 
@@ -192,11 +217,11 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 ## Sign-up and access flow (SHIPPED — Chunk H)
 
 - Self-registration: parents visit /o/{slug}/signup, click "Sign up with Google". Land in 'pending' state with their profile auto-created from Google data.
-- Admin approval: org_admin opens /admin → Pending tab. Sees pending memberships. Per-row Approve → modal with team checkboxes (defaulting to all checked) + default-team radio.
+- Admin approval: org_admin opens /admin → Pending tab. Per-row Approve → modal with team checkboxes + default-team radio.
 - Default landing: when a parent logs in after approval, they land on their default team. They can switch to any other team they're linked to via parent_teams.
-- Auth provider: Google OAuth only in v1. Email/password and magic link deferred.
-- No reject UI in v1. To deny a parent, admin would delete the membership row directly via SQL (rare case).
-- No email notification on approval. PendingChecker re-checks on focus so parent's pending screen auto-redirects when they return to the tab after approval.
+- Auth provider: Google OAuth only in v1.
+- No reject UI in v1. To deny a parent, admin deletes the membership row directly via SQL (rare case).
+- No email notification on approval. PendingChecker re-checks on focus so parent's pending screen auto-redirects.
 
 ## Admin roles
 
@@ -205,8 +230,8 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 
 ## Routing
 
-- Path-based: org-scoped pre-auth pages under /o/{slug}/... (currently just signup; full /o/{slug}/[everything else] routing deferred to cutover)
-- Non-org pages at root: /login, /signup (via /o/{slug}/signup), /account, etc.
+- Path-based: org-scoped pre-auth pages under /o/{slug}/... (currently just signup; full /o/{slug}/[everything else] routing deferred)
+- Non-org pages at root: /login, /account, etc.
 - Middleware enforces: not-public route → must be logged in. Org-scoped post-auth middleware deferred.
 
 ## Decisions made
@@ -218,15 +243,14 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Admin assigns team(s) at approval time (shipped)
 - Parents land on default team, can browse others
 - Two admin tiers: org_admin and team_admin
-- Brand strings and colors stored on the organizations record, loaded at runtime
-- Brand colors: primary_color AND secondary_color stored on organizations
+- Brand strings and colors stored on the organizations record
 - Logo files will live in Supabase Storage; logo_url field stores URL
 - Pattern C for season handling: permanent teams + per-season instances
 - Season rollover is an admin action (not automatic) — once per year per org
 - Old seasons preserved, queryable, but not the default view
 - Approval workflow: pending → approved is for self-registration. Admin-initiated role grants skip pending.
 - Routing: path-based (/o/{slug}/...). Subdomain routing deferred to post-revenue.
-- Per-season tables link to team_seasons. Permanent team_id dropped post-cutover.
+- Per-season tables link to team_seasons. Permanent team_id dropped post-cutover (Chunk 4b).
 - team_admins and parent_teams link to teams (permanent), not team_seasons
 - Membership modeling: one row per role
 - Enum named `membership_role`
@@ -235,21 +259,23 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - League opponent teams: all 17 existing teams have organization_id = Chicago Elite. Will revisit when a second league-running org signs up.
 - Feed and Chat attach to permanent team_id. Parents lose access when removed from parent_teams.
 - Chat hard delete only — chat is ephemeral.
-- Chat reactions now realtime sync via debounced refetch (2s debounce on team_message_reactions INSERT/DELETE).
+- Chat reactions realtime sync via debounced refetch (2s debounce).
 - Chat mute: per-membership via memberships.muted_chats uuid[]. Indefinite (on/off, no time-based).
 - Auth provider for signup: Google OAuth only in v1.
+- **RLS is on for all 17 tenant tables in prod.** Database enforces isolation.
+- Helpers use SECURITY DEFINER so they bypass RLS internally — critical for memberships RLS to be safe.
 
 ## Parked / explicitly out of scope (for now)
 
 - Stripe billing and subscription management — Phase 4
 - Marketing site, free-to-paid conversion — Phase 5
 - Multi-org users (one person in multiple orgs) — rejected
-- Per-player parent linking (parent sees only their own kid's data) — rejected
+- Per-player parent linking — rejected
 - Subdomain routing and custom domains — deferred
 - Migration from Pattern C to anything more complex — defer until needed
 - Cross-org league play / shared opponent rosters — deferred
-- Batting order in stats (deferred — needs batting_order_position column on player_stats)
-- Edit message UI — schema supports it (updated_at column) but no UI in v1
+- Batting order in stats (deferred — needs batting_order_position column)
+- Edit message UI — schema supports it but no UI in v1
 - Admin moderation of chat messages — v1 only allows author to delete their own
 - Email-based signup or magic link — Google OAuth only in v1
 - Reject button in admin pending queue — manual SQL workaround for now
@@ -260,10 +286,9 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 ### Critical fix: RLS was already ON in production (Chunk 8d era)
 - After dropping permissive policies, prod broke because RLS was actually enabled on 7 tables that had been masked by qual=true SELECT policies.
 - Resolution: disabled RLS on those 7 tables. Policies still exist — dormant until cutover.
-- Lesson for cutover: explicitly verify and set RLS state on EVERY tenant table.
 
 ### Weather forecasts gotcha (Chunk 3 era)
-- weather_forecasts rebuilt daily by a cache refresh process. Chunk 3 backfill got wiped overnight.
+- weather_forecasts rebuilt periodically by `/api/update-weather` cron. Chunk 3 backfill got wiped between runs.
 - Fix pattern: set column default FIRST, then backfill, then NOT NULL.
 
 ### Migration progress (all complete)
@@ -273,11 +298,11 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Feed v1: schema + actions + UI + push + skeleton loaders
 - Chat v1: schema + actions + UI + realtime + push + mute + realtime reactions
 - Chunk H: signup + admin approval flow
-- ⬜ Chunk 4b — Drop redundant team_id columns from per-season tables (post-cutover)
-- ⬜ Cutover — Enable RLS, deploy refactored app
+- **Cutover: RLS enabled on all 17 tenant tables in prod**
+- ⬜ Chunk 4b — Drop redundant team_id columns from per-season tables
 
 ### Pre-prod cleanup
-Before cutover, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
+Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
 
 ### Feed v1 lessons learned
 - Server Actions need `allowedOrigins` in next.config.ts for Codespace dev URL
@@ -289,42 +314,52 @@ Before cutover, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NO
 
 ### Chat v1 lessons learned
 - can_read_team helper was missing in dev. Created it before chat schema would land.
-- Default org_id on new tables references prod UUID; in dev had to ALTER COLUMN SET DEFAULT to dev's Chicago Elite UUID after table creation.
+- Default org_id on new tables references prod UUID; in dev had to ALTER COLUMN SET DEFAULT to dev's Chicago Elite UUID.
 - Storage bucket must be created via Supabase dashboard UI, then RLS policies applied separately.
 - Realtime publication needs `alter publication supabase_realtime add table public.X` per table.
 - Chat layout: composer must be `fixed bottom-0` above the bottom nav.
 
 ### Chunk H lessons learned
-- memberships.approved_by has FK to auth.users that rejects fake test UUIDs in dev. Tests skip setting approved_by. Should drop this FK in dev (matches the existing user_id FK relaxation), OR keep as-is and note for future tests.
-- Long-block paste from chat into Codespaces editor sometimes drops `<` characters right before newlines — caused 95 cascading TS errors on the first admin.ts paste. Workaround: search for `Promise\n` after pasting and verify `<` follows.
+- memberships.approved_by has FK to auth.users that rejects fake test UUIDs in dev. Tests skip setting approved_by.
+- Long-block paste from chat into Codespaces editor sometimes drops `<` characters right before newlines — caused 95 cascading TS errors. Workaround: search for `Promise\n` after pasting.
 - Production push_subscriptions had no user_id or membership_id column. Required additive migration to support mute.
 - AppShell was originally a client component importing UserMenu (which transitively imports server code), broke the build. Fixed by passing UserMenu as a React.ReactNode prop from layout.tsx.
 
 ### Mute UI lessons learned
-- Watch out: schema changes in prod by mistake. Always confirm "is this dev or prod?" before running SQL from any AI suggestion. The first migration in this work ran against prod unintentionally; the additive ALTER TABLE was harmless but a `DELETE FROM push_subscriptions` was nearly run against prod the same way.
-- Subscriptions created before the migration have membership_id=null. The filter logic treats null as "no mute info, send anyway" — graceful degradation but not retroactive.
-- Anti-flicker on mute toggle: load state must complete before rendering the button, otherwise it briefly shows the default before updating.
+- Watch out: schema changes in prod by mistake. Always confirm "is this dev or prod?" before running SQL. A nearly-fatal `DELETE FROM push_subscriptions` was caught just in time.
+- Subscriptions created before the migration have membership_id=null. Filter logic treats null as "no mute info, send anyway" — graceful degradation, not retroactive.
+- Anti-flicker on mute toggle: load state must complete before rendering the button.
 
 ### Realtime reactions lessons learned
-- team_message_reactions has no team_id column. Subscription filter on team_id isn't possible. Subscribing globally is fine for current scale; add team_id column if scale grows.
+- team_message_reactions has no team_id column. Subscription filter on team_id isn't possible. Subscribing globally is fine for current scale.
 - Debounce timer must clear on unmount to avoid setState-after-unmount warnings.
-- The "burst test" for debounce is hard to do manually because reaction UI involves tapping a message to open a menu, picking emoji, picker closes. By the time you can tap again, debounce window may have already closed. Delete-reaction is the easier burst test.
+- "Burst test" for debounce is hard to do manually because reaction UI takes time to open the picker. Delete-reaction is the easier burst test.
+
+### Cutover lessons learned
+- **Order matters.** Leaf tables first, then dependents, then the foundational table (memberships) last. If memberships breaks, every other policy breaks too.
+- **Read every policy expression before flipping.** Policy names differed between dev and prod for some tables; expressions matched. Trust expressions, not names.
+- **Distinguish "filtered to 0" from "actually 0".** When a SELECT returned 0 rows under impersonation, always re-run as superuser to confirm the underlying data really was sparse, not RLS-hidden.
+- **SECURITY DEFINER is what makes memberships RLS safe.** The helper functions read membership rows internally with elevated privileges; they don't depend on the caller's view of the table.
+- **Pre-existing data bugs surface during validation.** The tournament box score issue was found by carefully testing every page after Batch 3, but the bug pre-dated RLS.
+- **Cron and admin routes use service key.** Verified before flipping RLS on tables those routes write to. Service key bypasses RLS entirely.
+- **Test on prod after every flip.** Even when dev validated cleanly, the prod test caught one issue (tournament box scores) that we then diagnosed and ruled out as RLS-caused.
 
 ## RLS test harness (in on-deck-dev only)
 
-5 fake user UUIDs seeded into on-deck-dev for testing RLS policies. The `memberships.user_id` FK to `auth.users` is dropped in dev to allow these fake user IDs. The `memberships.approved_by` FK is NOT dropped — workaround is to omit approved_by in dev tests.
+5 fake user UUIDs seeded into on-deck-dev for testing RLS policies. The `memberships.user_id` FK to `auth.users` is dropped in dev. The `memberships.approved_by` FK is NOT dropped — workaround is to omit approved_by in dev tests.
 
 ### Fake users in on-deck-dev
 
 | User ID                              | Org                | Role        | Status   | Notes                          |
 |--------------------------------------|--------------------|-------------|----------|--------------------------------|
 | 11111111-1111-1111-1111-111111111111 | chicago-elite      | org_admin   | approved | User A                         |
-| 22222222-2222-2222-2222-222222222222 | northside-knights  | org_admin   | approved | User B                         |
+| 22222222-2222-2222-2222-222222222222 | northside-knights  | org_admin   | approved | User B — used for cross-tenant tests |
 | 33333333-3333-3333-3333-333333333333 | chicago-elite      | parent      | approved | User C — linked to Moore       |
 | 44444444-4444-4444-4444-444444444444 | chicago-elite      | parent      | pending  | User D — Daniel Davis (profile backfilled). For approval queue testing.|
 | 55555555-5555-5555-5555-555555555555 | chicago-elite      | team_admin  | approved | User E — scoped to Moore only  |
 
 User C is linked to Moore via parent_teams.
+Northside Knights is seeded with 1 team + 1 team_season + 4 players + 1 event + 1 league_game for cross-tenant testing.
 
 ### Impersonation pattern (for testing RLS policies)
 
@@ -340,30 +375,30 @@ For anonymous access: `set role anon;` then `reset role;` when done.
 
 ## Future features (parked)
 
-### Cutover (next up)
-Enable RLS on 17 tenant tables in prod. Test app behavior per-table. Major architectural milestone — multi-tenant story is real only after this.
-
 ### Admin manage-members UI
 After Chunk H, parents come in via signup but admins can't yet edit their team assignments, change their default team, or remove them post-approval without SQL. Build a "Members" tab in /admin that lists all approved memberships and lets admins edit assignments.
 
 ### Email notifications
-On approval (so the parent doesn't need PendingChecker to catch it), on team_admin invitation, on game status changes. Requires SMTP provider (Resend recommended). Multi-hour rabbit hole — defer until needed.
+On approval, on team_admin invitation, on game status changes. Requires SMTP provider (Resend recommended). Multi-hour rabbit hole — defer until needed.
 
 ### DMs
 1:1 conversations between team members. Highest moderation complexity — needs blocking, muting, read receipts. Reuses ~80% of chat plumbing (schema, storage, RLS, push helper).
 
 ### Batting order in stats
-player_stats.batting_order_position (integer, nullable). Display by batting_order_position NULLS LAST, jersey_number. Effort: medium — schema change trivial, lineup-entry UI is the real work.
+player_stats.batting_order_position (integer, nullable). Display by batting_order_position NULLS LAST, jersey_number.
 
 ### Chat features deferred to v2
 - @mentions / notification on mention
 - Read receipts
 - Typing indicators
-- Time-based mute (mute for X hours) — would need separate chat_mutes table or jsonb column
+- Time-based mute
 - Admin moderation override on delete
 - Edit messages
 - Message search
 - Pinned messages
 
 ### Magic link or email/password signup
-Currently Google OAuth only. Some parents won't have Google. Adding email/password or magic link is a multi-hour change but increases reach.
+Currently Google OAuth only. Adding email/password or magic link increases reach.
+
+### Tournament box scores fix (known bug)
+Found during cutover Batch 3 validation. Line score for tournament games shows only Elite's row; opponent's row missing. Confirmed NOT RLS-caused (bug persisted with RLS disabled on box_scores). Pre-existing data issue. Investigation: query box_scores for a tournament game and see if opponent row is missing or has wrong team_season_id.
