@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership } from '@/app/actions/admin'
-import type { PendingMembership, OrgTeam } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership } from '@/app/actions/admin'
+import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -60,7 +60,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'pending' | 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
+type Tab = 'pending' | 'members' | 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
 
 type Field = {
   id: string
@@ -213,6 +213,16 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
   const [approveDefaultTeamId, setApproveDefaultTeamId] = useState<string>('')
   const [approveSaving, setApproveSaving] = useState(false)
 
+  // Members tab
+  const [membersList, setMembersList] = useState<ApprovedParent[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [membersMsg, setMembersMsg] = useState<string | null>(null)
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
+  const [memberTeamIds, setMemberTeamIds] = useState<Set<string>>(new Set())
+  const [memberDefaultTeamId, setMemberDefaultTeamId] = useState<string>('')
+  const [memberSaving, setMemberSaving] = useState(false)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
   const [fields, setFields] = useState<Field[]>([])
@@ -287,6 +297,24 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
         setOrgTeams(teamsResult.teams)
       }
       setPendingLoading(false)
+    }
+    load()
+  }, [password, tab])
+
+  // Load approved parents when Members tab is active
+  useEffect(() => {
+    if (!password || tab !== 'members') return
+    const load = async () => {
+      setMembersLoading(true)
+      setMembersMsg(null)
+      const [membersResult, teamsResult] = await Promise.all([
+        getApprovedParents(),
+        getOrgTeams(),
+      ])
+      if (membersResult.ok) setMembersList(membersResult.members)
+      else setMembersMsg(`❌ ${membersResult.error}`)
+      if (teamsResult.ok) setOrgTeams(teamsResult.teams)
+      setMembersLoading(false)
     }
     load()
   }, [password, tab])
@@ -765,9 +793,10 @@ const deleteLeagueGame = async () => {
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-7 gap-1">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
           {([
             { key: 'pending', label: '👋 Pending' },
+            { key: 'members', label: '👥 Members' },
             { key: 'status', label: '📡 Status' },
             { key: 'score', label: '🏆 Score' },
             { key: 'stats', label: '📊 Stats' },
@@ -905,6 +934,191 @@ const deleteLeagueGame = async () => {
             )}
 
             {pendingMsg && <p className="text-sm text-center mt-2">{pendingMsg}</p>}
+          </>
+        )}
+
+        {/* ── Members Tab ───────────────────────────────────────────────── */}
+        {tab === 'members' && (
+          <>
+            {membersLoading && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                <p className="text-slate-400 text-sm">Loading members…</p>
+              </div>
+            )}
+
+            {!membersLoading && membersList.length === 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                <p className="text-slate-400 text-sm">No approved parents yet.</p>
+              </div>
+            )}
+
+            {!membersLoading && membersList.length > 0 && (
+              <div className="space-y-2">
+                {membersList.map(m => {
+                  const isEditing = editingMemberId === m.id
+                  const isRemoving = removingMemberId === m.id
+                  return (
+                    <div key={m.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-bold text-white">{m.full_name ?? '(no name)'}</p>
+                        <p className="text-xs text-slate-400">{m.email}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {m.teams.length === 0
+                            ? 'No teams assigned'
+                            : m.teams.map(t => t.is_default ? `${t.name} ★` : t.name).join(', ')}
+                        </p>
+                      </div>
+
+                      {!isEditing && !isRemoving && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingMemberId(m.id)
+                              setMemberTeamIds(new Set(m.teams.map(t => t.id)))
+                              setMemberDefaultTeamId(m.teams.find(t => t.is_default)?.id ?? m.teams[0]?.id ?? '')
+                              setMembersMsg(null)
+                            }}
+                            className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
+                          >
+                            Edit Teams
+                          </button>
+                          <button
+                            onClick={() => { setRemovingMemberId(m.id); setMembersMsg(null) }}
+                            className="rounded-xl border border-red-500/40 bg-transparent px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 transition"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+
+                      {isEditing && (
+                        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-3">
+                          <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Edit team access</p>
+                          {orgTeams.length === 0 ? (
+                            <p className="text-xs text-amber-400">No teams found.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {orgTeams.map(t => {
+                                const checked = memberTeamIds.has(t.id)
+                                const isDefault = memberDefaultTeamId === t.id
+                                return (
+                                  <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
+                                    <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => {
+                                          const next = new Set(memberTeamIds)
+                                          if (next.has(t.id)) {
+                                            next.delete(t.id)
+                                            if (memberDefaultTeamId === t.id) setMemberDefaultTeamId('')
+                                          } else {
+                                            next.add(t.id)
+                                            if (!memberDefaultTeamId) setMemberDefaultTeamId(t.id)
+                                          }
+                                          setMemberTeamIds(next)
+                                        }}
+                                        className="h-4 w-4"
+                                      />
+                                      <span className="text-sm text-white truncate">{t.name}</span>
+                                    </label>
+                                    {checked && (
+                                      <label className="flex items-center gap-1 text-xs cursor-pointer">
+                                        <input
+                                          type="radio"
+                                          name={`default-member-team-${m.id}`}
+                                          checked={isDefault}
+                                          onChange={() => setMemberDefaultTeamId(t.id)}
+                                          className="h-3 w-3"
+                                        />
+                                        <span className={isDefault ? 'text-red-400 font-semibold' : 'text-slate-500'}>
+                                          Default
+                                        </span>
+                                      </label>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={async () => {
+                                setMemberSaving(true)
+                                setMembersMsg(null)
+                                const result = await updateMemberTeams(
+                                  m.id,
+                                  Array.from(memberTeamIds),
+                                  memberDefaultTeamId
+                                )
+                                setMemberSaving(false)
+                                if (!result.ok) { setMembersMsg(`❌ ${result.error}`); return }
+                                setMembersList(prev => prev.map(x =>
+                                  x.id !== m.id ? x : {
+                                    ...x,
+                                    teams: orgTeams
+                                      .filter(t => memberTeamIds.has(t.id))
+                                      .map(t => ({ id: t.id, name: t.name, is_default: t.id === memberDefaultTeamId }))
+                                  }
+                                ))
+                                setEditingMemberId(null)
+                                setMembersMsg('✅ Teams updated')
+                              }}
+                              disabled={memberSaving || memberTeamIds.size === 0 || !memberDefaultTeamId}
+                              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {memberSaving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => setEditingMemberId(null)}
+                              disabled={memberSaving}
+                              className="rounded-xl bg-white/10 border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/20 transition disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {isRemoving && (
+                        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-3">
+                          <p className="text-sm text-white">
+                            Remove <span className="font-bold">{m.full_name ?? m.email}</span>? This deletes their membership and team access.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                setMemberSaving(true)
+                                setMembersMsg(null)
+                                const result = await removeMembership(m.id)
+                                setMemberSaving(false)
+                                if (!result.ok) { setMembersMsg(`❌ ${result.error}`); return }
+                                setMembersList(prev => prev.filter(x => x.id !== m.id))
+                                setRemovingMemberId(null)
+                                setMembersMsg('✅ Member removed')
+                              }}
+                              disabled={memberSaving}
+                              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {memberSaving ? 'Removing…' : 'Confirm Remove'}
+                            </button>
+                            <button
+                              onClick={() => setRemovingMemberId(null)}
+                              disabled={memberSaving}
+                              className="rounded-xl bg-white/10 border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/20 transition disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {membersMsg && <p className="text-sm text-center mt-2">{membersMsg}</p>}
           </>
         )}
 

@@ -189,3 +189,176 @@ export async function approveMembership(
   revalidatePath('/admin')
   return { ok: true }
 }
+
+// ─── Types (Members) ───────────────────────────────────────────────────────
+
+export type ApprovedParent = {
+  id: string           // membership id
+  user_id: string
+  full_name: string | null
+  email: string | null
+  teams: { id: string; name: string; is_default: boolean }[]
+  created_at: string
+}
+
+// ─── getApprovedParents ────────────────────────────────────────────────────
+
+export async function getApprovedParents(): Promise<
+  { ok: true; members: ApprovedParent[] } | { ok: false; error: string }
+> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data: memberships, error: memError } = await supabase
+    .from('memberships')
+    .select('id, user_id, organization_id, created_at')
+    .eq('organization_id', guard.membership.organization_id)
+    .eq('role', 'parent')
+    .eq('status', 'approved')
+    .order('created_at', { ascending: true })
+
+  if (memError) return { ok: false, error: memError.message }
+  if (!memberships || memberships.length === 0) return { ok: true, members: [] }
+
+  const membershipIds = memberships.map(m => m.id)
+  const userIds = Array.from(new Set(memberships.map(m => m.user_id)))
+
+  const [{ data: profiles }, { data: parentTeams }] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, email').in('id', userIds),
+    supabase
+      .from('parent_teams')
+      .select('membership_id, team_id, is_default, teams(id, name)')
+      .in('membership_id', membershipIds),
+  ])
+
+  const profileById: Record<string, { full_name: string | null; email: string | null }> = {}
+  for (const p of profiles ?? []) {
+    profileById[p.id] = { full_name: p.full_name, email: p.email }
+  }
+
+  const teamsByMembership: Record<string, { id: string; name: string; is_default: boolean }[]> = {}
+  for (const pt of parentTeams ?? []) {
+    if (!teamsByMembership[pt.membership_id]) teamsByMembership[pt.membership_id] = []
+    const team = pt.teams as unknown as { id: string; name: string }
+    if (team) {
+      teamsByMembership[pt.membership_id].push({
+        id: team.id,
+        name: team.name,
+        is_default: pt.is_default,
+      })
+    }
+  }
+
+  const members: ApprovedParent[] = memberships.map(m => ({
+    id: m.id,
+    user_id: m.user_id,
+    full_name: profileById[m.user_id]?.full_name ?? null,
+    email: profileById[m.user_id]?.email ?? null,
+    teams: teamsByMembership[m.id] ?? [],
+    created_at: m.created_at,
+  }))
+
+  return { ok: true, members }
+}
+
+// ─── updateMemberTeams ─────────────────────────────────────────────────────
+
+export async function updateMemberTeams(
+  membershipId: string,
+  teamIds: string[],
+  defaultTeamId: string
+): Promise<SimpleResult> {
+  if (!membershipId) return { ok: false, error: 'Missing membershipId' }
+  if (teamIds.length === 0) return { ok: false, error: 'Pick at least one team' }
+  if (!defaultTeamId) return { ok: false, error: 'Pick a default team' }
+  if (!teamIds.includes(defaultTeamId)) {
+    return { ok: false, error: 'Default team must be one of the selected teams' }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  // Verify membership belongs to this org and is an approved parent
+  const { data: target, error: targetError } = await supabase
+    .from('memberships')
+    .select('id, organization_id, role, status')
+    .eq('id', membershipId)
+    .maybeSingle()
+
+  if (targetError) return { ok: false, error: targetError.message }
+  if (!target) return { ok: false, error: 'Membership not found' }
+  if (target.organization_id !== guard.membership.organization_id) {
+    return { ok: false, error: 'Cannot edit memberships outside your org' }
+  }
+  if (target.role !== 'parent') return { ok: false, error: 'Only parent teams can be edited here' }
+
+  // Verify all teams belong to this org
+  const { data: teamCheck, error: teamError } = await supabase
+    .from('teams')
+    .select('id')
+    .in('id', teamIds)
+    .eq('organization_id', guard.membership.organization_id)
+
+  if (teamError) return { ok: false, error: teamError.message }
+  if (!teamCheck || teamCheck.length !== teamIds.length) {
+    return { ok: false, error: 'One or more teams do not belong to your org' }
+  }
+
+  // Replace parent_teams rows
+  const { error: deleteError } = await supabase
+    .from('parent_teams')
+    .delete()
+    .eq('membership_id', membershipId)
+
+  if (deleteError) return { ok: false, error: `Failed to clear teams: ${deleteError.message}` }
+
+  const rows = teamIds.map(tid => ({
+    membership_id: membershipId,
+    team_id: tid,
+    is_default: tid === defaultTeamId,
+  }))
+
+  const { error: insertError } = await supabase.from('parent_teams').insert(rows)
+  if (insertError) return { ok: false, error: `Failed to assign teams: ${insertError.message}` }
+
+  revalidatePath('/admin')
+  return { ok: true }
+}
+
+// ─── removeMembership ──────────────────────────────────────────────────────
+
+export async function removeMembership(membershipId: string): Promise<SimpleResult> {
+  if (!membershipId) return { ok: false, error: 'Missing membershipId' }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  // Verify membership belongs to this org
+  const { data: target, error: targetError } = await supabase
+    .from('memberships')
+    .select('id, organization_id, role')
+    .eq('id', membershipId)
+    .maybeSingle()
+
+  if (targetError) return { ok: false, error: targetError.message }
+  if (!target) return { ok: false, error: 'Membership not found' }
+  if (target.organization_id !== guard.membership.organization_id) {
+    return { ok: false, error: 'Cannot remove memberships outside your org' }
+  }
+  if (target.role !== 'parent') {
+    return { ok: false, error: 'Only parent memberships can be removed here' }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('memberships')
+    .delete()
+    .eq('id', membershipId)
+
+  if (deleteError) return { ok: false, error: deleteError.message }
+
+  revalidatePath('/admin')
+  return { ok: true }
+}
