@@ -358,8 +358,12 @@ export default function EventPage() {
     ? event.gear_notes.split(',').map(g => g.trim()).filter(Boolean)
     : []
 
- const usRow = boxScores.find(r => r.team_season_id === event.team_season_id)
-  const themRow = boxScores.find(r => r.team_season_id !== event.team_season_id) 
+ // Elite's row matches event.team_id. The opponent is the other row.
+  // For league games, opponent has a different team_id. For tournaments,
+  // opponent has team_id=null (they're not in our teams table). So opponent
+  // is simply "the row that isn't Elite's".
+  const usRow = boxScores.find(r => r.team_id === event.team_id)
+  const themRow = boxScores.find(r => r !== usRow)
   const hasBoxScore = usRow || themRow
 
   const playersWithStats = playerStats.filter(s => s.at_bats > 0 || (s.pitch_count ?? 0) > 0)
