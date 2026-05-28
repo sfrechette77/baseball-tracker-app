@@ -2,19 +2,19 @@
 
 ## Next session starts here
 
-**Cutover is COMPLETE.** All 17 tenant tables are now under RLS in production. The multi-tenant story is real — database enforces isolation, not just application code.
+**Cutover is COMPLETE.** All 17 tenant tables are now under RLS in production. The multi-tenant story is real — database enforces isolation, not just application code. Post-cutover cleanup and admin tooling are now underway.
 
-**Active polish items (pick one):**
+**Recently completed:**
+- ✅ **Tournament box score bug** — fixed. Root cause was app-side: for tournaments the opponent box_score row shares Elite's `team_season_id` and is distinguished by `team_id = null`, so the old `themRow` finder (matching on differing team_season_id) returned undefined. Fixed by matching the "us" row on `team_id === event.team_id` and taking the other row as "them".
+- ✅ **Chunk 4b** — dropped `fields.team_id` (the last redundant legacy column) in dev and prod. All other per-season `team_id` columns were already dropped in Chunk 3.
+- ✅ **Admin manage-members UI** — Members tab in /admin.
+- ✅ **Signup RLS fix** — public signup routes broke after the cutover (anonymous/new-user reads of `organizations` blocked by RLS). Fixed via a service-role client.
 
-1. **Tournament box score bug** — diagnosed during cutover Batch 3. Tournament games show only Elite's row in the line score; opponent row is missing. Confirmed NOT RLS-caused (disabled RLS on box_scores during diagnosis, still broken). Pre-existing data bug. Investigation: figure out whether the tournament opponent box_scores rows are missing entirely OR present with wrong `team_season_id` linkage.
+**Active items (pick one):**
 
-2. **Chunk 4b — drop redundant `team_id` columns from per-season tables.** Now that cutover is done and RLS via team_season_id is verified working, the legacy team_id columns on players, events, box_scores, league_games, standings (where they still exist) can be dropped. Mostly mechanical.
+1. **Admin invite team_admin role.** Currently no UI to add a team_admin (assistant coach) — they'd come in via Chunk H as a parent and need SQL surgery. Build a small invite-by-email flow that skips pending.
 
-3. **Admin manage-members UI.** After Chunk H, parents come in via signup but admins can't yet edit their team assignments, change defaults, or remove them post-approval without SQL. Build a "Members" tab in /admin.
-
-4. **Admin invite team_admin role.** Currently no UI to add a team_admin (assistant coach) — they'd come in via Chunk H as a parent and need SQL surgery. Build a small invite-by-email flow that skips pending.
-
-5. **Email notifications on approval.** PendingChecker re-check on focus works, but parents would benefit from an email saying "you're approved" instead of refreshing on hope.
+2. **Email notifications on approval.** PendingChecker re-check on focus works, but parents would benefit from an email saying "you're approved" instead of refreshing on hope.
 
 ---
 
@@ -34,6 +34,10 @@
 - ✅ Mute UI shipped — users can mute chat push notifications per team
 - ✅ Realtime reactions sync shipped — reactions update across devices with 2s debounce
 - ✅ **Cutover COMPLETE — all 17 tenant tables under RLS in production**
+- ✅ Tournament box score bug fixed (app-side opponent-row finder)
+- ✅ Chunk 4b — `fields.team_id` dropped (last redundant legacy column)
+- ✅ Admin manage-members UI shipped — Members tab in /admin
+- ✅ Signup RLS fix — service-role client for pre-auth routes
 
 ## Key identifiers (DO NOT LOSE)
 
@@ -118,9 +122,9 @@ Scope: realtime team chat, everyone can post, text + image, push on every messag
 Scope: org-scoped self-registration for parents, admin approval queue with team assignment.
 
 ### Signup flow
-- /o/[slug]/signup — public Server Component route, validates slug exists
+- /o/[slug]/signup — public Server Component route, validates slug exists (org lookup now uses the service-role client — see "Signup RLS fix")
 - SignupForm.tsx — client component, "Sign up with Google" button, uses signInWithOAuth with redirectTo /auth/callback?next=/o/[slug]/signup/complete
-- /o/[slug]/signup/complete — Server Component that runs after OAuth callback. Creates/upserts profile, creates pending membership (status='pending', role='parent', organization_id=org)
+- /o/[slug]/signup/complete — Server Component that runs after OAuth callback. Creates/upserts profile, creates pending membership (status='pending', role='parent', organization_id=org). Org lookup + profile/membership writes use the service-role client (see "Signup RLS fix"); user session read with the authenticated client.
 - Shows "You're almost in" pending screen with user email + sign-out button
 - PendingChecker.tsx — embedded client component that polls on mount + on window focus. When user is approved, redirects to /. No periodic polling.
 
@@ -135,6 +139,45 @@ Scope: org-scoped self-registration for parents, admin approval queue with team 
 - requireOrgAdmin() helper guards each action
 - approveMembership validates target membership belongs to admin's org, validates all team IDs belong to admin's org, flips status to approved, creates parent_teams rows, marks one as default
 - UI: per-row Approve button → modal with team checkboxes (defaulting to all checked) + "default team" radio.
+
+## Admin Manage-Members UI — SHIPPED
+
+Scope: org_admins can view approved parents and manage their team assignments / remove them, all in-app (previously SQL-only).
+
+### UI
+- /admin **Members** tab (8th tab, next to Pending). Tabs grid widened to accommodate.
+- Lists approved **parents only** (org_admins and team_admins excluded).
+- Per member card: name, email, assigned teams with the default marked by ★.
+- **Edit Teams** → inline panel with team checkboxes + default radio (same UX as the approval flow). Replaces all parent_teams rows.
+- **Remove** → confirm step → deletes the membership row (cascades to parent_teams). Parents only.
+
+### Server Actions (app/actions/admin.ts)
+- getApprovedParents — approved parent memberships in the admin's org, joined to profiles (name/email) and parent_teams (teams + default flag).
+- updateMemberTeams(membershipId, teamIds, defaultTeamId) — validates org + team ownership, deletes existing parent_teams rows, re-inserts with exactly one default.
+- removeMembership(membershipId) — validates org ownership + parent role, deletes the membership.
+- All three reuse the existing requireOrgAdmin() guard.
+
+### Decisions
+- Remove = hard delete of the membership row (not a status flip to rejected).
+- Members tab scoped to parents only (team_admins managed elsewhere / future invite flow).
+- Modal/inline edit pattern mirrors approval flow for consistency.
+
+## Signup RLS fix — SHIPPED (production bug)
+
+The cutover broke public signup. Symptom: /o/chicago-elite/signup returned 404 (then 500 after partial fixes); no new parent could register.
+
+### Root cause
+- The public signup routes read the `organizations` table to validate the slug. Post-cutover, the SELECT policy is `id IN current_user_org_ids()`. An anonymous visitor — or a brand-new authenticated user with no memberships yet — gets an empty set, so the org lookup returns null and the route 404s / redirects.
+- The /complete route had a second instance: it upserts into `profiles`, which has **no INSERT policy** under RLS, so the write would fail for a new user.
+
+### Fix
+- New `lib/supabase/service.ts` — service-role Supabase client (bypasses RLS). Server-only; never import into client code.
+- `app/o/[slug]/signup/page.tsx` — org slug lookup now uses the service client.
+- `app/o/[slug]/signup/complete/page.tsx` — service client for the org lookup + profiles upsert + memberships insert/select. The **user session** is still read with the normal authenticated client (createClient → supabase.auth.getUser()); only the DB work uses the service client.
+- New env var **`SUPABASE_SERVICE_ROLE_KEY`** added to Vercel (Production) and local .env.local.
+
+### Rule going forward
+Any **pre-auth or new-user server route** that touches tenant tables must use the service client, because RLS will block it (visitor has no membership yet; profiles has no INSERT policy). Reads/writes after the user is an approved member can use the authenticated client as usual.
 
 ## Mute UI — SHIPPED
 
@@ -182,7 +225,7 @@ For each batch:
 The four helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_team`, `can_admin_team_season`) are defined with `SECURITY DEFINER`, which means they execute as the function owner — bypassing the caller's RLS. This is what makes the cutover safe even on `memberships`: the helpers can see all the membership rows they need to evaluate permissions, even when the caller's view is RLS-restricted.
 
 ### Bugs/observations found during cutover
-- **Tournament box scores bug** (logged separately): on a tournament game in prod, the line score shows only Elite's row, not the opponent's. Diagnosed during Batch 3 by toggling box_scores RLS off — bug persisted with RLS off, so it's NOT RLS-caused. Pre-existing data issue. Logged in "Next session" list.
+- **Tournament box scores bug** (logged separately): on a tournament game in prod, the line score shows only Elite's row, not the opponent's. Diagnosed during Batch 3 by toggling box_scores RLS off — bug persisted with RLS off, so it's NOT RLS-caused. Pre-existing data issue. **Now FIXED (app-side) — see "Tournament box scores fix" near the bottom.**
 - **fields has NOT NULL team_id**: discovered when trying a synthetic INSERT during dev validation. Legacy from pre-multi-tenant schema. Not blocking cutover. Will be cleaned up in Chunk 4b.
 - **Empty-table check**: in dev, several tables had 0 rows (event_imports, weather_forecasts, box_scores, etc). Always verified with superuser SELECT to distinguish "RLS filtered everything" from "table is just empty". Important habit.
 - **Prod policy names ≠ dev policy names** for some tables (case + naming convention differences) but the policy expressions matched. Verify expressions, not names.
@@ -264,6 +307,8 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Auth provider for signup: Google OAuth only in v1.
 - **RLS is on for all 17 tenant tables in prod.** Database enforces isolation.
 - Helpers use SECURITY DEFINER so they bypass RLS internally — critical for memberships RLS to be safe.
+- **Pre-auth / new-user server routes use a service-role client** (lib/supabase/service.ts) for any tenant-table access, because RLS blocks visitors with no membership yet (and profiles has no INSERT policy). Authenticated client still used for the user session.
+- Admin Members tab: Remove = hard delete of membership (not status flip); scoped to parents only.
 
 ## Parked / explicitly out of scope (for now)
 
@@ -299,7 +344,9 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Chat v1: schema + actions + UI + realtime + push + mute + realtime reactions
 - Chunk H: signup + admin approval flow
 - **Cutover: RLS enabled on all 17 tenant tables in prod**
-- ⬜ Chunk 4b — Drop redundant team_id columns from per-season tables
+- ✅ Chunk 4b — dropped `fields.team_id` (dev + prod); all other per-season team_id columns already dropped in Chunk 3
+- ✅ Admin manage-members UI — Members tab in /admin
+- ✅ Signup RLS fix — service-role client for pre-auth routes (lib/supabase/service.ts); `SUPABASE_SERVICE_ROLE_KEY` added to Vercel + .env.local
 
 ### Pre-prod cleanup
 Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
@@ -334,6 +381,18 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - team_message_reactions has no team_id column. Subscription filter on team_id isn't possible. Subscribing globally is fine for current scale.
 - Debounce timer must clear on unmount to avoid setState-after-unmount warnings.
 - "Burst test" for debounce is hard to do manually because reaction UI takes time to open the picker. Delete-reaction is the easier burst test.
+
+### Chunk 4b lessons learned
+- Only `fields.team_id` actually remained — the rest were dropped in Chunk 3. Verify column existence with an information_schema query before writing DROP statements; don't assume the design doc's "to drop" list is still accurate.
+
+### Signup RLS fix lessons learned
+- **The cutover silently broke public signup.** Pre-auth routes that read tenant tables (here: `organizations` for slug validation) fail under RLS because the visitor has no membership → `current_user_org_ids()` is empty. Symptom was a 404, not an obvious permission error.
+- **profiles has no INSERT policy** — the /complete route's profile upsert also needed the service client, not just the org lookup.
+- The fix is a dedicated service-role client (lib/supabase/service.ts). Keep it server-only; it bypasses RLS entirely.
+- `SUPABASE_SERVICE_ROLE_KEY` must be set in **both** local .env.local and Vercel, scoped to **Production**. A missing/mis-scoped var throws "Missing Supabase service env vars" at runtime (shows as a server-side exception with a digest; check Vercel Runtime Logs for the real message).
+- **OAuth flows can't be tested from Codespaces.** The Google sign-in page loads, but the redirect back resolves to a wrong/unreachable address (`…-3000.app.github.dev:3000`). Test all login/signup flows on the deployed prod site.
+- **Dev project has no real auth.users** — all dev memberships use the fake test UUIDs, which can't log in. Anything behind requireOrgAdmin() can't be exercised in dev via real login; test those on prod.
+- `.env.local` env-swap workflow: back up prod values (`cp .env.local .env.local.prod.bak`) before pointing local at dev; restore with `cp .env.local.prod.bak .env.local`. Keep local on prod by default.
 
 ### Cutover lessons learned
 - **Order matters.** Leaf tables first, then dependents, then the foundational table (memberships) last. If memberships breaks, every other policy breaks too.
@@ -375,8 +434,8 @@ For anonymous access: `set role anon;` then `reset role;` when done.
 
 ## Future features (parked)
 
-### Admin manage-members UI
-After Chunk H, parents come in via signup but admins can't yet edit their team assignments, change their default team, or remove them post-approval without SQL. Build a "Members" tab in /admin that lists all approved memberships and lets admins edit assignments.
+### Admin manage-members UI — ✅ SHIPPED
+See "Admin Manage-Members UI — SHIPPED" above. Members tab in /admin: lists approved parents, edit team assignments + default, remove (hard delete). Actions: getApprovedParents, updateMemberTeams, removeMembership.
 
 ### Email notifications
 On approval, on team_admin invitation, on game status changes. Requires SMTP provider (Resend recommended). Multi-hour rabbit hole — defer until needed.
@@ -400,5 +459,5 @@ player_stats.batting_order_position (integer, nullable). Display by batting_orde
 ### Magic link or email/password signup
 Currently Google OAuth only. Adding email/password or magic link increases reach.
 
-### Tournament box scores fix (known bug)
-Found during cutover Batch 3 validation. Line score for tournament games shows only Elite's row; opponent's row missing. Confirmed NOT RLS-caused (bug persisted with RLS disabled on box_scores). Pre-existing data issue. Investigation: query box_scores for a tournament game and see if opponent row is missing or has wrong team_season_id.
+### Tournament box scores fix — ✅ FIXED (prior session)
+Was: line score for tournament games showed only Elite's row. Root cause was app-side, not data/RLS: for tournaments the opponent box_score row shares Elite's `team_season_id` (the opponent isn't a `teams` row — just text on `events.opponent`) and is distinguished by `team_id = null`. The old finder `boxScores.find(r => r.team_season_id !== event.team_season_id)` returned undefined. Fixed in `app/event/[id]/page.tsx`: find the "us" row by `team_id === event.team_id`, take the other row as "them". Also switched header label to the short `pickable?.label` and widened the team column to `max-w-[180px]` for long opponent names.

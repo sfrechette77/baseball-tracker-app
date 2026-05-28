@@ -1,8 +1,8 @@
 # On Deck — Database Schema
 
-**Last updated:** End of cutover session
+**Last updated:** End of Members-UI + signup-fix session
 **Environment:** Production (`fjrtcxfqculymgyfrato`)
-**Status:** **RLS is now ON for all 17 tenant tables.** Multi-tenancy is enforced at the database layer.
+**Status:** **RLS is now ON for all 17 tenant tables.** Multi-tenancy is enforced at the database layer. Chunk 4b complete (`fields.team_id` dropped). Pre-auth routes use a service-role client.
 
 ---
 
@@ -181,7 +181,7 @@ User profile data. References Supabase Auth users.
 **RLS Policies (ACTIVE):**
 - SELECT: users can read own profile OR org_admins can read profiles of org members
 - UPDATE: users can update own profile only
-- No INSERT/DELETE policies (managed by Supabase Auth lifecycle)
+- No INSERT/DELETE policies (managed by Supabase Auth lifecycle). **Consequence:** the signup `/complete` route can't upsert a profile with the authenticated client (RLS blocks the insert). It uses the **service-role client** instead (see "Service-role client" note below).
 
 ---
 
@@ -303,7 +303,7 @@ All under RLS now (post-cutover).
 | event_imports | `organization_id IN current_user_org_ids()` | `is_org_admin(organization_id)` |
 | weather_forecasts | `organization_id IN current_user_org_ids()` | `is_org_admin(organization_id)` |
 
-**Per-season tables** (players, events, box_scores, player_stats, league_games, standings) link via `team_season_id` to team_seasons. Old `team_id` columns DROPPED in Chunk 3 except on standings (which kept its team_name) and fields (which still has a NOT NULL team_id — legacy, will be cleaned up in Chunk 4b).
+**Per-season tables** (players, events, box_scores, player_stats, league_games, standings) link via `team_season_id` to team_seasons. Old `team_id` columns DROPPED in Chunk 3 except on standings (which kept its team_name). `fields.team_id` (a NOT NULL legacy column) was dropped in **Chunk 4b** (dev + prod) — no per-season tenant table now carries a redundant team_id.
 
 **Cron / service-key safety:** weather_forecasts and game_status_log writes go through service-key paths (cron `/api/update-weather`, admin `/api/admin`). Service key bypasses RLS entirely. event_imports has NO active writers as of cutover.
 
@@ -538,8 +538,27 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 **Other migrations run ad-hoc and not saved to repo:**
 - Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
 - Cutover: `alter table public.<name> enable row level security` for all 17 tenant tables in dev AND prod. Policies were created during Chunk 8; cutover just flipped the master switch.
+- Chunk 4b: `alter table public.fields drop column team_id;` — run against dev AND prod.
 - Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
 - Test harness: User C linked to Moore via parent_teams.
+
+---
+
+## Service-role client (pre-auth / new-user access)
+
+`lib/supabase/service.ts` exposes `createServiceClient()` — a Supabase client built with `SUPABASE_SERVICE_ROLE_KEY` that **bypasses RLS entirely**. Server-only; never import into client code.
+
+**Why it exists:** After the cutover, RLS blocks reads/writes for a visitor who has no membership yet. Public signup broke because:
+- `organizations` SELECT policy is `id IN current_user_org_ids()` → an anonymous/new user sees no orgs → slug validation failed (404).
+- `profiles` has no INSERT policy → the new user's profile upsert failed.
+
+**Where it's used:**
+- `app/o/[slug]/signup/page.tsx` — org slug lookup.
+- `app/o/[slug]/signup/complete/page.tsx` — org lookup + `profiles` upsert + `memberships` insert/select. The user session is still read with the authenticated client; only DB work uses the service client.
+
+**Rule:** any pre-auth or new-user server route that touches tenant tables must use the service client. After the user is an approved member, use the normal authenticated client so RLS still applies.
+
+**Env var:** `SUPABASE_SERVICE_ROLE_KEY` (prod `service_role` secret) — set in local `.env.local` AND Vercel (Production scope). Missing/mis-scoped → "Missing Supabase service env vars" at runtime.
 
 ---
 
@@ -553,16 +572,17 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - `players.team_id`, `events.team_id`, `box_scores.team_id`
 - `league_games.home_team_id`, `league_games.away_team_id`
 - `standings.team_name`
+- `fields.team_id` (NOT NULL legacy column — dropped in Chunk 4b, dev + prod)
 
 ---
 
 ## Outstanding items
 
-1. **Chunk 4b** — Drop redundant `team_id` columns from per-season tables (Approach A from migration still has them). Now safe post-cutover since team is reachable via team_season_id join.
-2. **fields.team_id NOT NULL** — Legacy from pre-multi-tenant. Probably drop alongside Chunk 4b.
+1. ✅ **Chunk 4b** — DONE. Only `fields.team_id` remained; dropped in dev + prod. All other per-season redundant team_id columns were already dropped in Chunk 3.
+2. ✅ **fields.team_id NOT NULL** — DONE (dropped in Chunk 4b).
 3. **Decide on `memberships.user_id` FK to `auth.users(id)`** — present in prod, dropped in dev for test harness.
 4. **Decide on `memberships.approved_by` FK** — present in both prod and dev. Causes test friction in dev (fake UUIDs can't be used). Either drop in dev or always omit in dev tests.
-5. **Tournament box scores bug** — diagnosed during cutover Batch 3 as pre-existing (not RLS-caused). Tournament games show only Elite's row in line score; opponent missing.
+5. ✅ **Tournament box scores bug** — FIXED (app-side, not data/RLS). Opponent box_score row shares Elite's team_season_id and is distinguished by `team_id = null`; the line-score finder was rewritten in `app/event/[id]/page.tsx` to match the "us" row on `team_id` rather than differing team_season_id.
 
 ---
 
