@@ -47,6 +47,7 @@ type StatRow = {
   earned_runs: number
   strikeouts_pitching: number
   walks_allowed: number
+  batting_order_position: number | null
 }
 
 type Standing = {
@@ -402,12 +403,12 @@ useEffect(() => {
       const supabase = createClient()
       const { data } = await supabase
         .from('player_stats')
-        .select('player_id, at_bats, hits, rbi, runs, walks, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks_allowed, hits_allowed, earned_runs')
+        .select('player_id, at_bats, hits, rbi, runs, walks, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks_allowed, hits_allowed, earned_runs, batting_order_position')
         .eq('event_id', statsEventId)
       const map: Record<string, StatRow> = {}
       for (const p of players) {
         const existing = (data ?? [] as unknown as StatRow[]).find((r: StatRow) => r.player_id === p.id)
-        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
+        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0, batting_order_position: null }
       }
       setPlayerStats(map)
     }
@@ -455,7 +456,7 @@ useEffect(() => {
         walks: stats.walks ?? 0, strikeouts: stats.strikeouts,
         pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
         strikeoutsPitching: stats.strikeouts_pitching ?? 0, walksAllowed: stats.walks_allowed ?? 0,
-        hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0
+        hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0, battingOrderPosition: stats.batting_order_position ?? null
       })
     }
     setStatsSaving(false)
@@ -1397,6 +1398,15 @@ const deleteLeagueGame = async () => {
                       <p className="text-xs font-semibold text-slate-300">
                         {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
                       </p>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wide">Bat #</label>
+                        <input type="number" min="1" value={s.batting_order_position ?? ''}
+                          onChange={e => {
+                            const v = e.target.value
+                            setPlayerStats(prev => ({ ...prev, [player.id]: { ...prev[player.id], batting_order_position: v === '' ? null : Number(v) } }))
+                          }}
+                          className="w-16 rounded-lg bg-white/10 border border-white/10 px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                      </div>
                       <p className="text-[10px] text-slate-500 uppercase tracking-wide">Batting</p>
                       <div className="grid grid-cols-5 gap-1">
                         {([

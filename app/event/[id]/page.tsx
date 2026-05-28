@@ -88,6 +88,7 @@ type PlayerStatRow = {
   earned_runs: number
   strikeouts_pitching: number
   walks_allowed: number
+  batting_order_position: number | null
   players: {
     name: string
     jersey_number: string | null
@@ -280,8 +281,8 @@ export default function EventPage() {
           supabase.from('player_stats').select(`
             player_id, at_bats, hits, rbi, runs, walks, strikeouts,
             pitch_count, innings_pitched, hits_allowed, earned_runs,
-            strikeouts_pitching, walks_allowed,
-            players (name)
+            strikeouts_pitching, walks_allowed, batting_order_position,
+            players (name, jersey_number)
           `).eq('event_id', eventId)
         ])
 
@@ -368,6 +369,20 @@ export default function EventPage() {
 
   const playersWithStats = playerStats.filter(s => s.at_bats > 0 || (s.pitch_count ?? 0) > 0)
   const pitchers = playerStats.filter(s => (s.pitch_count ?? 0) > 0)
+
+  const battingRows = playersWithStats
+    .filter(s => s.at_bats > 0)
+    .sort((a, b) => {
+      const ao = a.batting_order_position
+      const bo = b.batting_order_position
+      if (ao != null && bo != null) return ao - bo
+      if (ao != null) return -1
+      if (bo != null) return 1
+      const aj = a.players?.jersey_number ? parseInt(a.players.jersey_number, 10) : Infinity
+      const bj = b.players?.jersey_number ? parseInt(b.players.jersey_number, 10) : Infinity
+      if (aj !== bj) return aj - bj
+      return (a.players?.name ?? '').localeCompare(b.players?.name ?? '')
+    })
 
   return (
     <main className="min-h-screen bg-black pb-24 text-white">
@@ -509,7 +524,7 @@ export default function EventPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {playersWithStats.filter(s => s.at_bats > 0).map(s => (
+                  {battingRows.map(s => (
                     <tr key={s.player_id}>
                       <td className="py-3 pl-4 pr-2">
                         <p className="text-xs font-semibold text-white whitespace-nowrap">

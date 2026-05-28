@@ -542,7 +542,7 @@ export async function POST(req: NextRequest) {
 
     // ── Player stats ────────────────────────────────────────────────────────
     if (action === 'update_player_stats') {
-      const { playerId, eventId, atBats, hits, rbi, runs, walks, strikeouts, pitchCount, inningsPitched, strikeoutsPitching, walksAllowed, hitsAllowed, earnedRuns } = body
+      const { playerId, eventId, atBats, hits, rbi, runs, walks, strikeouts, pitchCount, inningsPitched, strikeoutsPitching, walksAllowed, hitsAllowed, earnedRuns, battingOrderPosition } = body
 
       const ownershipError = await verifyEventOwnership(eventId)
       if (ownershipError) return NextResponse.json({ error: ownershipError }, { status: 403 })
@@ -555,7 +555,7 @@ export async function POST(req: NextRequest) {
           walks: walks ?? 0, strikeouts,
           pitch_count: pitchCount ?? 0, innings_pitched: inningsPitched ?? 0,
           strikeouts_pitching: strikeoutsPitching ?? 0, walks_allowed: walksAllowed ?? 0,
-          hits_allowed: hitsAllowed ?? 0, earned_runs: earnedRuns ?? 0,
+          hits_allowed: hitsAllowed ?? 0, earned_runs: earnedRuns ?? 0, batting_order_position: battingOrderPosition ?? null,
         }, { onConflict: 'player_id,event_id' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
