@@ -9,6 +9,7 @@
 - ✅ **Chunk 4b** — dropped `fields.team_id` (the last redundant legacy column) in dev and prod. All other per-season `team_id` columns were already dropped in Chunk 3.
 - ✅ **Admin manage-members UI** — Members tab in /admin.
 - ✅ **Signup RLS fix** — public signup routes broke after the cutover (anonymous/new-user reads of `organizations` blocked by RLS). Fixed via a service-role client.
+- ✅ **Batting order** — `player_stats.batting_order_position` (dev + prod), admin "Bat #" entry, event-page Batting table sorted by it.
 
 **Active items (pick one):**
 
@@ -309,6 +310,8 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Helpers use SECURITY DEFINER so they bypass RLS internally — critical for memberships RLS to be safe.
 - **Pre-auth / new-user server routes use a service-role client** (lib/supabase/service.ts) for any tenant-table access, because RLS blocks visitors with no membership yet (and profiles has no INSERT policy). Authenticated client still used for the user session.
 - Admin Members tab: Remove = hard delete of membership (not status flip); scoped to parents only.
+- Batting order: stored on `player_stats.batting_order_position` (per-game, nullable). Display sort = batting_order_position NULLS LAST → jersey_number → name.
+- **Env var name wart:** `/api/admin/route.ts` reads `SUPABASE_SERVICE_KEY`; the signup fix reads `SUPABASE_SERVICE_ROLE_KEY`. Both hold the same prod service_role key. `.env.local` and Vercel must carry BOTH names until standardized. (Cleanup: pick one name, update both call sites + envs.)
 
 ## Parked / explicitly out of scope (for now)
 
@@ -347,6 +350,7 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - ✅ Chunk 4b — dropped `fields.team_id` (dev + prod); all other per-season team_id columns already dropped in Chunk 3
 - ✅ Admin manage-members UI — Members tab in /admin
 - ✅ Signup RLS fix — service-role client for pre-auth routes (lib/supabase/service.ts); `SUPABASE_SERVICE_ROLE_KEY` added to Vercel + .env.local
+- ✅ Batting order — `player_stats.batting_order_position` (dev + prod); admin entry + sorted display
 
 ### Pre-prod cleanup
 Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
@@ -393,6 +397,12 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - **OAuth flows can't be tested from Codespaces.** The Google sign-in page loads, but the redirect back resolves to a wrong/unreachable address (`…-3000.app.github.dev:3000`). Test all login/signup flows on the deployed prod site.
 - **Dev project has no real auth.users** — all dev memberships use the fake test UUIDs, which can't log in. Anything behind requireOrgAdmin() can't be exercised in dev via real login; test those on prod.
 - `.env.local` env-swap workflow: back up prod values (`cp .env.local .env.local.prod.bak`) before pointing local at dev; restore with `cp .env.local.prod.bak .env.local`. Keep local on prod by default.
+
+### Batting order lessons learned
+- **Two different service-key env var names exist.** `/api/admin/route.ts` reads `SUPABASE_SERVICE_KEY`; `lib/supabase/service.ts` (signup fix) reads `SUPABASE_SERVICE_ROLE_KEY`. Same value, two names. Stats-saving silently 500'd locally until `SUPABASE_SERVICE_KEY` was added to `.env.local` (it had only the `_ROLE_` name). Both names must be present in `.env.local` AND Vercel until standardized.
+- **"Unexpected end of JSON input" on a fetch = the API route threw before returning** (empty body, not valid JSON). The real error is in the **dev terminal**, not the browser console.
+- **Local app points at prod** (per `.env.local`), so a new column must exist in **prod** to test the save locally — adding it only to dev isn't enough when local is pointed at prod.
+- Multi-edit changes: verify each edit actually landed. The display sort failed only because edit #4 (swap `playersWithStats.filter(...)` → `battingRows`) silently didn't apply; grep confirmed it.
 
 ### Cutover lessons learned
 - **Order matters.** Leaf tables first, then dependents, then the foundational table (memberships) last. If memberships breaks, every other policy breaks too.
@@ -443,8 +453,8 @@ On approval, on team_admin invitation, on game status changes. Requires SMTP pro
 ### DMs
 1:1 conversations between team members. Highest moderation complexity — needs blocking, muting, read receipts. Reuses ~80% of chat plumbing (schema, storage, RLS, push helper).
 
-### Batting order in stats
-player_stats.batting_order_position (integer, nullable). Display by batting_order_position NULLS LAST, jersey_number.
+### Batting order in stats — ✅ SHIPPED
+`player_stats.batting_order_position` (smallint, nullable) added to dev + prod. Admin Stats tab has a "Bat #" input per player (persists via `/api/admin` update_player_stats → `battingOrderPosition`). Event page Batting table sorts by `batting_order_position` (NULLS LAST), then jersey_number, then name. Sort lives in `battingRows` in `app/event/[id]/page.tsx`.
 
 ### Chat features deferred to v2
 - @mentions / notification on mention

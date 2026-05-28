@@ -305,6 +305,8 @@ All under RLS now (post-cutover).
 
 **Per-season tables** (players, events, box_scores, player_stats, league_games, standings) link via `team_season_id` to team_seasons. Old `team_id` columns DROPPED in Chunk 3 except on standings (which kept its team_name). `fields.team_id` (a NOT NULL legacy column) was dropped in **Chunk 4b** (dev + prod) — no per-season tenant table now carries a redundant team_id.
 
+**`player_stats.batting_order_position`** (smallint, nullable) — added dev + prod for the batting order feature. Per-game batting slot. App display sorts the Batting table by this NULLS LAST, then jersey_number, then name. Written by `/api/admin` update_player_stats (`battingOrderPosition`).
+
 **Cron / service-key safety:** weather_forecasts and game_status_log writes go through service-key paths (cron `/api/update-weather`, admin `/api/admin`). Service key bypasses RLS entirely. event_imports has NO active writers as of cutover.
 
 ---
@@ -539,6 +541,7 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
 - Cutover: `alter table public.<name> enable row level security` for all 17 tenant tables in dev AND prod. Policies were created during Chunk 8; cutover just flipped the master switch.
 - Chunk 4b: `alter table public.fields drop column team_id;` — run against dev AND prod.
+- Batting order: `alter table public.player_stats add column batting_order_position smallint;` — run against dev AND prod.
 - Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
 - Test harness: User C linked to Moore via parent_teams.
 
@@ -559,6 +562,8 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 **Rule:** any pre-auth or new-user server route that touches tenant tables must use the service client. After the user is an approved member, use the normal authenticated client so RLS still applies.
 
 **Env var:** `SUPABASE_SERVICE_ROLE_KEY` (prod `service_role` secret) — set in local `.env.local` AND Vercel (Production scope). Missing/mis-scoped → "Missing Supabase service env vars" at runtime.
+
+**⚠ Env var name wart:** the older `/api/admin/route.ts` reads a *different* name — `SUPABASE_SERVICE_KEY` — for the same prod service_role key. So both `SUPABASE_SERVICE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` must exist (same value) in `.env.local` AND Vercel. Symptom if one is missing: that route 500s with an empty body ("Missing Supabase env vars" in the dev terminal; "Unexpected end of JSON input" in the browser). Cleanup later: standardize on one name and update both call sites + envs.
 
 ---
 
