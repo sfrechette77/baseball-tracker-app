@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { SignupForm } from './SignupForm'
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 export default async function SignupPage({ params }: Props) {
   const { slug } = await params
 
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   // Look up the org by slug. Use the public anon role so RLS doesn't matter
   // (organizations table SELECT policy will be permissive for slug lookups).

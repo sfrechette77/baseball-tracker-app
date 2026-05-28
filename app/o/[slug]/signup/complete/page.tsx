@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { PendingChecker } from './PendingChecker'
 
 type Props = {
@@ -9,31 +10,30 @@ type Props = {
 export default async function SignupCompletePage({ params }: Props) {
   const { slug } = await params
 
+  // Authenticated client — used only to read the current user's session.
   const supabase = await createClient()
-
-  // Must be authenticated by now (we just came back from OAuth callback)
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
   if (!user) {
-    // Something went wrong with the OAuth flow. Send them back to signup.
     redirect(`/o/${slug}/signup?error=not_authenticated`)
   }
 
-  // Look up the org
-  const { data: org, error: orgError } = await supabase
+  // Service client — bypasses RLS. Safe here: trusted post-OAuth server route.
+  // A brand-new user has no memberships yet, so the authenticated client can't
+  // read the org (RLS) or insert the profile (no INSERT policy). Service key fixes both.
+  const admin = createServiceClient()
+
+  const { data: org, error: orgError } = await admin
     .from('organizations')
     .select('id, name, slug')
     .eq('slug', slug)
     .maybeSingle()
-
   if (orgError || !org) {
     redirect('/login?error=org_not_found')
   }
 
-  // Check whether this user already has a membership in this org
-  const { data: existingMemberships } = await supabase
+  const { data: existingMemberships } = await admin
     .from('memberships')
     .select('id, role, status')
     .eq('user_id', user.id)
@@ -42,21 +42,17 @@ export default async function SignupCompletePage({ params }: Props) {
   const hasApproved = existingMemberships?.some(m => m.status === 'approved')
   const hasPending = existingMemberships?.some(m => m.status === 'pending')
 
-  // Already approved → send to dashboard
   if (hasApproved) {
     redirect('/')
   }
 
-  // Not pending yet → create the profile (idempotent) and pending membership
   if (!hasPending) {
-    // Upsert the profile so we have name + email for the admin queue.
-    // Use the Google-provided metadata.
     const fullName =
       (user.user_metadata?.full_name as string | undefined) ??
       (user.user_metadata?.name as string | undefined) ??
       null
 
-    await supabase
+    await admin
       .from('profiles')
       .upsert(
         {
@@ -67,9 +63,7 @@ export default async function SignupCompletePage({ params }: Props) {
         { onConflict: 'id' }
       )
 
-    // Create the pending membership.
-    // RLS on memberships allows users to insert their own pending row.
-    const { error: insertError } = await supabase.from('memberships').insert({
+    const { error: insertError } = await admin.from('memberships').insert({
       user_id: user.id,
       organization_id: org.id,
       role: 'parent',
@@ -77,14 +71,10 @@ export default async function SignupCompletePage({ params }: Props) {
     })
 
     if (insertError) {
-      // Most common cause: race condition where two requests inserted at once.
-      // Anything else, we still want to show the user the pending screen so
-      // they're not stranded — admin queue can deal with it.
       console.error('Failed to create pending membership:', insertError)
     }
   }
 
-  // Render the pending screen
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white p-6">
       <PendingChecker orgId={org.id} />
