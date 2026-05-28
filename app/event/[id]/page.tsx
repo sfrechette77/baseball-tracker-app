@@ -371,7 +371,6 @@ export default function EventPage() {
   const pitchers = playerStats.filter(s => (s.pitch_count ?? 0) > 0)
 
   const battingRows = playersWithStats
-    .filter(p => p.player_stats.batting_order_position !== null)
     .sort((a, b) => {
       const ao = a.batting_order_position
       const bo = b.batting_order_position
