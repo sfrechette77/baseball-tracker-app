@@ -45,6 +45,19 @@ export function Header({ userMenu }: { userMenu: ReactNode }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
+  // Logged-out / pending / no-team: render a bare header so we never read
+  // a null currentTeam.
+  if (!currentTeam) {
+    return (
+      <header className="border-b border-slate-800 bg-black px-4 py-3 sticky top-0 z-10">
+        <div className="flex items-center justify-between max-w-6xl mx-auto">
+          <span />
+          {userMenu}
+        </div>
+      </header>
+    )
+  }
+  
   const onlyOneTeam = availableTeams.length <= 1
 
   return (
