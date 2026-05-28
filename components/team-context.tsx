@@ -77,13 +77,32 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         let defaultId: string | null = null
 
         if (isOrgAdmin) {
-          // Org admins can pick any team in their org.
-          const { data } = await supabase
-            .from('teams')
-            .select('id, name, division')
+          // Org admins pick from teams the org FIELDS this season — teams
+          // with a team_season in the current season. Excludes league
+          // opponent teams, which share the org_id but have no team_season.
+          const { data: season } = await supabase
+            .from('seasons')
+            .select('id')
             .eq('organization_id', orgId)
-            .order('name')
-          teams = (data ?? []) as RawTeam[]
+            .eq('is_current', true)
+            .maybeSingle()
+
+          if (season) {
+            const { data: ts } = await supabase
+              .from('team_seasons')
+              .select('team_id, teams:team_id ( id, name, division )')
+              .eq('organization_id', orgId)
+              .eq('season_id', season.id)
+
+            const byId = new Map<string, RawTeam>()
+            for (const row of ts ?? []) {
+              const t = Array.isArray(row.teams) ? row.teams[0] : row.teams
+              if (t) byId.set(t.id, { id: t.id, name: t.name, division: t.division })
+            }
+            teams = Array.from(byId.values()).sort((a, b) =>
+              a.name.localeCompare(b.name)
+            )
+          }
         } else {
           // Parents + team_admins: only their assigned teams.
           const { data: parentRows } = await supabase
