@@ -46,12 +46,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: {
-      default: orgName,
-      template: `%s | ${orgName}`,
+      default: "On Deck",
+      template: "%s | On Deck",
     },
     description: `Game day dashboard for ${orgName}`,
     manifest: "/manifest.json",
-    applicationName: orgName,
+    applicationName: "On Deck",
     appleWebApp: {
       capable: true,
       statusBarStyle: "black-translucent",
