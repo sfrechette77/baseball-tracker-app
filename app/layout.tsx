@@ -50,7 +50,6 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${orgName}`,
     },
     description: `Game day dashboard for ${orgName}`,
-    manifest: "/manifest.json",
     applicationName: orgName,
     appleWebApp: {
       capable: true,
