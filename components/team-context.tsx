@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useActiveOrg } from '@/components/org-context'
 import type { PickableTeam } from '@/lib/teams'
 
 const STORAGE_KEY = 'selectedTeamId'
@@ -28,12 +27,11 @@ type TeamContextValue = {
 const TeamContext = createContext<TeamContextValue | null>(null)
 
 export function TeamProvider({ children }: { children: ReactNode }) {
-  const { org } = useActiveOrg()
   const [rawTeams, setRawTeams] = useState<RawTeam[]>([])
   const [currentTeamId, setCurrentTeamIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [hasUser, setHasUser] = useState(false)
 
-  // Load the teams this user can pick from, scoped to their role.
   useEffect(() => {
     let cancelled = false
 
@@ -46,6 +44,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
         if (!user) {
           if (!cancelled) {
+            setHasUser(false)
             setRawTeams([])
             setCurrentTeamIdState(null)
             setLoading(false)
@@ -53,91 +52,64 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        // All approved memberships for this user (one row per role).
         const { data: memberships } = await supabase
           .from('memberships')
-          .select('id, role, organization_id')
+          .select('id, organization_id')
           .eq('user_id', user.id)
           .eq('status', 'approved')
 
         if (cancelled) return
 
         if (!memberships || memberships.length === 0) {
+          setHasUser(true)
           setRawTeams([])
           setCurrentTeamIdState(null)
           setLoading(false)
           return
         }
 
-        const isOrgAdmin = memberships.some(m => m.role === 'org_admin')
         const orgId = memberships[0].organization_id
-        const membershipIds = memberships.map(m => m.id)
+        const membershipIds = memberships.map((m) => m.id)
 
-        let teams: RawTeam[] = []
-        let defaultId: string | null = null
+        // Cross-team visibility: every approved member sees all of the org's
+        // own teams (league opponents are flagged is_opponent and excluded).
+        const { data: teamRows } = await supabase
+          .from('teams')
+          .select('id, name, division')
+          .eq('organization_id', orgId)
+          .eq('is_opponent', false)
+          .order('name')
 
-        if (isOrgAdmin) {
-          // Org admins pick from the org's own teams — excludes league
-          // opponent teams, which share the org_id but are flagged is_opponent.
-          const { data } = await supabase
-            .from('teams')
-            .select('id, name, division')
-            .eq('organization_id', orgId)
-            .eq('is_opponent', false)
-            .order('name')
-          teams = (data ?? []) as RawTeam[]
-        } else {
-          // Parents + team_admins: only their assigned teams.
-          const { data: parentRows } = await supabase
-            .from('parent_teams')
-            .select('team_id, is_default, teams:team_id ( id, name, division )')
-            .in('membership_id', membershipIds)
+        const teams = (teamRows ?? []) as RawTeam[]
 
-          const { data: adminRows } = await supabase
-            .from('team_admins')
-            .select('team_id, teams:team_id ( id, name, division )')
-            .in('membership_id', membershipIds)
+        // A parent's home/default team, if they have one.
+        const { data: defaultRows } = await supabase
+          .from('parent_teams')
+          .select('team_id')
+          .in('membership_id', membershipIds)
+          .eq('is_default', true)
+          .limit(1)
+        const defaultId = defaultRows?.[0]?.team_id ?? null
 
-          const byId = new Map<string, RawTeam>()
-
-          for (const row of parentRows ?? []) {
-            const t = Array.isArray(row.teams) ? row.teams[0] : row.teams
-            if (t) {
-              byId.set(t.id, { id: t.id, name: t.name, division: t.division })
-              if (row.is_default) defaultId = t.id
-            }
-          }
-          for (const row of adminRows ?? []) {
-            const t = Array.isArray(row.teams) ? row.teams[0] : row.teams
-            if (t && !byId.has(t.id)) {
-              byId.set(t.id, { id: t.id, name: t.name, division: t.division })
-            }
-          }
-
-          teams = Array.from(byId.values()).sort((a, b) =>
-            a.name.localeCompare(b.name)
-          )
-        }
-
-        // Initial selection: saved choice, else default team, else first.
         let stored: string | null = null
         try {
           stored = localStorage.getItem(STORAGE_KEY)
         } catch {
           stored = null
         }
-
         const validStored =
-          stored && teams.some(t => t.id === stored) ? stored : null
+          stored && teams.some((t) => t.id === stored) ? stored : null
         const initialId =
           validStored ?? defaultId ?? (teams.length > 0 ? teams[0].id : null)
 
         if (cancelled) return
+        setHasUser(true)
         setRawTeams(teams)
         setCurrentTeamIdState(initialId)
         setLoading(false)
       } catch {
         if (!cancelled) {
+          setHasUser(true)
           setRawTeams([])
           setCurrentTeamIdState(null)
           setLoading(false)
@@ -152,7 +124,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setCurrentTeamId = (id: string) => {
-    if (!rawTeams.some(t => t.id === id)) return // ignore unknown ids
+    if (!rawTeams.some((t) => t.id === id)) return
     setCurrentTeamIdState(id)
     try {
       localStorage.setItem(STORAGE_KEY, id)
@@ -161,20 +133,18 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Display-shaped teams. fullName uses the org name once it's loaded.
   const availableTeams = useMemo<PickableTeam[]>(() => {
-    return rawTeams.map(t => ({
+    return rawTeams.map((t) => ({
       id: t.id,
       label: t.name,
-      fullName: org ? `${org.name} - ${t.name}` : t.name,
+      fullName: t.name,
       division: t.division ?? '',
     }))
-  }, [rawTeams, org])
+  }, [rawTeams])
 
-  const currentTeam = availableTeams.find(t => t.id === currentTeamId) ?? null
+  const currentTeam =
+    availableTeams.find((t) => t.id === currentTeamId) ?? null
 
-  // Hold the app behind a neutral loading screen until teams resolve, so no
-  // team-scoped page mounts without a team.
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -183,12 +153,38 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  // Logged in but no team — graceful message instead of crashing a page.
+  if (hasUser && !currentTeam) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-slate-200 text-base font-medium">
+          You&apos;re not linked to a team yet.
+        </p>
+        <p className="text-slate-400 text-sm max-w-xs">
+          Please contact your team admin to be added. If you just signed up,
+          your account may still be pending approval.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const supabase = createClient()
+              await supabase.auth.signOut()
+            } finally {
+              window.location.href = '/login'
+            }
+          }}
+          className="mt-2 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-white/5 transition"
+        >
+          Sign out
+        </button>
+      </div>
+    )
+  }
+
   return (
     <TeamContext.Provider
       value={{
-        // Non-null whenever a team-scoped page renders. Can be null for
-        // logged-out / pending / no-team users (their pages don't read it;
-        // Header guards against null).
         currentTeam: currentTeam as PickableTeam,
         setCurrentTeamId,
         availableTeams,
