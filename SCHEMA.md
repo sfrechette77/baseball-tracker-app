@@ -78,6 +78,7 @@ All helpers use `SECURITY DEFINER` to bypass RLS when checking permissions inter
 
 ### organizations
 Top-level tenant. Each org is one customer.
+**`primary_color` now drives the UI accent** at runtime via the `--brand` CSS variable (set in `org-context`, consumed by a red-palette remap in `globals.css`). Elite = `#dc2626`, Florida Vandals = `#F97316`. New orgs must set `primary_color` at creation or the UI falls back to the red default.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
@@ -277,6 +278,7 @@ Permanent team identity.
 | arrival_buffer_minutes | integer | NOT NULL, default 45 | |
 | owner_user_id | uuid | nullable | Legacy field |
 | created_at | timestamptz | NOT NULL, default now() | |
+| is_opponent | boolean | NOT NULL, default false | true = league opponent team (shares org_id but not fielded by the org); excluded from the team picker |
 
 **RLS Policies (ACTIVE):**
 - SELECT: `organization_id IN current_user_org_ids()` — members can read teams in their orgs
@@ -544,6 +546,9 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - Batting order: `alter table public.player_stats add column batting_order_position smallint;` — run against dev AND prod.
 - Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
 - Test harness: User C linked to Moore via parent_teams.
+- `teams.is_opponent`: `alter table public.teams add column is_opponent boolean not null default false;` — run dev + prod. Prod: marked the 15 league opponent teams `true` (Moore/Ayeski stay false).
+- Elite `primary_color` corrected: `#0f172a` → `#dc2626` (prod).
+- Florida Vandals prod org created (`4801e4d4-…`) + finalize (org_admin membership, teams Orange/Black, Spring 2026 season, team_seasons).
 
 ---
 
