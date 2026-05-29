@@ -92,6 +92,13 @@ export function OrgProvider({ children }: { children: ReactNode }) {
           return
         }
 
+        if (typeof document !== 'undefined') {
+          document.documentElement.style.setProperty(
+            '--brand',
+            orgRow.primary_color ?? '#dc2626'
+          )
+        }
+
         setState({
           org: {
             id: orgRow.id,
