@@ -92,6 +92,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black min-h-screen`}
       >
+       <link rel="manifest" href="/manifest" crossOrigin="use-credentials" /> 
        <OrgProvider>
         <TeamProvider>
           <AppShell userMenu={<UserMenu />}>{children}</AppShell>
