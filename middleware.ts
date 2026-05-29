@@ -74,6 +74,6 @@ export const config = {
      * - favicon.ico, icon files, manifest
      * - api routes (handle their own auth)
      */
-    '/((?!_next/static|_next/image|favicon.ico|icon-|manifest|api).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon-|manifest.json|api).*)',
   ],
 }

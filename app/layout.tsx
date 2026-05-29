@@ -50,11 +50,12 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${orgName}`,
     },
     description: `Game day dashboard for ${orgName}`,
+    manifest: "/manifest.json",
     applicationName: orgName,
     appleWebApp: {
       capable: true,
       statusBarStyle: "black-translucent",
-      title: orgName,
+      title: "On Deck",
     },
     formatDetection: {
       telephone: false,
@@ -92,7 +93,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black min-h-screen`}
       >
-       <link rel="manifest" href="/manifest" crossOrigin="use-credentials" /> 
        <OrgProvider>
         <TeamProvider>
           <AppShell userMenu={<UserMenu />}>{children}</AppShell>

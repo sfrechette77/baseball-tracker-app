@@ -1,24 +1,14 @@
 {
-  "name": "Chicago Elite 11U - Moore",
-  "short_name": "Elite 11U",
-  "description": "Game day dashboard for Chicago Elite 11U - Moore",
+  "name": "On Deck",
+  "short_name": "On Deck",
+  "description": "Game day dashboard for youth baseball",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
   "orientation": "portrait",
   "icons": [
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }
