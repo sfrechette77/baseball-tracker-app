@@ -249,7 +249,7 @@ The four helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_tea
 - **Prod policy names ≠ dev policy names** for some tables (case + naming convention differences) but the policy expressions matched. Verify expressions, not names.
 
 ### Cron / service-key safety
-Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
+Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_ROLE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
 
 ### Cross-tenant test seed in dev
 Northside Knights is seeded in dev with 1 team + 1 team_season + 4 players + 1 event + 1 league_game. This lets us prove cross-tenant isolation by impersonating User B (NK org_admin) and confirming they see ONLY northside-knights data, never chicago-elite.
@@ -346,7 +346,7 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - **Pre-auth / new-user server routes use a service-role client** (lib/supabase/service.ts) for any tenant-table access, because RLS blocks visitors with no membership yet (and profiles has no INSERT policy). Authenticated client still used for the user session.
 - Admin Members tab: Remove = hard delete of membership (not status flip); scoped to parents only.
 - Batting order: stored on `player_stats.batting_order_position` (per-game, nullable). Display sort = batting_order_position NULLS LAST → jersey_number → name.
-- **Env var name wart:** `/api/admin/route.ts` reads `SUPABASE_SERVICE_KEY`; the signup fix reads `SUPABASE_SERVICE_ROLE_KEY`. Both hold the same prod service_role key. `.env.local` and Vercel must carry BOTH names until standardized. (Cleanup: pick one name, update both call sites + envs.)
+- **Env var name wart:** `/api/admin/route.ts` reads `SUPABASE_SERVICE_ROLE_KEY`; the signup fix reads `SUPABASE_SERVICE_ROLE_KEY`. Both hold the same prod service_role key. `.env.local` and Vercel must carry BOTH names until standardized. (Cleanup: pick one name, update both call sites + envs.)
 - Team picker is DB-driven and role-scoped; org_admin sees own teams only (`is_opponent=false`), never league opponents.
 - `teams.is_opponent` distinguishes own teams from league opponents sharing the org_id.
 - Brand accent = `organizations.primary_color` via runtime `--brand`; Tailwind red palette remapped to it. New orgs set `primary_color` at creation.
@@ -438,7 +438,7 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - `.env.local` env-swap workflow: back up prod values (`cp .env.local .env.local.prod.bak`) before pointing local at dev; restore with `cp .env.local.prod.bak .env.local`. Keep local on prod by default.
 
 ### Batting order lessons learned
-- **Two different service-key env var names exist.** `/api/admin/route.ts` reads `SUPABASE_SERVICE_KEY`; `lib/supabase/service.ts` (signup fix) reads `SUPABASE_SERVICE_ROLE_KEY`. Same value, two names. Stats-saving silently 500'd locally until `SUPABASE_SERVICE_KEY` was added to `.env.local` (it had only the `_ROLE_` name). Both names must be present in `.env.local` AND Vercel until standardized.
+- **Two different service-key env var names exist.** `/api/admin/route.ts` reads `SUPABASE_SERVICE_ROLE_KEY`; `lib/supabase/service.ts` (signup fix) reads `SUPABASE_SERVICE_ROLE_KEY`. Same value, two names. Stats-saving silently 500'd locally until `SUPABASE_SERVICE_ROLE_KEY` was added to `.env.local` (it had only the `_ROLE_` name). Both names must be present in `.env.local` AND Vercel until standardized.
 - **"Unexpected end of JSON input" on a fetch = the API route threw before returning** (empty body, not valid JSON). The real error is in the **dev terminal**, not the browser console.
 - **Local app points at prod** (per `.env.local`), so a new column must exist in **prod** to test the save locally — adding it only to dev isn't enough when local is pointed at prod.
 - Multi-edit changes: verify each edit actually landed. The display sort failed only because edit #4 (swap `playersWithStats.filter(...)` → `battingRows`) silently didn't apply; grep confirmed it.

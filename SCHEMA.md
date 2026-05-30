@@ -568,7 +568,7 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 **Env var:** `SUPABASE_SERVICE_ROLE_KEY` (prod `service_role` secret) — set in local `.env.local` AND Vercel (Production scope). Missing/mis-scoped → "Missing Supabase service env vars" at runtime.
 
-**⚠ Env var name wart:** the older `/api/admin/route.ts` reads a *different* name — `SUPABASE_SERVICE_KEY` — for the same prod service_role key. So both `SUPABASE_SERVICE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` must exist (same value) in `.env.local` AND Vercel. Symptom if one is missing: that route 500s with an empty body ("Missing Supabase env vars" in the dev terminal; "Unexpected end of JSON input" in the browser). Cleanup later: standardize on one name and update both call sites + envs.
+**⚠ Env var name wart:** the older `/api/admin/route.ts` reads a *different* name — `SUPABASE_SERVICE_ROLE_KEY` — for the same prod service_role key. So both `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` must exist (same value) in `.env.local` AND Vercel. Symptom if one is missing: that route 500s with an empty body ("Missing Supabase env vars" in the dev terminal; "Unexpected end of JSON input" in the browser). Cleanup later: standardize on one name and update both call sites + envs.
 
 ---
 
