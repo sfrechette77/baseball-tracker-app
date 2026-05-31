@@ -61,7 +61,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'pending' | 'members' | 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
+type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings'
 
 type Field = {
   id: string
@@ -156,7 +156,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
 
 export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('status')
+  const [tab, setTab] = useState<Tab>('dashboard')
   const { currentTeam } = useCurrentTeam()
 
   // Events
@@ -796,6 +796,7 @@ const deleteLeagueGame = async () => {
         {/* Tabs */}
         <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
           {([
+            { key: 'dashboard', label: '🏠 Dashboard' },
             { key: 'pending', label: '👋 Pending' },
             { key: 'members', label: '👥 Members' },
             { key: 'status', label: '📡 Status' },
@@ -814,6 +815,51 @@ const deleteLeagueGame = async () => {
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
+
+        {/* ── Dashboard Tab ─────────────────────────────────────────────── */}
+{tab === 'dashboard' && (
+  <div className="space-y-4">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+        Organization Dashboard
+      </p>
+      <h2 className="mt-1 text-lg font-extrabold text-white">
+        On Deck Command Center
+      </h2>
+      <p className="mt-2 text-sm text-slate-400">
+        This will become the organization-wide view for teams, families, events,
+        approvals, and attention items.
+      </p>
+    </div>
+
+    <div className="grid grid-cols-2 gap-2">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p className="text-xs text-slate-500">Teams</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p className="text-xs text-slate-500">Families</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p className="text-xs text-slate-500">Players</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p className="text-xs text-slate-500">Pending</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <h3 className="text-sm font-bold text-white">Attention Required</h3>
+      <p className="mt-2 text-sm text-slate-400">
+        No dashboard data connected yet. Next step: wire this to your existing
+        org, team, player, event, and membership tables.
+      </p>
+    </div>
+  </div>
+)}
 
         {/* ── Pending Tab ────────────────────────────────────────────────── */}
         {tab === 'pending' && (
