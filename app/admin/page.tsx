@@ -204,6 +204,12 @@ const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfei
 const [leagueSaving, setLeagueSaving] = useState(false)
 const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
 
+// Dashboard tab
+const [dashboardLoading, setDashboardLoading] = useState(false)
+const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
+const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
+const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
+
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
@@ -278,6 +284,37 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password, currentTeam.id])
+
+  // Load dashboard snapshot when Dashboard tab is active
+useEffect(() => {
+  if (!password || tab !== 'dashboard') return
+
+  const load = async () => {
+    setDashboardLoading(true)
+    setDashboardMsg(null)
+
+    const [pendingResult, teamsResult] = await Promise.all([
+      getPendingMemberships(),
+      getOrgTeams(),
+    ])
+
+    if (pendingResult.ok) {
+      setDashboardPendingCount(pendingResult.pending.length)
+    } else {
+      setDashboardMsg(`❌ ${pendingResult.error}`)
+    }
+
+    if (teamsResult.ok) {
+      setDashboardTeamCount(teamsResult.teams.length)
+    } else {
+      setDashboardMsg(`❌ ${teamsResult.error}`)
+    }
+
+    setDashboardLoading(false)
+  }
+
+  load()
+}, [password, tab])
 
   // Load pending memberships + org teams when Pending tab is active
   useEffect(() => {
@@ -835,7 +872,7 @@ const deleteLeagueGame = async () => {
     <div className="grid grid-cols-2 gap-2">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Teams</p>
-        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">{dashboardLoading ? '...' : dashboardTeamCount ?? '—'}</p>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Families</p>
@@ -847,7 +884,7 @@ const deleteLeagueGame = async () => {
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Pending</p>
-        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">{dashboardLoading ? '...' : dashboardPendingCount ?? '—'}</p>
       </div>
     </div>
 
