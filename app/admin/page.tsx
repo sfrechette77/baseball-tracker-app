@@ -209,6 +209,7 @@ const [dashboardLoading, setDashboardLoading] = useState(false)
 const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
 const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
 const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
+const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -293,9 +294,10 @@ useEffect(() => {
     setDashboardLoading(true)
     setDashboardMsg(null)
 
-    const [pendingResult, teamsResult] = await Promise.all([
+    const [pendingResult, teamsResult, membersResult] = await Promise.all([
       getPendingMemberships(),
       getOrgTeams(),
+      getApprovedParents(),
     ])
 
     if (pendingResult.ok) {
@@ -310,6 +312,12 @@ useEffect(() => {
       setDashboardMsg(`❌ ${teamsResult.error}`)
     }
 
+    if (membersResult.ok) {
+      setDashboardFamilyCount(membersResult.members.length)
+    } else {
+      setDashboardMsg(`❌ ${membersResult.error}`)
+    }
+
     setDashboardLoading(false)
   }
 
@@ -322,7 +330,7 @@ useEffect(() => {
     const load = async () => {
       setPendingLoading(true)
       setPendingMsg(null)
-      const [pendingResult, teamsResult] = await Promise.all([
+      const [pendingResult, teamsResult,] = await Promise.all([
         getPendingMemberships(),
         getOrgTeams(),
       ])
@@ -876,7 +884,7 @@ const deleteLeagueGame = async () => {
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Families</p>
-        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+        <p className="mt-1 text-2xl font-extrabold text-white">{dashboardLoading ? '...' : dashboardFamilyCount ?? '—'}</p>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Players</p>
