@@ -208,6 +208,7 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
 const [dashboardLoading, setDashboardLoading] = useState(false)
 const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
 const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
+const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
 const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
 const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
 
@@ -308,6 +309,7 @@ useEffect(() => {
 
     if (teamsResult.ok) {
       setDashboardTeamCount(teamsResult.teams.length)
+      setDashboardTeams(teamsResult.teams)
     } else {
       setDashboardMsg(`❌ ${teamsResult.error}`)
     }
@@ -897,12 +899,49 @@ const deleteLeagueGame = async () => {
     </div>
 
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-      <h3 className="text-sm font-bold text-white">Attention Required</h3>
-      <p className="mt-2 text-sm text-slate-400">
-        No dashboard data connected yet. Next step: wire this to your existing
-        org, team, player, event, and membership tables.
-      </p>
-    </div>
+  <h3 className="text-sm font-bold text-white">Attention Required</h3>
+
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+  <div className="flex items-center justify-between">
+    <h3 className="text-sm font-bold text-white">Teams</h3>
+    <span className="text-xs text-slate-500">
+      {dashboardTeamCount ?? 0} total
+    </span>
+  </div>
+
+  <div className="mt-3 space-y-2">
+    {dashboardTeams.slice(0, 6).map(team => (
+      <div
+        key={team.id}
+        className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"
+      >
+        <p className="text-sm font-semibold text-white">{team.name}</p>
+      </div>
+    ))}
+  </div>
+
+  {dashboardTeams.length > 6 && (
+    <p className="mt-3 text-xs text-slate-500">
+      Showing 6 of {dashboardTeams.length} teams.
+    </p>
+  )}
+</div>
+
+  {dashboardLoading ? (
+    <p className="mt-2 text-sm text-slate-400">Checking organization status...</p>
+  ) : dashboardPendingCount && dashboardPendingCount > 0 ? (
+    <button
+      onClick={() => setTab('pending')}
+      className="mt-3 w-full rounded-xl bg-red-600 px-4 py-3 text-left text-sm font-bold text-white hover:bg-red-700 transition"
+    >
+      {dashboardPendingCount} parent{dashboardPendingCount === 1 ? '' : 's'} waiting for approval
+    </button>
+  ) : (
+    <p className="mt-2 text-sm text-slate-400">
+      Nothing needs attention right now.
+    </p>
+  )}
+</div>
   </div>
 )}
 
