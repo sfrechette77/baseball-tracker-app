@@ -841,6 +841,7 @@ const deleteLeagueGame = async () => {
   const selectedEvent = events.find(e => e.id === selectedEventId)
   const usTotal = usInnings.reduce((a, b) => a + b, 0)
   const themTotal = themInnings.reduce((a, b) => a + b, 0)
+  const dashboardEventsMissingFields = dashboardThisWeek.filter(event => !event.field_id)
 
   return (
     <main className="min-h-screen bg-black pb-10 text-white" style={{ colorScheme: 'dark' }}>
@@ -918,7 +919,52 @@ const deleteLeagueGame = async () => {
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
   <h3 className="text-sm font-bold text-white">Attention Required</h3>
 
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+  {dashboardLoading ? (
+    <p className="mt-2 text-sm text-slate-400">Checking organization status...</p>
+  ) : (
+    <div className="mt-3 space-y-2">
+      {dashboardPendingCount !== null && dashboardPendingCount > 0 && (
+        <button
+          onClick={() => setTab('pending')}
+          className="w-full rounded-xl bg-red-600 px-4 py-3 text-left text-sm font-bold text-white hover:bg-red-700 transition"
+        >
+          {dashboardPendingCount} parent{dashboardPendingCount === 1 ? '' : 's'} waiting for approval
+        </button>
+      )}
+
+          {dashboardEventsMissingFields.length > 0 && (
+            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+              <p className="text-sm font-bold text-yellow-200">
+                {dashboardEventsMissingFields.length} event{dashboardEventsMissingFields.length === 1 ? '' : 's'} missing field assignment
+              </p>
+              <div className="mt-2 space-y-1">
+            {dashboardEventsMissingFields.slice(0, 3).map(event => (
+              <div key={event.id} className="text-xs text-yellow-100/70">
+                • {event.team_name ?? 'Unknown Team'} —{' '}
+                {event.opponent ? `vs ${event.opponent}` : event.title ?? 'Event'}
+              </div>
+            ))}
+
+            {dashboardEventsMissingFields.length > 3 && (
+              <div className="text-xs text-yellow-100/70">
+                + {dashboardEventsMissingFields.length - 3} more
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(!dashboardPendingCount || dashboardPendingCount === 0) &&
+        dashboardEventsMissingFields.length === 0 && (
+          <p className="text-sm text-slate-400">
+            Nothing needs attention right now.
+          </p>
+        )}
+    </div>
+  )}
+</div>
+
+<div className="rounded-2xl border border-white/10 bg-white/5 p-5">
   <div className="flex items-center justify-between">
     <h3 className="text-sm font-bold text-white">This Week</h3>
     <span className="text-xs text-slate-500">
@@ -965,7 +1011,7 @@ const deleteLeagueGame = async () => {
   )}
 </div>
 
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+<div className="rounded-2xl border border-white/10 bg-white/5 p-5">
   <div className="flex items-center justify-between">
     <h3 className="text-sm font-bold text-white">Teams</h3>
     <span className="text-xs text-slate-500">
@@ -990,23 +1036,7 @@ const deleteLeagueGame = async () => {
     </p>
   )}
 </div>
-
-  {dashboardLoading ? (
-    <p className="mt-2 text-sm text-slate-400">Checking organization status...</p>
-  ) : dashboardPendingCount && dashboardPendingCount > 0 ? (
-    <button
-      onClick={() => setTab('pending')}
-      className="mt-3 w-full rounded-xl bg-red-600 px-4 py-3 text-left text-sm font-bold text-white hover:bg-red-700 transition"
-    >
-      {dashboardPendingCount} parent{dashboardPendingCount === 1 ? '' : 's'} waiting for approval
-    </button>
-  ) : (
-    <p className="mt-2 text-sm text-slate-400">
-      Nothing needs attention right now.
-    </p>
-  )}
 </div>
-  </div>
 )}
 
         {/* ── Pending Tab ────────────────────────────────────────────────── */}
