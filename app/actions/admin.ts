@@ -208,6 +208,7 @@ export type ApprovedParent = {
   full_name: string | null
   email: string | null
   teams: { id: string; name: string; is_default: boolean }[]
+  team_admin_teams: { id: string; name: string }[]
   created_at: string
 }
 
@@ -234,13 +235,20 @@ export async function getApprovedParents(): Promise<
   const membershipIds = memberships.map(m => m.id)
   const userIds = Array.from(new Set(memberships.map(m => m.user_id)))
 
-  const [{ data: profiles }, { data: parentTeams }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email').in('id', userIds),
-    supabase
-      .from('parent_teams')
-      .select('membership_id, team_id, is_default, teams(id, name)')
-      .in('membership_id', membershipIds),
-  ])
+  const [{ data: profiles }, { data: parentTeams }, { data: teamAdminMemberships }] = await Promise.all([
+  supabase.from('profiles').select('id, full_name, email').in('id', userIds),
+  supabase
+    .from('parent_teams')
+    .select('membership_id, team_id, is_default, teams(id, name)')
+    .in('membership_id', membershipIds),
+  supabase
+    .from('memberships')
+    .select('id, user_id')
+    .eq('organization_id', guard.membership.organization_id)
+    .eq('role', 'team_admin')
+    .eq('status', 'approved')
+    .in('user_id', userIds),
+])
 
   const profileById: Record<string, { full_name: string | null; email: string | null }> = {}
   for (const p of profiles ?? []) {
@@ -260,12 +268,45 @@ export async function getApprovedParents(): Promise<
     }
   }
 
+  const teamAdminMembershipIds = (teamAdminMemberships ?? []).map(m => m.id)
+
+  const { data: teamAdminRows } = teamAdminMembershipIds.length > 0
+    ? await supabase
+        .from('team_admins')
+        .select('membership_id, team_id, teams(id, name)')
+        .in('membership_id', teamAdminMembershipIds)
+    : { data: [] }
+
+  const teamAdminMembershipById: Record<string, { user_id: string }> = {}
+  for (const m of teamAdminMemberships ?? []) {
+    teamAdminMembershipById[m.id] = { user_id: m.user_id }
+  }
+
+  const teamAdminTeamsByUserId: Record<string, { id: string; name: string }[]> = {}
+  for (const row of teamAdminRows ?? []) {
+    const membership = teamAdminMembershipById[row.membership_id]
+    if (!membership) continue
+
+    if (!teamAdminTeamsByUserId[membership.user_id]) {
+      teamAdminTeamsByUserId[membership.user_id] = []
+    }
+
+    const team = row.teams as unknown as { id: string; name: string }
+    if (team) {
+      teamAdminTeamsByUserId[membership.user_id].push({
+        id: team.id,
+        name: team.name,
+      })
+    }
+  }
+
   const members: ApprovedParent[] = memberships.map(m => ({
     id: m.id,
     user_id: m.user_id,
     full_name: profileById[m.user_id]?.full_name ?? null,
     email: profileById[m.user_id]?.email ?? null,
     teams: teamsByMembership[m.id] ?? [],
+    team_admin_teams: teamAdminTeamsByUserId[m.user_id] ?? [],
     created_at: m.created_at,
   }))
 

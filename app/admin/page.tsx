@@ -1272,6 +1272,16 @@ const deleteLeagueGame = async () => {
                             ? 'No teams assigned'
                             : m.teams.map(t => t.is_default ? `${t.name} ★` : t.name).join(', ')}
                         </p>
+                        {m.team_admin_teams.length > 0 && (
+                          <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
+                              Team Admin
+                            </p>
+                            <p className="mt-1 text-xs text-yellow-100">
+                              {m.team_admin_teams.map(t => t.name).join(', ')}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {!isEditing && !isRemoving && (
