@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
-import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
+import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 
@@ -218,6 +218,7 @@ export default function AdminPage() {
   const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
   const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<OrgTeam[]>([])
   const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
+  const [dashboardTeamHealthCounts, setDashboardTeamHealthCounts] = useState<DashboardTeamHealthCounts[]>([])
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -305,13 +306,14 @@ useEffect(() => {
     setDashboardLoading(true)
     setDashboardMsg(null)
 
-    const [pendingResult, teamsResult, membersResult, playersResult, thisWeekResult, teamAdminsResult] = await Promise.all([
+    const [pendingResult, teamsResult, membersResult, playersResult, thisWeekResult, teamAdminsResult, teamHealthResult] = await Promise.all([
       getPendingMemberships(),
       getOrgTeams(),
       getApprovedParents(),
       getDashboardPlayerCount(),
       getDashboardThisWeek(),
       getDashboardTeamAdminAssignments(),
+      getDashboardTeamHealthCounts(),
     ])
 
     if (pendingResult.ok) {
@@ -343,6 +345,12 @@ useEffect(() => {
       setDashboardTeamAdminAssignments(teamAdminsResult.assignments)
     } else if (!teamAdminsResult.ok) {
       setDashboardMsg(`❌ ${teamAdminsResult.error}`)
+    }
+
+    if (teamHealthResult.ok) {
+      setDashboardTeamHealthCounts(teamHealthResult.counts)
+    } else {
+      setDashboardMsg(`❌ ${teamHealthResult.error}`)
     }
 
     if (membersResult.ok) {
@@ -922,9 +930,13 @@ const deleteLeagueGame = async () => {
   if (!password) return <PasswordGate onSuccess={setPassword} />
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
+
   const usTotal = usInnings.reduce((a, b) => a + b, 0)
+
   const themTotal = themInnings.reduce((a, b) => a + b, 0)
+
   const dashboardEventsMissingFields = dashboardThisWeek.filter(event => !event.field_id)
+
   const dashboardTeamIdsWithUpcomingEvents = new Set(
     dashboardThisWeek
       .map(event => event.team_id)
@@ -934,6 +946,20 @@ const deleteLeagueGame = async () => {
   const dashboardTeamsWithNoUpcomingEvents = dashboardTeams.filter(
     team => !dashboardTeamIdsWithUpcomingEvents.has(team.id)
   )
+
+  const dashboardTeamHealthByTeamId = new Map(
+  dashboardTeamHealthCounts.map(count => [count.team_id, count])
+)
+
+  const dashboardTeamsWithNoPlayers = dashboardTeams.filter(team => {
+    const counts = dashboardTeamHealthByTeamId.get(team.id)
+    return !counts || counts.player_count === 0
+  })
+
+  const dashboardTeamsWithNoFamilies = dashboardTeams.filter(team => {
+    const counts = dashboardTeamHealthByTeamId.get(team.id)
+    return !counts || counts.family_count === 0
+  })
 
   return (
     <main className="min-h-screen bg-black pb-10 text-white" style={{ colorScheme: 'dark' }}>
@@ -988,6 +1014,8 @@ const deleteLeagueGame = async () => {
             dashboardTeamAdminAssignments={dashboardTeamAdminAssignments}
             dashboardEventsMissingFields={dashboardEventsMissingFields}
             dashboardTeamsWithNoUpcomingEvents={dashboardTeamsWithNoUpcomingEvents}
+            dashboardTeamsWithNoPlayers={dashboardTeamsWithNoPlayers}
+            dashboardTeamsWithNoFamilies={dashboardTeamsWithNoFamilies}
             formatDate={formatDate}
             setTab={setTab}
           />

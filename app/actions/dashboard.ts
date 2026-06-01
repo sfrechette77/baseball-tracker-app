@@ -22,6 +22,12 @@ export type DashboardTeamAdminAssignment = {
   email: string | null
 }
 
+export type DashboardTeamHealthCounts = {
+  team_id: string
+  player_count: number
+  family_count: number
+}
+
 async function requireOrgAdmin(): Promise<
   | { ok: true; membership: { organization_id: string } }
   | { ok: false; error: string }
@@ -65,6 +71,63 @@ export async function getDashboardPlayerCount(): Promise<
   if (error) return { ok: false, error: error.message }
 
   return { ok: true, playerCount: count ?? 0 }
+}
+
+export async function getDashboardTeamHealthCounts(): Promise<
+  { ok: true; counts: DashboardTeamHealthCounts[] } | { ok: false; error: string }
+> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data: teams, error: teamsError } = await supabase
+    .from('teams')
+    .select('id')
+    .eq('organization_id', guard.membership.organization_id)
+
+  if (teamsError) return { ok: false, error: teamsError.message }
+
+  const teamIds = (teams ?? []).map(t => t.id)
+  if (teamIds.length === 0) return { ok: true, counts: [] }
+
+  const [{ data: players, error: playersError }, { data: parentTeams, error: parentTeamsError }] = await Promise.all([
+    supabase
+      .from('players')
+      .select('id, team_id')
+      .in('team_id', teamIds),
+    supabase
+      .from('parent_teams')
+      .select('membership_id, team_id, memberships!inner(status, role, organization_id)')
+      .in('team_id', teamIds)
+      .eq('memberships.organization_id', guard.membership.organization_id)
+      .eq('memberships.role', 'parent')
+      .eq('memberships.status', 'approved'),
+  ])
+
+  if (playersError) return { ok: false, error: playersError.message }
+  if (parentTeamsError) return { ok: false, error: parentTeamsError.message }
+
+  const countsByTeamId: Record<string, DashboardTeamHealthCounts> = {}
+
+  for (const teamId of teamIds) {
+    countsByTeamId[teamId] = {
+      team_id: teamId,
+      player_count: 0,
+      family_count: 0,
+    }
+  }
+
+  for (const player of players ?? []) {
+    if (!countsByTeamId[player.team_id]) continue
+    countsByTeamId[player.team_id].player_count += 1
+  }
+
+  for (const parentTeam of parentTeams ?? []) {
+    if (!countsByTeamId[parentTeam.team_id]) continue
+    countsByTeamId[parentTeam.team_id].family_count += 1
+  }
+
+  return { ok: true, counts: Object.values(countsByTeamId) }
 }
 
 export async function getDashboardThisWeek(): Promise<

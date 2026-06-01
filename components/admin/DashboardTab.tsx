@@ -14,6 +14,8 @@ type Props = {
   dashboardEventsMissingFields: DashboardEvent[]
   dashboardTeamAdminAssignments: DashboardTeamAdminAssignment[]
   dashboardTeamsWithNoUpcomingEvents: OrgTeam[]
+  dashboardTeamsWithNoPlayers: OrgTeam[]
+  dashboardTeamsWithNoFamilies: OrgTeam[]
   formatDate: (dateStr: string) => string
   setTab: (tab: 'pending') => void
 }
@@ -31,6 +33,8 @@ export function DashboardTab({
   dashboardEventsMissingFields,
   dashboardTeamAdminAssignments,
   dashboardTeamsWithNoUpcomingEvents,
+  dashboardTeamsWithNoPlayers,
+  dashboardTeamsWithNoFamilies,
   formatDate,
   setTab,
 }: Props) {
@@ -158,10 +162,42 @@ export function DashboardTab({
               </div>
             )}
 
+            {dashboardTeamsWithNoPlayers.length > 0 && (
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+                <p className="text-sm font-bold text-yellow-200">
+                  {dashboardTeamsWithNoPlayers.length} team{dashboardTeamsWithNoPlayers.length === 1 ? '' : 's'} with no players
+                </p>
+                <div className="mt-2 space-y-1">
+                  {dashboardTeamsWithNoPlayers.slice(0, 3).map(team => (
+                    <div key={team.id} className="text-xs text-yellow-100/70">
+                      • {team.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {dashboardTeamsWithNoFamilies.length > 0 && (
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+                <p className="text-sm font-bold text-yellow-200">
+                  {dashboardTeamsWithNoFamilies.length} team{dashboardTeamsWithNoFamilies.length === 1 ? '' : 's'} with no families
+                </p>
+                <div className="mt-2 space-y-1">
+                  {dashboardTeamsWithNoFamilies.slice(0, 3).map(team => (
+                    <div key={team.id} className="text-xs text-yellow-100/70">
+                      • {team.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {(!dashboardPendingCount || dashboardPendingCount === 0) &&
               dashboardEventsMissingFields.length === 0 &&
               dashboardTeamsMissingAdmins.length === 0 &&
-              dashboardTeamsWithNoUpcomingEvents.length === 0 && (
+              dashboardTeamsWithNoUpcomingEvents.length === 0 &&
+              dashboardTeamsWithNoPlayers.length === 0 &&
+              dashboardTeamsWithNoFamilies.length === 0 && (
                 <p className="text-sm text-slate-400">
                   Nothing needs attention right now.
                 </p>
