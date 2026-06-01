@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent } from '@/app/actions/dashboard'
 
@@ -236,6 +236,9 @@ const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<O
   const [memberDefaultTeamId, setMemberDefaultTeamId] = useState<string>('')
   const [memberSaving, setMemberSaving] = useState(false)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
+  const [promoteTeamIds, setPromoteTeamIds] = useState<Set<string>>(new Set())
+  const [promoteSaving, setPromoteSaving] = useState(false)
 
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
@@ -595,6 +598,42 @@ useEffect(() => {
     setApproveTeamIds(new Set())
     setApproveDefaultTeamId('')
   }
+
+  const startPromoteMember = (member: ApprovedParent) => {
+  setPromotingMemberId(member.id)
+  setPromoteTeamIds(new Set(member.teams.map(t => t.id)))
+  setMembersMsg(null)
+}
+
+const cancelPromoteMember = () => {
+  setPromotingMemberId(null)
+  setPromoteTeamIds(new Set())
+}
+
+const togglePromoteTeam = (teamId: string) => {
+  const next = new Set(promoteTeamIds)
+  if (next.has(teamId)) next.delete(teamId)
+  else next.add(teamId)
+  setPromoteTeamIds(next)
+}
+
+const savePromoteMember = async () => {
+  if (!promotingMemberId) return
+  setPromoteSaving(true)
+  setMembersMsg(null)
+
+  const result = await makeMemberTeamAdmin(promotingMemberId, Array.from(promoteTeamIds))
+
+  setPromoteSaving(false)
+
+  if (!result.ok) {
+    setMembersMsg(`❌ ${result.error}`)
+    return
+  }
+
+  setMembersMsg('✅ Team admin assigned')
+  cancelPromoteMember()
+}
 
   const toggleApproveTeam = (teamId: string) => {
     const next = new Set(approveTeamIds)
@@ -1236,7 +1275,7 @@ const deleteLeagueGame = async () => {
                       </div>
 
                       {!isEditing && !isRemoving && (
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                           <button
                             onClick={() => {
                               setEditingMemberId(m.id)
@@ -1247,6 +1286,12 @@ const deleteLeagueGame = async () => {
                             className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
                           >
                             Edit Teams
+                          </button>
+                          <button
+                            onClick={() => startPromoteMember(m)}
+                            className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
+                          >
+                            Make Admin
                           </button>
                           <button
                             onClick={() => { setRemovingMemberId(m.id); setMembersMsg(null) }}
@@ -1339,6 +1384,54 @@ const deleteLeagueGame = async () => {
                               onClick={() => setEditingMemberId(null)}
                               disabled={memberSaving}
                               className="rounded-xl bg-white/10 border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-white/20 transition disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {promotingMemberId === m.id && (
+                        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3 space-y-3">
+                          <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
+                            Make team admin
+                          </p>
+
+                          {orgTeams.length === 0 ? (
+                            <p className="text-xs text-amber-400">No teams found.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {orgTeams.map(t => {
+                                const checked = promoteTeamIds.has(t.id)
+                                return (
+                                  <label
+                                    key={t.id}
+                                    className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-white cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => togglePromoteTeam(t.id)}
+                                    />
+                                    {t.name}
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={savePromoteMember}
+                              disabled={promoteSaving || promoteTeamIds.size === 0}
+                              className="flex-1 rounded-xl bg-yellow-500 py-2 text-xs font-bold text-black hover:bg-yellow-400 disabled:opacity-50"
+                            >
+                              {promoteSaving ? 'Saving...' : 'Save Admin'}
+                            </button>
+                            <button
+                              onClick={cancelPromoteMember}
+                              disabled={promoteSaving}
+                              className="rounded-xl bg-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/20"
                             >
                               Cancel
                             </button>
