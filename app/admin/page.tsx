@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
-import { getDashboardPlayerCount } from '@/app/actions/dashboard'
+import { getDashboardPlayerCount, getDashboardThisWeek, type DashboardEvent } from '@/app/actions/dashboard'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -213,6 +213,7 @@ const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
 const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
 const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
 const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
+const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -297,11 +298,12 @@ useEffect(() => {
     setDashboardLoading(true)
     setDashboardMsg(null)
 
-    const [pendingResult, teamsResult, membersResult, playersResult] = await Promise.all([
+    const [pendingResult, teamsResult, membersResult, playersResult, thisWeekResult] = await Promise.all([
       getPendingMemberships(),
       getOrgTeams(),
       getApprovedParents(),
       getDashboardPlayerCount(),
+      getDashboardThisWeek(),
     ])
 
     if (pendingResult.ok) {
@@ -327,6 +329,12 @@ useEffect(() => {
       setDashboardPlayerCount(playersResult.playerCount)
     } else {
       setDashboardMsg(`❌ ${playersResult.error}`)
+    }
+
+    if (thisWeekResult.ok) {
+      setDashboardThisWeek(thisWeekResult.events)
+    } else {
+      setDashboardMsg(`❌ ${thisWeekResult.error}`)
     }
 
     setDashboardLoading(false)
@@ -909,6 +917,53 @@ const deleteLeagueGame = async () => {
 
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
   <h3 className="text-sm font-bold text-white">Attention Required</h3>
+
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+  <div className="flex items-center justify-between">
+    <h3 className="text-sm font-bold text-white">This Week</h3>
+    <span className="text-xs text-slate-500">
+      {dashboardThisWeek.length} event{dashboardThisWeek.length === 1 ? '' : 's'}
+    </span>
+  </div>
+
+  {dashboardLoading ? (
+    <p className="mt-3 text-sm text-slate-400">Loading this week...</p>
+  ) : dashboardThisWeek.length === 0 ? (
+    <p className="mt-3 text-sm text-slate-400">No events scheduled in the next 7 days.</p>
+  ) : (
+    <div className="mt-3 space-y-2">
+      {dashboardThisWeek.slice(0, 6).map(event => (
+        <div
+          key={event.id}
+          className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-white">
+                {event.team_name ?? 'Unknown team'}
+              </p>
+              <p className="text-xs text-slate-400">
+                {event.opponent ? `vs ${event.opponent}` : event.title ?? event.event_type ?? 'Event'}
+              </p>
+              <p className="text-xs text-slate-500">
+                {event.field_name ?? 'Field TBD'}
+              </p>
+            </div>
+            <p className="shrink-0 text-right text-xs text-slate-400">
+              {formatDate(event.starts_at)}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {dashboardThisWeek.length > 6 && (
+    <p className="mt-3 text-xs text-slate-500">
+      Showing 6 of {dashboardThisWeek.length} events.
+    </p>
+  )}
+</div>
 
   <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
   <div className="flex items-center justify-between">
