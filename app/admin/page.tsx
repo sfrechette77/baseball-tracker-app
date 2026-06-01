@@ -210,7 +210,7 @@ const [dashboardLoading, setDashboardLoading] = useState(false)
 const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
 const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
 const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
-const DASHBOARD_ORG_TEAM_NAMES = ['Elite 11U - Ayeski', 'Elite 11U - Moore']
+const DASHBOARD_ORG_TEAM_IDS = ['4beb0750-1883-4b56-a386-db280675036c', '0c8cc8d0-2398-41c2-8ba0-036d62ee13a6',]
 const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
 const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
 const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
@@ -317,7 +317,7 @@ useEffect(() => {
 
     if (teamsResult.ok) {
        const orgDashboardTeams = teamsResult.teams.filter(team =>
-          DASHBOARD_ORG_TEAM_NAMES.includes(team.name)
+          DASHBOARD_ORG_TEAM_IDS.includes(team.id)
         )
 
       setDashboardTeamCount(orgDashboardTeams.length)
@@ -328,7 +328,7 @@ useEffect(() => {
 
     if (teamsResult.ok && teamAdminsResult.ok) {
       const orgDashboardTeams = teamsResult.teams.filter(team =>
-        DASHBOARD_ORG_TEAM_NAMES.includes(team.name)
+        DASHBOARD_ORG_TEAM_IDS.includes(team.id)
       )
 
       const teamsWithAdmins = new Set(teamAdminsResult.assignments.map(a => a.team_id))

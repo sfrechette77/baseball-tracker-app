@@ -21,6 +21,11 @@ export type OrgTeam = {
 
 export type SimpleResult = { ok: true } | { ok: false; error: string }
 
+const ORG_TEAM_IDS = [
+  '4beb0750-1883-4b56-a386-db280675036c',
+  '0c8cc8d0-2398-41c2-8ba0-036d62ee13a6',
+]
+
 // ─── Auth guard ────────────────────────────────────────────────────────────
 
 async function requireOrgAdmin(): Promise<
@@ -110,7 +115,12 @@ export async function getOrgTeams(): Promise<
     .order('name', { ascending: true })
 
   if (error) return { ok: false, error: error.message }
-  return { ok: true, teams: (data ?? []) as OrgTeam[] }
+
+  const teams = ((data ?? []) as OrgTeam[]).filter(team =>
+  ORG_TEAM_IDS.includes(team.id)
+)
+
+  return { ok: true, teams}
 }
 
 // ─── approveMembership ─────────────────────────────────────────────────────
