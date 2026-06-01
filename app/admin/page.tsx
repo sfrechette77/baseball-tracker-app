@@ -8,6 +8,7 @@ import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/a
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -161,6 +162,9 @@ export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('dashboard')
   const { currentTeam } = useCurrentTeam()
+  const { membership, loading: orgLoading } = useActiveOrg()
+  const isOrgAdmin = membership?.role === 'org_admin'
+  const isTeamAdmin = membership?.role === 'team_admin'
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -961,6 +965,24 @@ const deleteLeagueGame = async () => {
     return !counts || counts.family_count === 0
   })
 
+  const allAdminTabs = [
+  { key: 'dashboard', label: '🏠 Dashboard' },
+  { key: 'pending', label: '👋 Pending' },
+  { key: 'members', label: '👥 Members' },
+  { key: 'status', label: '📡 Status' },
+  { key: 'score', label: '🏆 Score' },
+  { key: 'stats', label: '📊 Stats' },
+  { key: 'events', label: '📅 Events' },
+  { key: 'league', label: '⚾ League' },
+  { key: 'standings', label: '📋 Standings' },
+] as const
+
+const teamAdminAllowedTabs: Tab[] = ['status', 'score', 'stats', 'events']
+
+const visibleAdminTabs = isOrgAdmin
+  ? allAdminTabs
+  : allAdminTabs.filter(t => teamAdminAllowedTabs.includes(t.key))
+
   return (
     <main className="min-h-screen bg-black pb-10 text-white" style={{ colorScheme: 'dark' }}>
       {/* Header */}
@@ -978,17 +1000,7 @@ const deleteLeagueGame = async () => {
 
         {/* Tabs */}
         <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
-          {([
-            { key: 'dashboard', label: '🏠 Dashboard' },
-            { key: 'pending', label: '👋 Pending' },
-            { key: 'members', label: '👥 Members' },
-            { key: 'status', label: '📡 Status' },
-            { key: 'score', label: '🏆 Score' },
-            { key: 'stats', label: '📊 Stats' },
-            { key: 'events', label: '📅 Events' },
-            { key: 'league', label: '⚾ League' },
-            { key: 'standings', label: '📋 Standings' },
-          ] as const).map(({ key, label }) => (
+          {visibleAdminTabs.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
               {label}
