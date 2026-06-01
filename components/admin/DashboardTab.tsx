@@ -1,5 +1,5 @@
 import type { OrgTeam } from '@/app/actions/admin'
-import type { DashboardEvent } from '@/app/actions/dashboard'
+import type { DashboardEvent, DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
 
 type Props = {
   dashboardLoading: boolean
@@ -12,6 +12,7 @@ type Props = {
   dashboardTeams: OrgTeam[]
   dashboardTeamsMissingAdmins: OrgTeam[]
   dashboardEventsMissingFields: DashboardEvent[]
+  dashboardTeamAdminAssignments: DashboardTeamAdminAssignment[]
   formatDate: (dateStr: string) => string
   setTab: (tab: 'pending') => void
 }
@@ -27,6 +28,7 @@ export function DashboardTab({
   dashboardTeams,
   dashboardTeamsMissingAdmins,
   dashboardEventsMissingFields,
+  dashboardTeamAdminAssignments,
   formatDate,
   setTab,
 }: Props) {
@@ -143,6 +145,40 @@ export function DashboardTab({
               )}
           </div>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">Team Admin Coverage</h3>
+          <span className="text-xs text-slate-500">
+            {dashboardTeams.length} team{dashboardTeams.length === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {dashboardTeams.map(team => {
+            const admins = dashboardTeamAdminAssignments.filter(a => a.team_id === team.id)
+
+            return (
+              <div
+                key={team.id}
+                className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"
+              >
+                <p className="text-sm font-semibold text-white">{team.name}</p>
+
+                {admins.length > 0 ? (
+                  <p className="mt-1 text-xs text-green-300">
+                    ✓ {admins.map(a => a.full_name || a.email || 'Unnamed admin').join(', ')}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-yellow-300">
+                    ⚠ No team admin assigned
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5">

@@ -16,6 +16,10 @@ export type DashboardEvent = {
 
 export type DashboardTeamAdminAssignment = {
   team_id: string
+  membership_id: string
+  user_id: string
+  full_name: string | null
+  email: string | null
 }
 
 async function requireOrgAdmin(): Promise<
@@ -123,17 +127,52 @@ export async function getDashboardTeamAdminAssignments(): Promise<
   const guard = await requireOrgAdmin()
   if (!guard.ok) return { ok: false, error: guard.error }
 
-  const { data, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('team_admins')
-    .select('team_id, memberships!inner(organization_id)')
+    .select(`
+      membership_id,
+      team_id,
+      memberships!inner (
+        id,
+        user_id,
+        organization_id
+      )
+    `)
     .eq('memberships.organization_id', guard.membership.organization_id)
 
   if (error) return { ok: false, error: error.message }
 
+  const normalized = (rows ?? []).map((row: any) => {
+    const membership = Array.isArray(row.memberships) ? row.memberships[0] : row.memberships
+    return {
+      membership_id: row.membership_id,
+      team_id: row.team_id,
+      user_id: membership?.user_id as string,
+    }
+  }).filter(row => row.user_id)
+
+  const userIds = Array.from(new Set(normalized.map(row => row.user_id)))
+
+  const { data: profiles } = userIds.length > 0
+    ? await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds)
+    : { data: [] }
+
+  const profileById: Record<string, { full_name: string | null; email: string | null }> = {}
+  for (const p of profiles ?? []) {
+    profileById[p.id] = { full_name: p.full_name, email: p.email }
+  }
+
   return {
     ok: true,
-    assignments: (data ?? []).map(row => ({
+    assignments: normalized.map(row => ({
       team_id: row.team_id,
+      membership_id: row.membership_id,
+      user_id: row.user_id,
+      full_name: profileById[row.user_id]?.full_name ?? null,
+      email: profileById[row.user_id]?.email ?? null,
     })),
   }
 }

@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
-import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent } from '@/app/actions/dashboard'
+import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 
@@ -217,6 +217,7 @@ const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(
 const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
 const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
 const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<OrgTeam[]>([])
+const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -339,6 +340,7 @@ useEffect(() => {
       setDashboardTeamsMissingAdmins(
         orgDashboardTeams.filter(team => !teamsWithAdmins.has(team.id))
       )
+      setDashboardTeamAdminAssignments(teamAdminsResult.assignments)
     } else if (!teamAdminsResult.ok) {
       setDashboardMsg(`❌ ${teamAdminsResult.error}`)
     }
@@ -974,6 +976,7 @@ const deleteLeagueGame = async () => {
             dashboardThisWeek={dashboardThisWeek}
             dashboardTeams={dashboardTeams}
             dashboardTeamsMissingAdmins={dashboardTeamsMissingAdmins}
+            dashboardTeamAdminAssignments={dashboardTeamAdminAssignments}
             dashboardEventsMissingFields={dashboardEventsMissingFields}
             formatDate={formatDate}
             setTab={setTab}
