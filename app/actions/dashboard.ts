@@ -14,6 +14,10 @@ export type DashboardEvent = {
   field_name: string | null
 }
 
+export type DashboardTeamAdminAssignment = {
+  team_id: string
+}
+
 async function requireOrgAdmin(): Promise<
   | { ok: true; membership: { organization_id: string } }
   | { ok: false; error: string }
@@ -110,4 +114,26 @@ export async function getDashboardThisWeek(): Promise<
   }))
 
   return { ok: true, events }
+}
+
+export async function getDashboardTeamAdminAssignments(): Promise<
+  { ok: true; assignments: DashboardTeamAdminAssignment[] } | { ok: false; error: string }
+> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data, error } = await supabase
+    .from('team_admins')
+    .select('team_id, memberships!inner(organization_id)')
+    .eq('memberships.organization_id', guard.membership.organization_id)
+
+  if (error) return { ok: false, error: error.message }
+
+  return {
+    ok: true,
+    assignments: (data ?? []).map(row => ({
+      team_id: row.team_id,
+    })),
+  }
 }

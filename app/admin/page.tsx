@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
-import { getDashboardPlayerCount, getDashboardThisWeek, type DashboardEvent } from '@/app/actions/dashboard'
+import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent } from '@/app/actions/dashboard'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -214,6 +214,7 @@ const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null
 const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
 const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
 const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
+const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<OrgTeam[]>([])
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -298,12 +299,13 @@ useEffect(() => {
     setDashboardLoading(true)
     setDashboardMsg(null)
 
-    const [pendingResult, teamsResult, membersResult, playersResult, thisWeekResult] = await Promise.all([
+    const [pendingResult, teamsResult, membersResult, playersResult, thisWeekResult, teamAdminsResult] = await Promise.all([
       getPendingMemberships(),
       getOrgTeams(),
       getApprovedParents(),
       getDashboardPlayerCount(),
       getDashboardThisWeek(),
+      getDashboardTeamAdminAssignments(),
     ])
 
     if (pendingResult.ok) {
@@ -317,6 +319,15 @@ useEffect(() => {
       setDashboardTeams(teamsResult.teams)
     } else {
       setDashboardMsg(`❌ ${teamsResult.error}`)
+    }
+
+    if (teamsResult.ok && teamAdminsResult.ok) {
+      const teamsWithAdmins = new Set(teamAdminsResult.assignments.map(a => a.team_id))
+      setDashboardTeamsMissingAdmins(
+        teamsResult.teams.filter(team => !teamsWithAdmins.has(team.id))
+      )
+    } else if (!teamAdminsResult.ok) {
+      setDashboardMsg(`❌ ${teamAdminsResult.error}`)
     }
 
     if (membersResult.ok) {
@@ -954,8 +965,29 @@ const deleteLeagueGame = async () => {
         </div>
       )}
 
+          {dashboardTeamsMissingAdmins.length > 0 && (
+            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+              <p className="text-sm font-bold text-yellow-200">
+                {dashboardTeamsMissingAdmins.length} team{dashboardTeamsMissingAdmins.length === 1 ? '' : 's'} missing team admin
+              </p>
+              <div className="mt-2 space-y-1">
+                {dashboardTeamsMissingAdmins.slice(0, 3).map(team => (
+                  <div key={team.id} className="text-xs text-yellow-100/70">
+                    • {team.name}
+                  </div>
+                ))}
+                {dashboardTeamsMissingAdmins.length > 3 && (
+                  <div className="text-xs text-yellow-100/70">
+                    + {dashboardTeamsMissingAdmins.length - 3} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
       {(!dashboardPendingCount || dashboardPendingCount === 0) &&
-        dashboardEventsMissingFields.length === 0 && (
+        dashboardEventsMissingFields.length === 0 &&
+        dashboardTeamsMissingAdmins.length === 0 && (  
           <p className="text-sm text-slate-400">
             Nothing needs attention right now.
           </p>
