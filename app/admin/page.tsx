@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
+import { getDashboardPlayerCount } from '@/app/actions/dashboard'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -211,6 +212,7 @@ const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null
 const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
 const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
 const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
+const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -295,10 +297,11 @@ useEffect(() => {
     setDashboardLoading(true)
     setDashboardMsg(null)
 
-    const [pendingResult, teamsResult, membersResult] = await Promise.all([
+    const [pendingResult, teamsResult, membersResult, playersResult] = await Promise.all([
       getPendingMemberships(),
       getOrgTeams(),
       getApprovedParents(),
+      getDashboardPlayerCount(),
     ])
 
     if (pendingResult.ok) {
@@ -318,6 +321,12 @@ useEffect(() => {
       setDashboardFamilyCount(membersResult.members.length)
     } else {
       setDashboardMsg(`❌ ${membersResult.error}`)
+    }
+
+    if (playersResult.ok) {
+      setDashboardPlayerCount(playersResult.playerCount)
+    } else {
+      setDashboardMsg(`❌ ${playersResult.error}`)
     }
 
     setDashboardLoading(false)
@@ -890,7 +899,7 @@ const deleteLeagueGame = async () => {
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Players</p>
-        <p className="mt-1 text-2xl font-extrabold text-white">—</p>
+        <p className="mt-1 text-2xl font-extrabold text-white"> {dashboardLoading ? '...' : dashboardPlayerCount ?? '—'}</p>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
         <p className="text-xs text-slate-500">Pending</p>
