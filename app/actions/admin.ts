@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -20,11 +21,6 @@ export type OrgTeam = {
 }
 
 export type SimpleResult = { ok: true } | { ok: false; error: string }
-
-const ORG_TEAM_IDS = [
-  '4beb0750-1883-4b56-a386-db280675036c',
-  '0c8cc8d0-2398-41c2-8ba0-036d62ee13a6',
-]
 
 // ─── Auth guard ────────────────────────────────────────────────────────────
 
