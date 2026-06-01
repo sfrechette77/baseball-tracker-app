@@ -13,6 +13,7 @@ type Props = {
   dashboardTeamsMissingAdmins: OrgTeam[]
   dashboardEventsMissingFields: DashboardEvent[]
   dashboardTeamAdminAssignments: DashboardTeamAdminAssignment[]
+  dashboardTeamsWithNoUpcomingEvents: OrgTeam[]
   formatDate: (dateStr: string) => string
   setTab: (tab: 'pending') => void
 }
@@ -29,6 +30,7 @@ export function DashboardTab({
   dashboardTeamsMissingAdmins,
   dashboardEventsMissingFields,
   dashboardTeamAdminAssignments,
+  dashboardTeamsWithNoUpcomingEvents,
   formatDate,
   setTab,
 }: Props) {
@@ -136,9 +138,30 @@ export function DashboardTab({
               </div>
             )}
 
+            {dashboardTeamsWithNoUpcomingEvents.length > 0 && (
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+                <p className="text-sm font-bold text-yellow-200">
+                  {dashboardTeamsWithNoUpcomingEvents.length} team{dashboardTeamsWithNoUpcomingEvents.length === 1 ? '' : 's'} with no upcoming events
+                </p>
+                <div className="mt-2 space-y-1">
+                  {dashboardTeamsWithNoUpcomingEvents.slice(0, 3).map(team => (
+                    <div key={team.id} className="text-xs text-yellow-100/70">
+                      • {team.name}
+                    </div>
+                  ))}
+                  {dashboardTeamsWithNoUpcomingEvents.length > 3 && (
+                    <div className="text-xs text-yellow-100/70">
+                      + {dashboardTeamsWithNoUpcomingEvents.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {(!dashboardPendingCount || dashboardPendingCount === 0) &&
               dashboardEventsMissingFields.length === 0 &&
-              dashboardTeamsMissingAdmins.length === 0 && (
+              dashboardTeamsMissingAdmins.length === 0 &&
+              dashboardTeamsWithNoUpcomingEvents.length === 0 && (
                 <p className="text-sm text-slate-400">
                   Nothing needs attention right now.
                 </p>

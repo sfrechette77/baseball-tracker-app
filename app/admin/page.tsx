@@ -195,29 +195,29 @@ export default function AdminPage() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
   // League tab
-const [allTeams, setAllTeams] = useState<TeamRow[]>([])
-const [allLeagueGames, setAllLeagueGames] = useState<LeagueGameAdminRow[]>([])
-const [leagueEditingId, setLeagueEditingId] = useState<string | null>(null)
-const [leagueHomeTeamId, setLeagueHomeTeamId] = useState('')
-const [leagueAwayTeamId, setLeagueAwayTeamId] = useState('')
-const [leaguePlayedAt, setLeaguePlayedAt] = useState('')
-const [leagueHomeScore, setLeagueHomeScore] = useState('')
-const [leagueAwayScore, setLeagueAwayScore] = useState('')
-const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('final')
-const [leagueSaving, setLeagueSaving] = useState(false)
-const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
+  const [allTeams, setAllTeams] = useState<TeamRow[]>([])
+  const [allLeagueGames, setAllLeagueGames] = useState<LeagueGameAdminRow[]>([])
+  const [leagueEditingId, setLeagueEditingId] = useState<string | null>(null)
+  const [leagueHomeTeamId, setLeagueHomeTeamId] = useState('')
+  const [leagueAwayTeamId, setLeagueAwayTeamId] = useState('')
+  const [leaguePlayedAt, setLeaguePlayedAt] = useState('')
+  const [leagueHomeScore, setLeagueHomeScore] = useState('')
+  const [leagueAwayScore, setLeagueAwayScore] = useState('')
+  const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('final')
+  const [leagueSaving, setLeagueSaving] = useState(false)
+  const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
 
 // Dashboard tab
-const [dashboardLoading, setDashboardLoading] = useState(false)
-const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
-const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
-const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
-const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
-const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
-const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
-const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
-const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<OrgTeam[]>([])
-const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
+  const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
+  const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
+  const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
+  const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
+  const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
+  const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
+  const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<OrgTeam[]>([])
+  const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -455,10 +455,10 @@ useEffect(() => {
   }, [statusEventId, password])
 
   // Load all teams and all league games when League tab is active
-useEffect(() => {
-  if (!password) return
-  const load = async () => {
-    const supabase = createClient()
+  useEffect(() => {
+    if (!password) return
+    const load = async () => {
+      const supabase = createClient()
     
     const { data: teamsData } = await supabase
       .from('teams')
@@ -925,6 +925,15 @@ const deleteLeagueGame = async () => {
   const usTotal = usInnings.reduce((a, b) => a + b, 0)
   const themTotal = themInnings.reduce((a, b) => a + b, 0)
   const dashboardEventsMissingFields = dashboardThisWeek.filter(event => !event.field_id)
+  const dashboardTeamIdsWithUpcomingEvents = new Set(
+    dashboardThisWeek
+      .map(event => event.team_id)
+      .filter((teamId): teamId is string => Boolean(teamId))
+  )
+
+  const dashboardTeamsWithNoUpcomingEvents = dashboardTeams.filter(
+    team => !dashboardTeamIdsWithUpcomingEvents.has(team.id)
+  )
 
   return (
     <main className="min-h-screen bg-black pb-10 text-white" style={{ colorScheme: 'dark' }}>
@@ -978,6 +987,7 @@ const deleteLeagueGame = async () => {
             dashboardTeamsMissingAdmins={dashboardTeamsMissingAdmins}
             dashboardTeamAdminAssignments={dashboardTeamAdminAssignments}
             dashboardEventsMissingFields={dashboardEventsMissingFields}
+            dashboardTeamsWithNoUpcomingEvents={dashboardTeamsWithNoUpcomingEvents}
             formatDate={formatDate}
             setTab={setTab}
           />
