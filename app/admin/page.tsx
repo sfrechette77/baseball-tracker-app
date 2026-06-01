@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent } from '@/app/actions/dashboard'
 
@@ -633,6 +633,27 @@ const savePromoteMember = async () => {
 
   setMembersMsg('✅ Team admin assigned')
   cancelPromoteMember()
+}
+
+const removeTeamAdminTeam = async (memberId: string, teamId: string) => {
+  setMembersMsg(null)
+
+  const result = await removeMemberTeamAdmin(memberId, teamId)
+
+  if (!result.ok) {
+    setMembersMsg(`❌ ${result.error}`)
+    return
+  }
+
+  setMembersMsg('✅ Team admin access removed')
+
+  const [membersResult, teamsResult] = await Promise.all([
+    getApprovedParents(),
+    getOrgTeams(),
+  ])
+
+  if (membersResult.ok) setMembersList(membersResult.members)
+  if (teamsResult.ok) setOrgTeams(teamsResult.teams)
 }
 
   const toggleApproveTeam = (teamId: string) => {
@@ -1277,9 +1298,20 @@ const deleteLeagueGame = async () => {
                             <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
                               Team Admin
                             </p>
-                            <p className="mt-1 text-xs text-yellow-100">
-                              {m.team_admin_teams.map(t => t.name).join(', ')}
-                            </p>
+
+                            <div className="mt-2 space-y-2">
+                              {m.team_admin_teams.map(t => (
+                                <div key={t.id} className="flex items-center justify-between gap-2">
+                                  <p className="text-xs text-yellow-100">{t.name}</p>
+                                  <button
+                                    onClick={() => removeTeamAdminTeam(m.id, t.id)}
+                                    className="rounded-lg border border-yellow-500/30 px-2 py-1 text-[10px] font-bold text-yellow-100 hover:bg-yellow-500/10"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>

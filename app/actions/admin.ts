@@ -398,6 +398,52 @@ export async function makeMemberTeamAdmin(
   return { ok: true }
 }
 
+export async function removeMemberTeamAdmin(
+  parentMembershipId: string,
+  teamId: string
+): Promise<SimpleResult> {
+  if (!parentMembershipId) return { ok: false, error: 'Missing parentMembershipId' }
+  if (!teamId) return { ok: false, error: 'Missing teamId' }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data: parentMembership, error: parentError } = await supabase
+    .from('memberships')
+    .select('id, user_id, organization_id, role')
+    .eq('id', parentMembershipId)
+    .maybeSingle()
+
+  if (parentError) return { ok: false, error: parentError.message }
+  if (!parentMembership) return { ok: false, error: 'Parent membership not found' }
+  if (parentMembership.organization_id !== guard.membership.organization_id) {
+    return { ok: false, error: 'Cannot manage memberships outside your org' }
+  }
+
+  const { data: teamAdminMembership, error: adminError } = await supabase
+    .from('memberships')
+    .select('id')
+    .eq('user_id', parentMembership.user_id)
+    .eq('organization_id', guard.membership.organization_id)
+    .eq('role', 'team_admin')
+    .maybeSingle()
+
+  if (adminError) return { ok: false, error: adminError.message }
+  if (!teamAdminMembership) return { ok: false, error: 'Team admin membership not found' }
+
+  const { error: deleteError } = await supabase
+    .from('team_admins')
+    .delete()
+    .eq('membership_id', teamAdminMembership.id)
+    .eq('team_id', teamId)
+
+  if (deleteError) return { ok: false, error: deleteError.message }
+
+  revalidatePath('/admin')
+  return { ok: true }
+}
+
 // ─── updateMemberTeams ─────────────────────────────────────────────────────
 
 export async function updateMemberTeams(
