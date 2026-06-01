@@ -210,6 +210,7 @@ const [dashboardLoading, setDashboardLoading] = useState(false)
 const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
 const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
 const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
+const DASHBOARD_ORG_TEAM_NAMES = ['Elite 11U - Ayeski', 'Elite 11U - Moore']
 const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
 const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
 const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
@@ -315,16 +316,24 @@ useEffect(() => {
     }
 
     if (teamsResult.ok) {
-      setDashboardTeamCount(teamsResult.teams.length)
-      setDashboardTeams(teamsResult.teams)
+       const orgDashboardTeams = teamsResult.teams.filter(team =>
+          DASHBOARD_ORG_TEAM_NAMES.includes(team.name)
+        )
+
+      setDashboardTeamCount(orgDashboardTeams.length)
+      setDashboardTeams(orgDashboardTeams)
     } else {
       setDashboardMsg(`❌ ${teamsResult.error}`)
     }
 
     if (teamsResult.ok && teamAdminsResult.ok) {
+      const orgDashboardTeams = teamsResult.teams.filter(team =>
+        DASHBOARD_ORG_TEAM_NAMES.includes(team.name)
+      )
+
       const teamsWithAdmins = new Set(teamAdminsResult.assignments.map(a => a.team_id))
       setDashboardTeamsMissingAdmins(
-        teamsResult.teams.filter(team => !teamsWithAdmins.has(team.id))
+        orgDashboardTeams.filter(team => !teamsWithAdmins.has(team.id))
       )
     } else if (!teamAdminsResult.ok) {
       setDashboardMsg(`❌ ${teamAdminsResult.error}`)
@@ -1097,7 +1106,7 @@ const deleteLeagueGame = async () => {
                     <div key={p.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div>
                         <p className="text-sm font-bold text-white">
-                          {p.full_name ?? '(no name)'}
+                          {p.full_name || p.email || '(no name)'}
                         </p>
                         <p className="text-xs text-slate-400">{p.email}</p>
                         <p className="text-[10px] text-slate-500 mt-1">
@@ -1217,7 +1226,7 @@ const deleteLeagueGame = async () => {
                   return (
                     <div key={m.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div>
-                        <p className="text-sm font-bold text-white">{m.full_name ?? '(no name)'}</p>
+                        <p className="text-sm font-bold text-white">{m.full_name || m.email || '(no name)'}</p>
                         <p className="text-xs text-slate-400">{m.email}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           {m.teams.length === 0
