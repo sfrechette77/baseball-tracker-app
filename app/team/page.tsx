@@ -43,6 +43,12 @@ type LeagueGameRow = {
 
 type SubView = 'overview' |'standings' | 'results' | 'roster'
 
+type TeamOverviewEvent = {
+  id: string
+  event_type: string | null
+  result: string | null
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function formatRecord(w: number, l: number, t: number): string {
@@ -102,6 +108,36 @@ function TeamPageInner() {
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
   const [teamAdminAssignments, setTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
   const [teamAdminsLoading, setTeamAdminsLoading] = useState(true)
+  const [overviewPlayerCount, setOverviewPlayerCount] = useState<number | null>(null)
+  const [overviewEvents, setOverviewEvents] = useState<TeamOverviewEvent[]>([])
+
+  const overviewRecord = useMemo(() => overviewEvents.reduce(
+    (acc, e) => {
+      if (e.result === 'win') acc.wins++
+      else if (e.result === 'loss') acc.losses++
+      else if (e.result === 'tie') acc.ties++
+      return acc
+    },
+    { wins: 0, losses: 0, ties: 0 }
+  ), [overviewEvents])
+
+  const overviewLeagueRecord = useMemo(() => overviewEvents
+    .filter(e => e.event_type !== 'tournament')
+    .reduce(
+      (acc, e) => {
+        if (e.result === 'win') acc.wins++
+        else if (e.result === 'loss') acc.losses++
+        else if (e.result === 'tie') acc.ties++
+        return acc
+      },
+      { wins: 0, losses: 0, ties: 0 }
+    ), [overviewEvents])
+
+  const overviewWinPct = (() => {
+    const total = overviewRecord.wins + overviewRecord.losses + overviewRecord.ties
+    if (total === 0) return '—'
+    return ((overviewRecord.wins + overviewRecord.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
+  })()
 
   // Read sub-view from URL, default to standings
   const viewParam = searchParams.get('view')
@@ -132,6 +168,42 @@ function TeamPageInner() {
     }
 
     loadTeamAdmins()
+  }, [currentTeam.id])
+
+  useEffect(() => {
+    const loadPlayerCount = async () => {
+      if (!teamSeasonId) {
+        setOverviewPlayerCount(0)
+        return
+      }
+
+      const supabase = createClient()
+
+      const { count } = await supabase
+        .from('players')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_season_id', teamSeasonId)
+
+      setOverviewPlayerCount(count ?? 0)
+    }
+
+    loadPlayerCount()
+  }, [teamSeasonId])
+
+  useEffect(() => {
+    const loadOverviewEvents = async () => {
+      const supabase = createClient()
+
+      const { data } = await supabase
+        .from('events')
+        .select('id, event_type, result')
+        .eq('team_id', currentTeam.id)
+        .not('result', 'is', null)
+
+      setOverviewEvents((data ?? []) as TeamOverviewEvent[])
+    }
+
+    loadOverviewEvents()
   }, [currentTeam.id])
 
   if (teamSeasonNotFound) {
@@ -187,19 +259,61 @@ function TeamPageInner() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
-        {view === 'overview' && (
-          <div className="space-y-4">
+          <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+            {view === 'overview' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                    Team Overview
+                  </p>
+                  <h2 className="mt-1 text-lg font-extrabold text-white">
+                    {currentTeam.fullName}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {currentTeam.division}
+                  </p>
+                </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+              Record
+            </p>
+
+            <p className="mt-3 text-xs text-slate-400 tabular-nums">
+              <span className="text-slate-500">PCT </span>
+              <span className="text-white font-semibold">{overviewWinPct}</span>
+
+              <span className="mx-2 text-slate-700">·</span>
+
+              <span className="text-slate-500">Overall </span>
+              <span className="text-slate-300 font-semibold">
+                {overviewRecord.wins}–{overviewRecord.losses}
+                {overviewRecord.ties > 0 ? `–${overviewRecord.ties}` : ''}
+              </span>
+
+              <span className="mx-2 text-slate-700">·</span>
+
+              <span className="text-slate-500">League </span>
+              <span className="text-slate-300 font-semibold">
+                {overviewLeagueRecord.wins}–{overviewLeagueRecord.losses}
+                {overviewLeagueRecord.ties > 0 ? `–${overviewLeagueRecord.ties}` : ''}
+              </span>
+            </p>
+          </div>
+
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
-                Team Overview
+                Roster
               </p>
-              <h2 className="mt-1 text-lg font-extrabold text-white">
-                {currentTeam.fullName}
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {currentTeam.division}
-              </p>
+
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-3xl font-extrabold text-white">
+                  {overviewPlayerCount ?? '—'}
+                </span>
+                <span className="pb-1 text-sm text-slate-400">
+                  players
+                </span>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">

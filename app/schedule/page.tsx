@@ -164,28 +164,6 @@ export default function SchedulePage() {
     }, {})
   }, [filteredEvents])
 
-  const record = useMemo(() => events.reduce(
-    (acc, e) => {
-      if (e.result === 'win') acc.wins++
-      else if (e.result === 'loss') acc.losses++
-      else if (e.result === 'tie') acc.ties++
-      return acc
-    },
-    { wins: 0, losses: 0, ties: 0 }
-  ), [events])
-
-  const leagueRecord = useMemo(() => events
-    .filter(e => e.result !== null && e.event_type !== 'tournament')
-    .reduce(
-      (acc, e) => {
-        if (e.result === 'win') acc.wins++
-        else if (e.result === 'loss') acc.losses++
-        else if (e.result === 'tie') acc.ties++
-        return acc
-      },
-      { wins: 0, losses: 0, ties: 0 }
-    ), [events])
-
   if (loading) {
     return (
       <main className="min-h-screen bg-black pb-32 text-white">
@@ -228,12 +206,6 @@ export default function SchedulePage() {
     practices: 'No practices scheduled.',
   }[filter]
 
-  const winPct = (() => {
-    const total = record.wins + record.losses + record.ties
-    if (total === 0) return '—'
-    return ((record.wins + record.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
-  })()
-
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
@@ -241,21 +213,6 @@ export default function SchedulePage() {
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
-
-        <p className="mt-3 text-xs text-slate-400 tabular-nums">
-          <span className="text-slate-500">PCT </span>
-          <span className="text-white font-semibold">{winPct}</span>
-          <span className="mx-2 text-slate-700">·</span>
-          <span className="text-slate-500">Overall </span>
-          <span className="text-slate-300 font-semibold">
-            {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
-          </span>
-          <span className="mx-2 text-slate-700">·</span>
-          <span className="text-slate-500">League </span>
-          <span className="text-slate-300 font-semibold">
-            {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
-          </span>
-        </p>
       </div>
 
       {/* Content */}
