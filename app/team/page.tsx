@@ -8,6 +8,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { Skeleton, RowSkeleton } from '@/components/Skeleton'
+import { getDashboardTeamAdminAssignments, type DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,8 @@ function TeamPageInner() {
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const [teamAdminAssignments, setTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
+  const [teamAdminsLoading, setTeamAdminsLoading] = useState(true)
 
   // Read sub-view from URL, default to standings
   const viewParam = searchParams.get('view')
@@ -108,10 +111,28 @@ function TeamPageInner() {
       : 'overview'
 
   const setView = (next: SubView) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('view', next)
-    router.replace(url.pathname + url.search, { scroll: false })
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', next)
+  router.replace(url.pathname + url.search, { scroll: false })
   }
+
+  useEffect(() => {
+    const loadTeamAdmins = async () => {
+      setTeamAdminsLoading(true)
+
+      const result = await getDashboardTeamAdminAssignments()
+
+      if (result.ok) {
+        setTeamAdminAssignments(
+          result.assignments.filter(a => a.team_id === currentTeam.id)
+        )
+      }
+
+      setTeamAdminsLoading(false)
+    }
+
+    loadTeamAdmins()
+  }, [currentTeam.id])
 
   if (teamSeasonNotFound) {
     return (
@@ -168,16 +189,42 @@ function TeamPageInner() {
 
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
         {view === 'overview' && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
-              Team Overview
-            </p>
-            <h2 className="mt-1 text-lg font-extrabold text-white">
-              {currentTeam.label}
-            </h2>
-            <p className="mt-2 text-sm text-slate-400">
-              This will become the team home for record, team admins, upcoming games, and roster summary.
-            </p>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                Team Overview
+              </p>
+              <h2 className="mt-1 text-lg font-extrabold text-white">
+                {currentTeam.fullName}
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                {currentTeam.division}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                Team Admins
+              </p>
+              {teamAdminsLoading ? (
+                <p className="mt-2 text-sm text-slate-400">Loading team admins...</p>
+              ) : teamAdminAssignments.length === 0 ? (
+                <p className="mt-2 text-sm text-yellow-300">No team admin assigned.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {teamAdminAssignments.map(admin => (
+                    <div key={admin.membership_id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                      <p className="text-sm font-semibold text-white">
+                        {admin.full_name || admin.email || 'Unnamed admin'}
+                      </p>
+                      {admin.email && (
+                        <p className="text-xs text-slate-500">{admin.email}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
         {view === 'standings' && (
