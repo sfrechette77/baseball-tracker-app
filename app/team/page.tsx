@@ -252,8 +252,15 @@ function TeamPageInner() {
                 key={key}
                 onClick={() => setView(key)}
                 className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
-                  view === key ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'
+                  view === key
+                  ? 'text-white'
+                  : 'text-slate-400 hover:text-white'
                 }`}
+                style={
+                  view === key
+                    ? { backgroundColor: brandColor }
+                    : undefined
+                }
               >
                 {label}
               </button>
@@ -678,6 +685,9 @@ function ResultsView({ division }: { division: string }) {
 // ─── Roster sub-view ──────────────────────────────────────────────────────
 
 function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string | null; teamSeasonLoading: boolean }) {
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color ?? '#dc2626'
+  
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -744,7 +754,9 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
       {sortedPlayers.map((player) => (
         <Link key={player.id} href={`/player/${player.id}`}>
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 font-bold text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full font-bold text-white"
+                  style={{ backgroundColor: brandColor }}
+                >
               {player.jersey_number ?? '?'}
             </div>
             <div className="flex-1">
