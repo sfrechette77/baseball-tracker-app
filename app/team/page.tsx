@@ -9,6 +9,7 @@ import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { Skeleton, RowSkeleton } from '@/components/Skeleton'
 import { getDashboardTeamAdminAssignments, type DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
+import { useActiveOrg } from '@/components/org-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,8 @@ function TeamPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color ?? '#dc2626'
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
   const [teamAdminAssignments, setTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
   const [teamAdminsLoading, setTeamAdminsLoading] = useState(true)
@@ -262,17 +265,32 @@ function TeamPageInner() {
           <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
             {view === 'overview' && (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
-                    Team Overview
-                  </p>
-                  <h2 className="mt-1 text-lg font-extrabold text-white">
-                    {currentTeam.fullName}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {currentTeam.division}
-                  </p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="flex items-center gap-4">
+                  {org?.logo_url && (
+                    <img
+                      src={org.logo_url}
+                      alt={org.name ?? 'Organization logo'}
+                      className="h-16 w-16 object-contain"
+                    />
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[10px] uppercase tracking-wide font-semibold"
+                      style={{ color: brandColor }}
+                    >
+                      Team Overview
+                    </p>
+                    <h2 className="mt-1 text-lg font-extrabold text-white">
+                      {currentTeam.fullName}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {currentTeam.division}
+                    </p>
+                  </div>
                 </div>
+              </div>  
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
