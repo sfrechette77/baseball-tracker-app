@@ -990,7 +990,7 @@ const visibleAdminTabs = isOrgAdmin
         <div className="mx-auto max-w-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Admin</p>
-            <h1 className="text-xl font-extrabold text-white">Game Manager</h1>
+            <h1 className="text-xl font-extrabold text-white">Organization Console</h1>
           </div>
           <button onClick={() => { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }}
             className="text-xs text-slate-500 hover:text-slate-300 transition">

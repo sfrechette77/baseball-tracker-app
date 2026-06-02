@@ -40,7 +40,7 @@ type LeagueGameRow = {
   events: { id: string }[]
 }
 
-type SubView = 'standings' | 'results' | 'roster'
+type SubView = 'overview' |'standings' | 'results' | 'roster'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -103,7 +103,9 @@ function TeamPageInner() {
   // Read sub-view from URL, default to standings
   const viewParam = searchParams.get('view')
   const view: SubView =
-    viewParam === 'roster' || viewParam === 'results' ? viewParam : 'standings'
+    viewParam === 'standings' || viewParam === 'results' || viewParam === 'roster'
+      ? viewParam
+      : 'overview'
 
   const setView = (next: SubView) => {
     const url = new URL(window.location.href)
@@ -133,7 +135,8 @@ function TeamPageInner() {
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
         <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">
-          {view === 'standings' ? 'Standings'
+          {view === 'overview' ? 'Team'
+            : view === 'standings' ? 'Standings'
             : view === 'results' ? 'Results'
             : 'Roster'}
         </h1>
@@ -143,10 +146,11 @@ function TeamPageInner() {
       {/* Toggle */}
       <div className="mx-auto max-w-sm px-4 pt-4">
         <div className="flex gap-1 rounded-full bg-white/5 border border-white/10 p-1">
-          {(['standings', 'results', 'roster'] as const).map((key) => {
-            const label = key === 'standings' ? 'Standings'
-              : key === 'results' ? 'Results'
-              : 'Roster'
+          {(['overview', 'standings', 'results', 'roster'] as const).map((key) => {
+           const label = key === 'overview' ? 'Overview'
+            : key === 'standings' ? 'Standings'
+            : key === 'results' ? 'Results'
+            : 'Roster'
             return (
               <button
                 key={key}
@@ -163,6 +167,19 @@ function TeamPageInner() {
       </div>
 
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+        {view === 'overview' && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+              Team Overview
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold text-white">
+              {currentTeam.label}
+            </h2>
+            <p className="mt-2 text-sm text-slate-400">
+              This will become the team home for record, team admins, upcoming games, and roster summary.
+            </p>
+          </div>
+        )}
         {view === 'standings' && (
           <StandingsView division={currentTeam.division} currentTeamId={currentTeam.id} />
         )}
