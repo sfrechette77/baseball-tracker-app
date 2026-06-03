@@ -4,7 +4,7 @@ import dotenv from "dotenv"
 dotenv.config()
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
 
 if (!supabaseUrl) {
@@ -12,7 +12,7 @@ if (!supabaseUrl) {
 }
 
 if (!supabaseKey) {
-  throw new Error("SUPABASE_SERVICE_KEY is required")
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY is required")
 }
 
 if (!googleMapsKey) {

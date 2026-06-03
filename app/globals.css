@@ -2,6 +2,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --brand: #dc2626; /* red default (Chicago Elite); overridden per-org at runtime */
 }
 @theme inline {
   --color-background: var(--background);
@@ -28,4 +29,26 @@ body {
 select option {
   background-color: #0a0a0a;
   color: #ededed;
+}
+
+select option {
+  background-color: #0a0a0a;
+  color: #ededed;
+}
+
+/* Re-tint Tailwind's red palette to the active org's brand color, so every
+   existing red-* utility follows --brand. Avoids editing the ~220 hardcoded
+   usages. --brand is set per-org at runtime by org-context (red default). */
+:root {
+  --color-red-50:  color-mix(in srgb, var(--brand) 10%, white);
+  --color-red-100: color-mix(in srgb, var(--brand) 22%, white);
+  --color-red-200: color-mix(in srgb, var(--brand) 38%, white);
+  --color-red-300: color-mix(in srgb, var(--brand) 58%, white);
+  --color-red-400: color-mix(in srgb, var(--brand) 80%, white);
+  --color-red-500: var(--brand);
+  --color-red-600: var(--brand);
+  --color-red-700: color-mix(in srgb, var(--brand) 82%, black);
+  --color-red-800: color-mix(in srgb, var(--brand) 66%, black);
+  --color-red-900: color-mix(in srgb, var(--brand) 52%, black);
+  --color-red-950: color-mix(in srgb, var(--brand) 38%, black);
 }

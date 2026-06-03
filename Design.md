@@ -2,7 +2,21 @@
 
 ## Next session starts here
 
-**Cutover is COMPLETE.** All 17 tenant tables are now under RLS in production. The multi-tenant story is real — database enforces isolation, not just application code. Post-cutover cleanup and admin tooling are now underway.
+**Multi-tenant is live with a real second tenant.** Florida Vandals exists in prod with its own org_admin login, isolated teams, and orange branding. Per-org theming works.
+
+**Recently completed (this session):**
+- ✅ Team picker is now DB-driven (was hardcoded `teams.ts`). Loads by role: org_admin → org's own teams (`is_opponent=false`); parent/team_admin → assigned teams via `parent_teams`/`team_admins`. Loading gate added; header null-guarded.
+- ✅ `teams.is_opponent` flag (prod + dev) — separates the 15 league opponent teams (all carry Elite's org_id) from own teams (Moore, Ayeski).
+- ✅ Florida Vandals bootstrapped — prod org (first real second tenant) + dev org (renamed from Northside Knights).
+- ✅ Per-org brand color: `--brand` CSS var (set from `organizations.primary_color`) + Tailwind red-palette remap. Elite red, Vandals orange.
+- ✅ Box score fix — 0-AB players with a `batting_order_position` now show (`battingRows` built from `playerStats`, not `playersWithStats`).
+
+**Active items (pick one):**
+1. **layout.tsx branding** — tab title, manifest, icons still hardcoded "Chicago Elite 11U" for every org. Make metadata org-aware for a true per-org PWA.
+2. **teams.ts cleanup** — `PICKABLE_TEAMS`/`DEFAULT_TEAM_ID` are dead code now (only the `PickableTeam` type is still imported).
+3. Admin invite team_admin role (carried over).
+4. Email notifications on approval (carried over).
+5. (debt) Standardize the service-key env var name.
 
 **Recently completed:**
 - ✅ **Tournament box score bug** — fixed. Root cause was app-side: for tournaments the opponent box_score row shares Elite's `team_season_id` and is distinguished by `team_id = null`, so the old `themRow` finder (matching on differing team_season_id) returned undefined. Fixed by matching the "us" row on `team_id === event.team_id` and taking the other row as "them".
@@ -49,6 +63,9 @@
 - **Steve's membership_id** (org_admin, Chicago Elite): `7cbfaaa5-e502-4f5f-a576-a0dbd668cf98`
 - **Moore team UUID:** `4beb0750-1883-4b56-a386-db280675036c`
 - **Ayeski team UUID:** `0c8cc8d0-2398-41c2-8ba0-036d62ee13a6`
+- **Florida Vandals org UUID (prod):** `4801e4d4-bc14-410f-8b00-62b27e6827ef` (slug `florida-vandals`; admin `frechettegaming22@gmail.com`)
+- **Florida Vandals org UUID (dev):** `6cadb1e5-905d-4dee-9d62-46cb7d4f2b62` (renamed from Northside Knights; still User B's org for cross-tenant tests)
+- **Dev project ref:** `gpsqykddcubponpbwule`
 
 ## Feed v1 — SHIPPED
 
@@ -232,7 +249,7 @@ The four helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_tea
 - **Prod policy names ≠ dev policy names** for some tables (case + naming convention differences) but the policy expressions matched. Verify expressions, not names.
 
 ### Cron / service-key safety
-Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
+Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_ROLE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
 
 ### Cross-tenant test seed in dev
 Northside Knights is seeded in dev with 1 team + 1 team_season + 4 players + 1 event + 1 league_game. This lets us prove cross-tenant isolation by impersonating User B (NK org_admin) and confirming they see ONLY northside-knights data, never chicago-elite.
@@ -266,6 +283,24 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Auth provider: Google OAuth only in v1.
 - No reject UI in v1. To deny a parent, admin deletes the membership row directly via SQL (rare case).
 - No email notification on approval. PendingChecker re-checks on focus so parent's pending screen auto-redirects.
+
+## Team picker (DB-driven) + per-org theming — SHIPPED
+
+### Team picker
+- `team-context.tsx` no longer reads `teams.ts`. On mount it loads the user's approved memberships, then:
+- org_admin → `teams` where `organization_id = org AND is_opponent = false`
+- parent / team_admin → teams via `parent_teams` + `team_admins` (merged, deduped)
+- Default selection: saved localStorage choice → parent's `is_default` → first team.
+- Provider holds a loading spinner until teams resolve, so no team-scoped page mounts without a team. Public `currentTeam` stays non-null (no page-consumer edits); header  guards the logged-out/pending/no-team null.
+
+### is_opponent
+- `teams.is_opponent` (boolean, NOT NULL, default false). `true` = league opponent that shares the org_id but isn't fielded by the org. Excluded from the picker. Prod: 15 opponents flagged true, Moore/Ayeski false.
+
+### Per-org theming
+- `organizations.primary_color` drives the UI accent via a runtime `--brand` CSS variable (set in `org-context`).
+- `globals.css` remaps Tailwind's `--color-red-*` scale to `--brand` via `color-mix`, so all existing `red-*` utilities follow the org color with zero component edits.
+- Elite `primary_color` = `#dc2626`; Vandals = `#F97316`. New orgs must set `primary_color` at creation or they fall back to the red default.
+- Caveat: "danger/delete" reds are org-tinted too (accepted).
 
 ## Admin roles
 
@@ -311,7 +346,11 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - **Pre-auth / new-user server routes use a service-role client** (lib/supabase/service.ts) for any tenant-table access, because RLS blocks visitors with no membership yet (and profiles has no INSERT policy). Authenticated client still used for the user session.
 - Admin Members tab: Remove = hard delete of membership (not status flip); scoped to parents only.
 - Batting order: stored on `player_stats.batting_order_position` (per-game, nullable). Display sort = batting_order_position NULLS LAST → jersey_number → name.
-- **Env var name wart:** `/api/admin/route.ts` reads `SUPABASE_SERVICE_KEY`; the signup fix reads `SUPABASE_SERVICE_ROLE_KEY`. Both hold the same prod service_role key. `.env.local` and Vercel must carry BOTH names until standardized. (Cleanup: pick one name, update both call sites + envs.)
+- **Env var name wart:** `/api/admin/route.ts` reads `SUPABASE_SERVICE_ROLE_KEY`; the signup fix reads `SUPABASE_SERVICE_ROLE_KEY`. Both hold the same prod service_role key. `.env.local` and Vercel must carry BOTH names until standardized. (Cleanup: pick one name, update both call sites + envs.)
+- Team picker is DB-driven and role-scoped; org_admin sees own teams only (`is_opponent=false`), never league opponents.
+- `teams.is_opponent` distinguishes own teams from league opponents sharing the org_id.
+- Brand accent = `organizations.primary_color` via runtime `--brand`; Tailwind red palette remapped to it. New orgs set `primary_color` at creation.
+- One-user-one-org enforced in practice during bootstrap: a new org's admin must use a different Google account than any existing org.
 
 ## Parked / explicitly out of scope (for now)
 
@@ -399,7 +438,7 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - `.env.local` env-swap workflow: back up prod values (`cp .env.local .env.local.prod.bak`) before pointing local at dev; restore with `cp .env.local.prod.bak .env.local`. Keep local on prod by default.
 
 ### Batting order lessons learned
-- **Two different service-key env var names exist.** `/api/admin/route.ts` reads `SUPABASE_SERVICE_KEY`; `lib/supabase/service.ts` (signup fix) reads `SUPABASE_SERVICE_ROLE_KEY`. Same value, two names. Stats-saving silently 500'd locally until `SUPABASE_SERVICE_KEY` was added to `.env.local` (it had only the `_ROLE_` name). Both names must be present in `.env.local` AND Vercel until standardized.
+- **Two different service-key env var names exist.** `/api/admin/route.ts` reads `SUPABASE_SERVICE_ROLE_KEY`; `lib/supabase/service.ts` (signup fix) reads `SUPABASE_SERVICE_ROLE_KEY`. Same value, two names. Stats-saving silently 500'd locally until `SUPABASE_SERVICE_ROLE_KEY` was added to `.env.local` (it had only the `_ROLE_` name). Both names must be present in `.env.local` AND Vercel until standardized.
 - **"Unexpected end of JSON input" on a fetch = the API route threw before returning** (empty body, not valid JSON). The real error is in the **dev terminal**, not the browser console.
 - **Local app points at prod** (per `.env.local`), so a new column must exist in **prod** to test the save locally — adding it only to dev isn't enough when local is pointed at prod.
 - Multi-edit changes: verify each edit actually landed. The display sort failed only because edit #4 (swap `playersWithStats.filter(...)` → `battingRows`) silently didn't apply; grep confirmed it.
@@ -412,6 +451,15 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - **Pre-existing data bugs surface during validation.** The tournament box score issue was found by carefully testing every page after Batch 3, but the bug pre-dated RLS.
 - **Cron and admin routes use service key.** Verified before flipping RLS on tables those routes write to. Service key bypasses RLS entirely.
 - **Test on prod after every flip.** Even when dev validated cleanly, the prod test caught one issue (tournament box scores) that we then diagnosed and ruled out as RLS-caused.
+
+### Per-org theming + picker lessons learned
+- org_admin "all teams in org" pulled in 15 league opponent teams (all carry Elite's org_id — the documented wart). Fixed with `is_opponent`. Season-scoping did NOT work: opponents have current-season `team_seasons` (for standings).
+- Kept `currentTeam` non-null in the public type to avoid editing every page consumer; gate rendering on a loading state instead, and null-guard only the header.
+- Tailwind v4 `red-*` utilities resolve to `var(--color-red-*)`; override those vars to retint globally — no need to touch the ~220 usages.
+- `color-mix()` fails silently on a blank `--brand` → reds render with no color → invisible UI. `??` doesn't catch an empty string; guard with `.trim()`.
+- Elite's `primary_color` was `#0f172a` (the PWA `themeColor`), unused until `--brand` wired it — which broke the UI. Corrected to `#dc2626`.
+- **Codespaces free tier ran out mid-session → use github.dev** (browser editor, no compute meter). Search panel replaces `grep`; commit+push triggers the Vercel deploy. Same paste-`<`-drop gotcha applies.
+- **New-prod-org bootstrap recipe:** create the `organizations` row (so the slug resolves) → admin signs up their Google account at `/o/{slug}/signup` (creates auth user + pending parent) → SQL: insert approved `org_admin` membership, delete the pending parent, create teams + a current season + team_seasons.
 
 ## RLS test harness (in on-deck-dev only)
 
