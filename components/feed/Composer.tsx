@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition } from 'react'
 import { createPost } from '../../app/actions/feed'
+import { useActiveOrg } from '@/components/org-context'
 
 type Props = {
   teamId: string
@@ -18,6 +19,8 @@ export function Composer({ teamId, onPosted }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -135,7 +138,8 @@ export function Composer({ teamId, onPosted }: Props) {
         <button
           onClick={handleSubmit}
           disabled={isPending || !body.trim() || charCount > MAX_BODY_LENGTH}
-          className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+          style={{ backgroundColor: brandColor }}
         >
           {isPending ? 'Posting…' : 'Post'}
         </button>

@@ -8,6 +8,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { RowSkeleton } from '@/components/Skeleton'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -84,6 +85,8 @@ export default function SchedulePage() {
   const [filter, setFilter] = useState<FilterKey>('upcoming')
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     // Wait until team_season is resolved — don't enter the try/finally
@@ -168,7 +171,9 @@ export default function SchedulePage() {
     return (
       <main className="min-h-screen bg-black pb-32 text-white">
         <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-          <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+          <p className="text-xl tracking-[0.1em] font-bold"
+          style={{ color: brandColor }}
+          >2026</p>
           <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
         </div>
         <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
@@ -211,7 +216,9 @@ export default function SchedulePage() {
 
       {/* Page title with record subtitle */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p className="text-xl tracking-[0.1em] font-bold"
+            style={{ color: brandColor }}
+        >2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
       </div>
 
@@ -236,9 +243,17 @@ export default function SchedulePage() {
                 onClick={() => setFilter(f.key)}
                 className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold transition ${
                   isActive
-                    ? 'bg-red-600 border-red-600 text-white'
+                    ? 'text-white'
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
                 }`}
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: brandColor,
+                        borderColor: brandColor,
+                      }
+                    : undefined
+                }
               >
                 {f.label}
               </button>

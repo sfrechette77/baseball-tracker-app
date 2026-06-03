@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { deleteMessage } from '../../app/actions/chat'
 import type { ChatMessage } from '../../app/actions/chat'
 import { MessageReactionBar, MessageReactionPicker } from './MessageReactionBar'
+import { useActiveOrg } from '@/components/org-context'
 
 type Props = {
   message: ChatMessage
@@ -22,6 +23,8 @@ export function MessageBubble({ message, currentMembershipId, showAuthor, onChan
   const [imageError, setImageError] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   const isOwn = message.author_membership_id === currentMembershipId
   const canDelete = isOwn
@@ -59,7 +62,8 @@ export function MessageBubble({ message, currentMembershipId, showAuthor, onChan
       {!isOwn && (
         <div className="w-8 flex-shrink-0">
           {showAuthor ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+            <div className="flex h-8 w-8 items-center justify-center text-[10px] font-bold text-white"
+            style={{ backgroundColor: brandColor }}>
               {initials}
             </div>
           ) : (
@@ -87,9 +91,14 @@ export function MessageBubble({ message, currentMembershipId, showAuthor, onChan
             onClick={() => setShowActions(prev => !prev)}
             className={`text-left rounded-2xl px-3 py-2 ${
               isOwn
-                ? 'bg-red-600 text-white'
+                ? 'text-white'
                 : 'bg-white/10 text-slate-100'
             }`}
+            style={
+              isOwn
+                ? { backgroundColor: brandColor }
+                : undefined
+            }
           >
             {message.body && (
               <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>

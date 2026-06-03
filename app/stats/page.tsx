@@ -7,6 +7,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { Skeleton } from '@/components/Skeleton'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -55,6 +56,8 @@ export default function StatsPage() {
   const [sortBy, setSortBy] = useState<'avg' | 'hits' | 'rbi' | 'runs'>('avg')
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     // Wait until team_season is resolved — don't enter the try/finally
@@ -63,6 +66,7 @@ export default function StatsPage() {
       setLoading(true)
       return
     }
+
     const load = async () => {
       try {
         if (teamSeasonNotFound || !teamSeasonId) {
@@ -70,11 +74,20 @@ export default function StatsPage() {
           setStats([])
           return
         }
+
         const supabase = createClient()
         const [{ data: playerData }, { data: statData }] = await Promise.all([
-          supabase.from('players').select('id, name, jersey_number, position').eq('team_season_id', teamSeasonId).order('jersey_number', { ascending: true }),
-          supabase.from('player_stats').select('player_id, at_bats, hits, rbi, runs, strikeouts').eq('team_season_id', teamSeasonId)
+          supabase
+            .from('players')
+            .select('id, name, jersey_number, position')
+            .eq('team_season_id', teamSeasonId)
+            .order('jersey_number', { ascending: true }),
+          supabase
+            .from('player_stats')
+            .select('player_id, at_bats, hits, rbi, runs, strikeouts')
+            .eq('team_season_id', teamSeasonId),
         ])
+
         setPlayers((playerData ?? []) as Player[])
         setStats((statData ?? []) as StatRow[])
       } catch (err) {
@@ -83,6 +96,7 @@ export default function StatsPage() {
         setLoading(false)
       }
     }
+
     load()
   }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound])
 
@@ -99,10 +113,11 @@ export default function StatsPage() {
         }),
         { at_bats: 0, hits: 0, rbi: 0, runs: 0, strikeouts: 0 }
       )
+
       return {
         ...player,
         ...totals,
-        avg: calcAvg(totals.hits, totals.at_bats)
+        avg: calcAvg(totals.hits, totals.at_bats),
       }
     })
   }, [players, stats])
@@ -121,6 +136,7 @@ export default function StatsPage() {
           <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
           <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
         </div>
+
         <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
           {/* Sort chips */}
           <div className="flex gap-2">
@@ -129,6 +145,7 @@ export default function StatsPage() {
             <Skeleton className="h-7 flex-1 rounded-full" />
             <Skeleton className="h-7 flex-1 rounded-full" />
           </div>
+
           {/* Table */}
           <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
             <table className="w-full text-sm">
@@ -155,6 +172,7 @@ export default function StatsPage() {
             </table>
           </div>
         </div>
+
         <BottomNav active="stats" />
       </main>
     )
@@ -165,10 +183,14 @@ export default function StatsPage() {
 
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
-
       {/* Page title */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p
+          className="text-xl tracking-[0.1em] font-bold"
+          style={{ color: brandColor }}
+        >
+          2026
+        </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
       </div>
 
@@ -182,13 +204,18 @@ export default function StatsPage() {
             </p>
           </div>
         )}
+
         {/* Sort controls */}
         <div className="flex gap-2">
           {(['avg', 'hits', 'rbi', 'runs'] as const).map(key => (
-            <button key={key} onClick={() => setSortBy(key)}
+            <button
+              key={key}
+              onClick={() => setSortBy(key)}
               className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
-                sortBy === key ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'
-              }`}>
+                sortBy === key ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'
+              }`}
+              style={sortBy === key ? { backgroundColor: brandColor } : undefined}
+            >
               {key === 'avg' ? 'AVG' : key.toUpperCase()}
             </button>
           ))}
@@ -205,15 +232,52 @@ export default function StatsPage() {
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="py-2 pl-4 pr-2 text-left text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Player</th>
-                  <th className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-12 ${highlightedCol === 'avg' ? 'text-red-400' : 'text-slate-500'}`}>AVG</th>
-                  <th className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${highlightedCol === 'hits' ? 'text-red-400' : 'text-slate-500'}`}>H</th>
-                  <th className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${highlightedCol === 'rbi' ? 'text-red-400' : 'text-slate-500'}`}>RBI</th>
-                  <th className={`py-2 pl-2 pr-4 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${highlightedCol === 'runs' ? 'text-red-400' : 'text-slate-500'}`}>R</th>
+                  <th
+                    className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-12 ${
+                      highlightedCol === 'avg' ? '' : 'text-slate-500'
+                    }`}
+                    style={highlightedCol === 'avg' ? { color: brandColor } : undefined}
+                  >
+                    AVG
+                  </th>
+                  <th
+                    className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${
+                      highlightedCol === 'hits' ? '' : 'text-slate-500'
+                    }`}
+                    style={highlightedCol === 'hits' ? { color: brandColor } : undefined}
+                  >
+                    H
+                  </th>
+                  <th
+                    className={`py-2 px-2 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${
+                      highlightedCol === 'rbi' ? '' : 'text-slate-500'
+                    }`}
+                    style={highlightedCol === 'rbi' ? { color: brandColor } : undefined}
+                  >
+                    RBI
+                  </th>
+                  <th
+                    className={`py-2 pl-2 pr-4 text-center text-[11px] uppercase tracking-wide font-semibold w-10 ${
+                      highlightedCol === 'runs' ? '' : 'text-slate-500'
+                    }`}
+                    style={highlightedCol === 'runs' ? { color: brandColor } : undefined}
+                  >
+                    R
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {sortedPlayers.map((player, i) => (
-                  <tr key={player.id} className={i === 0 ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
+                  <tr key={player.id} className={i === 0 ? 'border-l-2' : ''}
+                  style={
+                    i === 0
+                      ? {
+                          backgroundColor: `${brandColor}1A`, // subtle tint
+                          borderLeftColor: brandColor,
+                        }
+                      : undefined
+                  }
+                  >
                     <td className="py-3 pl-4 pr-2">
                       <div className="flex items-baseline gap-2">
                         <span className="text-xs text-slate-500 tabular-nums">
@@ -222,16 +286,36 @@ export default function StatsPage() {
                         <span className="text-sm text-slate-300">{player.name}</span>
                       </div>
                     </td>
-                    <td className={`py-3 px-2 text-center tabular-nums ${highlightedCol === 'avg' ? 'text-red-400 font-bold' : 'text-slate-300'}`}>
+                    <td
+                      className={`py-3 px-2 text-center tabular-nums ${
+                        highlightedCol === 'avg' ? 'font-bold' : 'text-slate-300'
+                      }`}
+                      style={highlightedCol === 'avg' ? { color: brandColor } : undefined}
+                    >
                       {player.avg}
                     </td>
-                    <td className={`py-3 px-2 text-center tabular-nums ${highlightedCol === 'hits' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                    <td
+                      className={`py-3 px-2 text-center tabular-nums ${
+                        highlightedCol === 'hits' ? 'font-bold' : 'text-slate-400'
+                      }`}
+                      style={highlightedCol === 'hits' ? { color: brandColor } : undefined}
+                    >
                       {player.hits}
                     </td>
-                    <td className={`py-3 px-2 text-center tabular-nums ${highlightedCol === 'rbi' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                    <td
+                      className={`py-3 px-2 text-center tabular-nums ${
+                        highlightedCol === 'rbi' ? 'font-bold' : 'text-slate-400'
+                      }`}
+                      style={highlightedCol === 'rbi' ? { color: brandColor } : undefined}
+                    >
                       {player.rbi}
                     </td>
-                    <td className={`py-3 pl-2 pr-4 text-center tabular-nums ${highlightedCol === 'runs' ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                    <td
+                      className={`py-3 pl-2 pr-4 text-center tabular-nums ${
+                        highlightedCol === 'runs' ? 'font-bold' : 'text-slate-400'
+                      }`}
+                      style={highlightedCol === 'runs' ? { color: brandColor } : undefined}
+                    >
                       {player.runs}
                     </td>
                   </tr>

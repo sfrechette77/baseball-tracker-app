@@ -229,7 +229,11 @@ function TeamPageInner() {
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p className="text-xl tracking-[0.1em] font-bold"
+            style={{ color: brandColor }}
+            >
+              2026
+            </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">
           {view === 'overview' ? 'Team'
             : view === 'standings' ? 'Standings'
@@ -247,6 +251,7 @@ function TeamPageInner() {
             : key === 'standings' ? 'Standings'
             : key === 'results' ? 'Results'
             : 'Roster'
+            const brandColor = org?.primary_color || '#dc2626'
             return (
               <button
                 key={key}
@@ -300,8 +305,9 @@ function TeamPageInner() {
               </div>  
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
-              Record
+            <p className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}>
+                Record
             </p>
 
             <p className="mt-3 text-xs text-slate-400 tabular-nums">
@@ -327,7 +333,8 @@ function TeamPageInner() {
           </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+              <p className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}>
                 Roster
               </p>
 
@@ -342,9 +349,10 @@ function TeamPageInner() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+              <p className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}>
                 Team Admins
-              </p>
+                </p>
               {teamAdminsLoading ? (
                 <p className="mt-2 text-sm text-slate-400">Loading team admins...</p>
               ) : teamAdminAssignments.length === 0 ? (

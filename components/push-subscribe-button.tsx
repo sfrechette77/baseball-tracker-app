@@ -37,6 +37,8 @@ export function PushSubscribeButton() {
   const [state, setState] = useState<PermissionState>('default')
   const [message, setMessage] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   // Detect support and current subscription state on mount and team change
   useEffect(() => {
@@ -234,8 +236,9 @@ export function PushSubscribeButton() {
         <button
           onClick={handleSubscribe}
           disabled={working}
-          className="flex-shrink-0 rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition disabled:opacity-50"
-        >
+          className="flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-bold text-white transition disabled:opacity-50"
+          style={{ backgroundColor: brandColor }}
+          >
           {working ? '...' : 'Turn on'}
         </button>
       </div>
