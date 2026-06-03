@@ -61,6 +61,8 @@ function MessagesPageInner() {
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
   const { membership, loading: orgLoading } = useActiveOrg()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   const viewParam = searchParams.get('view')
   const view: SubView = viewParam === 'chat' ? 'chat' : 'announcements'
@@ -95,7 +97,11 @@ function MessagesPageInner() {
     <main className="h-[100dvh] bg-black text-white flex flex-col overflow-hidden">
       {/* Header */}
       <div className="mx-auto max-w-sm w-full px-4 pt-6 pb-2 flex-shrink-0">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p className="text-xl tracking-[0.1em] font-bold"
+            style={{ color: brandColor }}
+          >
+            2026
+          </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Messages</h1>
         <p className="text-sm text-slate-400 mt-1">{currentTeam.fullName}</p>
       </div>
@@ -108,8 +114,9 @@ function MessagesPageInner() {
               key={key}
               onClick={() => setView(key)}
               className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
-                view === key ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'
+                view === key ? 'text-white' : 'text-slate-400 hover:text-white'
               }`}
+              style={view === key ? { backgroundColor: brandColor } : undefined}
             >
               {key === 'announcements' ? 'Announcements' : 'Chat'}
             </button>

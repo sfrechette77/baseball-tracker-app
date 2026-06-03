@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useActiveOrg } from '@/components/org-context'
 
 export type BottomNavKey = 'home' | 'schedule' | 'team' | 'stats' | 'messages'
 
@@ -53,6 +54,9 @@ function MessagesIcon({ active }: { active?: boolean }) {
 }
 
 export function BottomNav({ active }: { active: BottomNavKey }) {
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
+  
   const links = [
     { href: '/', label: 'Home', key: 'home', Icon: HomeIcon },
     { href: '/schedule', label: 'Schedule', key: 'schedule', Icon: CalendarIcon },
@@ -66,8 +70,14 @@ export function BottomNav({ active }: { active: BottomNavKey }) {
         {links.map(({ href, label, key, Icon }) => {
           const isActive = active === key
           return (
-            <Link key={key} href={href}
-              className={`flex flex-col items-center gap-1 py-3 transition ${isActive ? 'text-red-500' : 'text-slate-500 hover:text-slate-300'}`}>
+            <Link
+              key={key}
+              href={href}
+              className={`flex flex-col items-center gap-1 py-3 transition ${
+                isActive ? 'text-white' : 'text-slate-500 hover:text-slate-300'
+              }`}
+              style={isActive ? { color: brandColor } : undefined}
+            >
               <Icon active={isActive} />
               <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
             </Link>

@@ -3,8 +3,13 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
+import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
+import { DashboardTab } from '@/components/admin/DashboardTab'
+import { ORG_TEAM_IDS } from '@/lib/orgTeams'
+import { useActiveOrg } from '@/components/org-context'
+
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -61,7 +66,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'pending' | 'members' | 'status' |'score' | 'stats' | 'events' | 'league' | 'standings'
+type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings'
 
 type Field = {
   id: string
@@ -140,7 +145,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
           <input type="password" placeholder="Enter password" value={input}
             onChange={e => { setInput(e.target.value); setError(false) }}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500" />
+            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-slate-400" />
           {error && <p className="text-red-400 text-sm">Incorrect password</p>}
           <button onClick={handleSubmit}
             className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition">
@@ -156,8 +161,13 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
 
 export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('status')
+  const [tab, setTab] = useState<Tab>('dashboard')
   const { currentTeam } = useCurrentTeam()
+  const { membership, loading: orgLoading } = useActiveOrg()
+  const isOrgAdmin = membership?.role === 'org_admin'
+  const isTeamAdmin = membership?.role === 'team_admin'
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -192,17 +202,30 @@ export default function AdminPage() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
   // League tab
-const [allTeams, setAllTeams] = useState<TeamRow[]>([])
-const [allLeagueGames, setAllLeagueGames] = useState<LeagueGameAdminRow[]>([])
-const [leagueEditingId, setLeagueEditingId] = useState<string | null>(null)
-const [leagueHomeTeamId, setLeagueHomeTeamId] = useState('')
-const [leagueAwayTeamId, setLeagueAwayTeamId] = useState('')
-const [leaguePlayedAt, setLeaguePlayedAt] = useState('')
-const [leagueHomeScore, setLeagueHomeScore] = useState('')
-const [leagueAwayScore, setLeagueAwayScore] = useState('')
-const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('final')
-const [leagueSaving, setLeagueSaving] = useState(false)
-const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
+  const [allTeams, setAllTeams] = useState<TeamRow[]>([])
+  const [allLeagueGames, setAllLeagueGames] = useState<LeagueGameAdminRow[]>([])
+  const [leagueEditingId, setLeagueEditingId] = useState<string | null>(null)
+  const [leagueHomeTeamId, setLeagueHomeTeamId] = useState('')
+  const [leagueAwayTeamId, setLeagueAwayTeamId] = useState('')
+  const [leaguePlayedAt, setLeaguePlayedAt] = useState('')
+  const [leagueHomeScore, setLeagueHomeScore] = useState('')
+  const [leagueAwayScore, setLeagueAwayScore] = useState('')
+  const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('final')
+  const [leagueSaving, setLeagueSaving] = useState(false)
+  const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
+
+// Dashboard tab
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardMsg, setDashboardMsg] = useState<string | null>(null)
+  const [dashboardTeamCount, setDashboardTeamCount] = useState<number | null>(null)
+  const [dashboardTeams, setDashboardTeams] = useState<OrgTeam[]>([])
+  const [dashboardPendingCount, setDashboardPendingCount] = useState<number | null>(null)
+  const [dashboardFamilyCount, setDashboardFamilyCount] = useState<number | null>(null)
+  const [dashboardPlayerCount, setDashboardPlayerCount] = useState<number | null>(null)
+  const [dashboardThisWeek, setDashboardThisWeek] = useState<DashboardEvent[]>([])
+  const [dashboardTeamsMissingAdmins, setDashboardTeamsMissingAdmins] = useState<OrgTeam[]>([])
+  const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
+  const [dashboardTeamHealthCounts, setDashboardTeamHealthCounts] = useState<DashboardTeamHealthCounts[]>([])
 
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
@@ -223,6 +246,9 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
   const [memberDefaultTeamId, setMemberDefaultTeamId] = useState<string>('')
   const [memberSaving, setMemberSaving] = useState(false)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
+  const [promoteTeamIds, setPromoteTeamIds] = useState<Set<string>>(new Set())
+  const [promoteSaving, setPromoteSaving] = useState(false)
 
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
@@ -279,13 +305,92 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password, currentTeam.id])
 
+  // Load dashboard snapshot when Dashboard tab is active
+useEffect(() => {
+  if (!password || tab !== 'dashboard') return
+
+  const load = async () => {
+    setDashboardLoading(true)
+    setDashboardMsg(null)
+
+    const [pendingResult, teamsResult, membersResult, playersResult, thisWeekResult, teamAdminsResult, teamHealthResult] = await Promise.all([
+      getPendingMemberships(),
+      getOrgTeams(),
+      getApprovedParents(),
+      getDashboardPlayerCount(),
+      getDashboardThisWeek(),
+      getDashboardTeamAdminAssignments(),
+      getDashboardTeamHealthCounts(),
+    ])
+
+    if (pendingResult.ok) {
+      setDashboardPendingCount(pendingResult.pending.length)
+    } else {
+      setDashboardMsg(`❌ ${pendingResult.error}`)
+    }
+
+    if (teamsResult.ok) {
+       const orgDashboardTeams = teamsResult.teams.filter(team =>
+          ORG_TEAM_IDS.includes(team.id)
+        )
+
+      setDashboardTeamCount(orgDashboardTeams.length)
+      setDashboardTeams(orgDashboardTeams)
+    } else {
+      setDashboardMsg(`❌ ${teamsResult.error}`)
+    }
+
+    if (teamsResult.ok && teamAdminsResult.ok) {
+      const orgDashboardTeams = teamsResult.teams.filter(team =>
+        ORG_TEAM_IDS.includes(team.id)
+      )
+
+      const teamsWithAdmins = new Set(teamAdminsResult.assignments.map(a => a.team_id))
+      setDashboardTeamsMissingAdmins(
+        orgDashboardTeams.filter(team => !teamsWithAdmins.has(team.id))
+      )
+      setDashboardTeamAdminAssignments(teamAdminsResult.assignments)
+    } else if (!teamAdminsResult.ok) {
+      setDashboardMsg(`❌ ${teamAdminsResult.error}`)
+    }
+
+    if (teamHealthResult.ok) {
+      setDashboardTeamHealthCounts(teamHealthResult.counts)
+    } else {
+      setDashboardMsg(`❌ ${teamHealthResult.error}`)
+    }
+
+    if (membersResult.ok) {
+      setDashboardFamilyCount(membersResult.members.length)
+    } else {
+      setDashboardMsg(`❌ ${membersResult.error}`)
+    }
+
+    if (playersResult.ok) {
+      setDashboardPlayerCount(playersResult.playerCount)
+    } else {
+      setDashboardMsg(`❌ ${playersResult.error}`)
+    }
+
+    if (thisWeekResult.ok) {
+      setDashboardThisWeek(thisWeekResult.events)
+    } else {
+      setDashboardMsg(`❌ ${thisWeekResult.error}`)
+    }
+
+    setDashboardLoading(false)
+  }
+
+  load()
+}, [password, tab])
+
   // Load pending memberships + org teams when Pending tab is active
   useEffect(() => {
     if (!password || tab !== 'pending') return
     const load = async () => {
       setPendingLoading(true)
       setPendingMsg(null)
-      const [pendingResult, teamsResult] = await Promise.all([
+      const [pendingResult, teamsResult,] = await Promise.all([
         getPendingMemberships(),
         getOrgTeams(),
       ])
@@ -365,10 +470,10 @@ const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
   }, [statusEventId, password])
 
   // Load all teams and all league games when League tab is active
-useEffect(() => {
-  if (!password) return
-  const load = async () => {
-    const supabase = createClient()
+  useEffect(() => {
+    if (!password) return
+    const load = async () => {
+      const supabase = createClient()
     
     const { data: teamsData } = await supabase
       .from('teams')
@@ -511,6 +616,63 @@ useEffect(() => {
     setApproveTeamIds(new Set())
     setApproveDefaultTeamId('')
   }
+
+  const startPromoteMember = (member: ApprovedParent) => {
+  setPromotingMemberId(member.id)
+  setPromoteTeamIds(new Set(member.teams.map(t => t.id)))
+  setMembersMsg(null)
+}
+
+const cancelPromoteMember = () => {
+  setPromotingMemberId(null)
+  setPromoteTeamIds(new Set())
+}
+
+const togglePromoteTeam = (teamId: string) => {
+  const next = new Set(promoteTeamIds)
+  if (next.has(teamId)) next.delete(teamId)
+  else next.add(teamId)
+  setPromoteTeamIds(next)
+}
+
+const savePromoteMember = async () => {
+  if (!promotingMemberId) return
+  setPromoteSaving(true)
+  setMembersMsg(null)
+
+  const result = await makeMemberTeamAdmin(promotingMemberId, Array.from(promoteTeamIds))
+
+  setPromoteSaving(false)
+
+  if (!result.ok) {
+    setMembersMsg(`❌ ${result.error}`)
+    return
+  }
+
+  setMembersMsg('✅ Team admin assigned')
+  cancelPromoteMember()
+}
+
+const removeTeamAdminTeam = async (memberId: string, teamId: string) => {
+  setMembersMsg(null)
+
+  const result = await removeMemberTeamAdmin(memberId, teamId)
+
+  if (!result.ok) {
+    setMembersMsg(`❌ ${result.error}`)
+    return
+  }
+
+  setMembersMsg('✅ Team admin access removed')
+
+  const [membersResult, teamsResult] = await Promise.all([
+    getApprovedParents(),
+    getOrgTeams(),
+  ])
+
+  if (membersResult.ok) setMembersList(membersResult.members)
+  if (teamsResult.ok) setOrgTeams(teamsResult.teams)
+}
 
   const toggleApproveTeam = (teamId: string) => {
     const next = new Set(approveTeamIds)
@@ -775,8 +937,54 @@ const deleteLeagueGame = async () => {
   if (!password) return <PasswordGate onSuccess={setPassword} />
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
+
   const usTotal = usInnings.reduce((a, b) => a + b, 0)
+
   const themTotal = themInnings.reduce((a, b) => a + b, 0)
+
+  const dashboardEventsMissingFields = dashboardThisWeek.filter(event => !event.field_id)
+
+  const dashboardTeamIdsWithUpcomingEvents = new Set(
+    dashboardThisWeek
+      .map(event => event.team_id)
+      .filter((teamId): teamId is string => Boolean(teamId))
+  )
+
+  const dashboardTeamsWithNoUpcomingEvents = dashboardTeams.filter(
+    team => !dashboardTeamIdsWithUpcomingEvents.has(team.id)
+  )
+
+  const dashboardTeamHealthByTeamId = new Map(
+  dashboardTeamHealthCounts.map(count => [count.team_id, count])
+)
+
+  const dashboardTeamsWithNoPlayers = dashboardTeams.filter(team => {
+    const counts = dashboardTeamHealthByTeamId.get(team.id)
+    return !counts || counts.player_count === 0
+  })
+
+  const dashboardTeamsWithNoFamilies = dashboardTeams.filter(team => {
+    const counts = dashboardTeamHealthByTeamId.get(team.id)
+    return !counts || counts.family_count === 0
+  })
+
+  const allAdminTabs = [
+  { key: 'dashboard', label: '🏠 Dashboard' },
+  { key: 'pending', label: '👋 Pending' },
+  { key: 'members', label: '👥 Members' },
+  { key: 'status', label: '📡 Status' },
+  { key: 'score', label: '🏆 Score' },
+  { key: 'stats', label: '📊 Stats' },
+  { key: 'events', label: '📅 Events' },
+  { key: 'league', label: '⚾ League' },
+  { key: 'standings', label: '📋 Standings' },
+] as const
+
+const teamAdminAllowedTabs: Tab[] = ['status', 'score', 'stats', 'events']
+
+const visibleAdminTabs = isOrgAdmin
+  ? allAdminTabs
+  : allAdminTabs.filter(t => teamAdminAllowedTabs.includes(t.key))
 
   return (
     <main className="min-h-screen bg-black pb-10 text-white" style={{ colorScheme: 'dark' }}>
@@ -784,8 +992,12 @@ const deleteLeagueGame = async () => {
       <div className="bg-black px-4 pt-8 pb-4 border-b border-white/10">
         <div className="mx-auto max-w-sm flex items-center justify-between">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Admin</p>
-            <h1 className="text-xl font-extrabold text-white">Game Manager</h1>
+            <p className="text-[10px] uppercase tracking-[0.25em] font-semibold"
+                style={{ color: brandColor }}
+                >
+                  Admin
+                </p>
+            <h1 className="text-xl font-extrabold text-white">Organization Console</h1>
           </div>
           <button onClick={() => { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }}
             className="text-xs text-slate-500 hover:text-slate-300 transition">
@@ -795,18 +1007,11 @@ const deleteLeagueGame = async () => {
 
         {/* Tabs */}
         <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
-          {([
-            { key: 'pending', label: '👋 Pending' },
-            { key: 'members', label: '👥 Members' },
-            { key: 'status', label: '📡 Status' },
-            { key: 'score', label: '🏆 Score' },
-            { key: 'stats', label: '📊 Stats' },
-            { key: 'events', label: '📅 Events' },
-            { key: 'league', label: '⚾ League' },
-            { key: 'standings', label: '📋 Standings' },
-          ] as const).map(({ key, label }) => (
+          {visibleAdminTabs.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
+              className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}
+              style={tab === key ? { backgroundColor: brandColor } : undefined}
+              >
               {label}
             </button>
           ))}
@@ -814,6 +1019,28 @@ const deleteLeagueGame = async () => {
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
+
+        {/* ── Dashboard Tab ─────────────────────────────────────────────── */}
+         {tab === 'dashboard' && (
+          <DashboardTab
+            dashboardLoading={dashboardLoading}
+            dashboardMsg={dashboardMsg}
+            dashboardTeamCount={dashboardTeamCount}
+            dashboardFamilyCount={dashboardFamilyCount}
+            dashboardPlayerCount={dashboardPlayerCount}
+            dashboardPendingCount={dashboardPendingCount}
+            dashboardThisWeek={dashboardThisWeek}
+            dashboardTeams={dashboardTeams}
+            dashboardTeamsMissingAdmins={dashboardTeamsMissingAdmins}
+            dashboardTeamAdminAssignments={dashboardTeamAdminAssignments}
+            dashboardEventsMissingFields={dashboardEventsMissingFields}
+            dashboardTeamsWithNoUpcomingEvents={dashboardTeamsWithNoUpcomingEvents}
+            dashboardTeamsWithNoPlayers={dashboardTeamsWithNoPlayers}
+            dashboardTeamsWithNoFamilies={dashboardTeamsWithNoFamilies}
+            formatDate={formatDate}
+            setTab={setTab}
+          />
+        )} 
 
         {/* ── Pending Tab ────────────────────────────────────────────────── */}
         {tab === 'pending' && (
@@ -841,7 +1068,7 @@ const deleteLeagueGame = async () => {
                     <div key={p.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div>
                         <p className="text-sm font-bold text-white">
-                          {p.full_name ?? '(no name)'}
+                          {p.full_name || p.email || '(no name)'}
                         </p>
                         <p className="text-xs text-slate-400">{p.email}</p>
                         <p className="text-[10px] text-slate-500 mt-1">
@@ -961,17 +1188,38 @@ const deleteLeagueGame = async () => {
                   return (
                     <div key={m.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div>
-                        <p className="text-sm font-bold text-white">{m.full_name ?? '(no name)'}</p>
+                        <p className="text-sm font-bold text-white">{m.full_name || m.email || '(no name)'}</p>
                         <p className="text-xs text-slate-400">{m.email}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           {m.teams.length === 0
                             ? 'No teams assigned'
                             : m.teams.map(t => t.is_default ? `${t.name} ★` : t.name).join(', ')}
                         </p>
+                        {m.team_admin_teams.length > 0 && (
+                          <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
+                              Team Admin
+                            </p>
+
+                            <div className="mt-2 space-y-2">
+                              {m.team_admin_teams.map(t => (
+                                <div key={t.id} className="flex items-center justify-between gap-2">
+                                  <p className="text-xs text-yellow-100">{t.name}</p>
+                                  <button
+                                    onClick={() => removeTeamAdminTeam(m.id, t.id)}
+                                    className="rounded-lg border border-yellow-500/30 px-2 py-1 text-[10px] font-bold text-yellow-100 hover:bg-yellow-500/10"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {!isEditing && !isRemoving && (
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                           <button
                             onClick={() => {
                               setEditingMemberId(m.id)
@@ -979,9 +1227,17 @@ const deleteLeagueGame = async () => {
                               setMemberDefaultTeamId(m.teams.find(t => t.is_default)?.id ?? m.teams[0]?.id ?? '')
                               setMembersMsg(null)
                             }}
-                            className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
+                            className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white transition"
+                            style={{ backgroundColor: brandColor }}
                           >
                             Edit Teams
+                          </button>
+                          <button
+                            onClick={() => startPromoteMember(m)}
+                            className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white transition"
+                            style={{ backgroundColor: brandColor }}
+                          >
+                            Make Admin
                           </button>
                           <button
                             onClick={() => { setRemovingMemberId(m.id); setMembersMsg(null) }}
@@ -1081,6 +1337,54 @@ const deleteLeagueGame = async () => {
                         </div>
                       )}
 
+                      {promotingMemberId === m.id && (
+                        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3 space-y-3">
+                          <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
+                            Make team admin
+                          </p>
+
+                          {orgTeams.length === 0 ? (
+                            <p className="text-xs text-amber-400">No teams found.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {orgTeams.map(t => {
+                                const checked = promoteTeamIds.has(t.id)
+                                return (
+                                  <label
+                                    key={t.id}
+                                    className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-white cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => togglePromoteTeam(t.id)}
+                                    />
+                                    {t.name}
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={savePromoteMember}
+                              disabled={promoteSaving || promoteTeamIds.size === 0}
+                              className="flex-1 rounded-xl bg-yellow-500 py-2 text-xs font-bold text-black hover:bg-yellow-400 disabled:opacity-50"
+                            >
+                              {promoteSaving ? 'Saving...' : 'Save Admin'}
+                            </button>
+                            <button
+                              onClick={cancelPromoteMember}
+                              disabled={promoteSaving}
+                              className="rounded-xl bg-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/20"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {isRemoving && (
                         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-3">
                           <p className="text-sm text-white">
@@ -1129,7 +1433,7 @@ const deleteLeagueGame = async () => {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pick a Game to Broadcast</p>
               <select value={statusEventId} onChange={e => { setStatusEventId(e.target.value); setStatusMsg(null) }}
-                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-slate-400">
                 <option value="">— Pick a game —</option>
                 {events
                   .filter(e => new Date(e.starts_at).getTime() >= Date.now() - 24 * 60 * 60 * 1000)
@@ -1173,8 +1477,17 @@ const deleteLeagueGame = async () => {
                 </div>
 
                 {/* Draft new status */}
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-4">
-                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Set Broadcast</p>
+                <div className="rounded-2xl p-4 space-y-4"
+                      style={{
+                        border: `1px solid ${brandColor}4D`,
+                        backgroundColor: `${brandColor}0D`,
+                      }}
+                    >
+                  <p className="text-[10px] uppercase tracking-wide font-semibold"
+                      style={{ color: brandColor }}
+                  >
+                    Set Broadcast
+                  </p>
                   <div className="grid grid-cols-1 gap-2">
                     {([
                       { key: 'on', label: '🟢 Game On', desc: 'Show up as scheduled', cls: 'border-green-500/40 bg-green-500/10' },
@@ -1207,11 +1520,13 @@ const deleteLeagueGame = async () => {
                     <textarea value={statusDraftMessage} rows={2}
                       placeholder="Coaches arriving at 8am to evaluate, decision by 9am"
                       onChange={e => setStatusDraftMessage(e.target.value)}
-                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                   </div>
 
                   <button onClick={saveStatus} disabled={statusSaving || !statusDraftStatus === undefined}
-                    className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                    className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                    >
                     {statusSaving ? 'Broadcasting...' : 'Save & Broadcast'}
                   </button>
                   {statusMsg && <p className="text-sm text-center">{statusMsg}</p>}
@@ -1267,7 +1582,7 @@ const deleteLeagueGame = async () => {
                 setThemInnings(Array(7).fill(0))
                 setIsHome(false)
               }}
-                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-slate-400">
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
@@ -1340,7 +1655,7 @@ const deleteLeagueGame = async () => {
                           next[idx] = Number(e.target.value)
                           setUsInnings(next)
                         }}
-                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
+                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                     ))}
                   </div>
                   <div className="grid grid-cols-9 gap-1 items-center">
@@ -1354,7 +1669,7 @@ const deleteLeagueGame = async () => {
                           next[idx] = Number(e.target.value)
                           setThemInnings(next)
                         }}
-                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
+                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                     ))}
                   </div>
                   <div className="flex justify-between rounded-xl bg-white/5 px-4 py-2">
@@ -1364,7 +1679,9 @@ const deleteLeagueGame = async () => {
                 </div>
 
                 <button onClick={saveScore} disabled={scoreSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                  >
                   {scoreSaving ? 'Saving...' : 'Save Score + Box Score'}
                 </button>
                 {scoreMsg && <p className="text-sm text-center">{scoreMsg}</p>}
@@ -1379,7 +1696,7 @@ const deleteLeagueGame = async () => {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Select Game</p>
               <select value={statsEventId} onChange={e => { setStatsEventId(e.target.value); setStatsMsg(null) }}
-                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:slate-400">
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
@@ -1405,7 +1722,7 @@ const deleteLeagueGame = async () => {
                             const v = e.target.value
                             setPlayerStats(prev => ({ ...prev, [player.id]: { ...prev[player.id], batting_order_position: v === '' ? null : Number(v) } }))
                           }}
-                          className="w-16 rounded-lg bg-white/10 border border-white/10 px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                          className="w-16 rounded-lg bg-white/10 border border-white/10 px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                       </div>
                       <p className="text-[10px] text-slate-500 uppercase tracking-wide">Batting</p>
                       <div className="grid grid-cols-5 gap-1">
@@ -1421,7 +1738,7 @@ const deleteLeagueGame = async () => {
                             <p className="text-[9px] text-slate-500 text-center">{label}</p>
                             <input type="number" value={val}
                               onChange={e => updateStat(player.id, field, e.target.value)}
-                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                           </div>
                         ))}
                       </div>
@@ -1439,7 +1756,7 @@ const deleteLeagueGame = async () => {
                             <p className="text-[9px] text-slate-500 text-center">{label}</p>
                             <input type="number" value={val}
                               onChange={e => updateStat(player.id, field, e.target.value)}
-                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                           </div>
                         ))}
                       </div>
@@ -1448,7 +1765,9 @@ const deleteLeagueGame = async () => {
                 })}
 
                 <button onClick={saveStats} disabled={statsSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                  >
                   {statsSaving ? 'Saving...' : 'Save All Stats'}
                 </button>
                 {statsMsg && <p className="text-sm text-center">{statsMsg}</p>}
@@ -1465,7 +1784,12 @@ const deleteLeagueGame = async () => {
               <div className="grid grid-cols-3 gap-2">
                 {(['upcoming', 'past', 'all'] as const).map(f => (
                   <button key={f} onClick={() => setEventFilter(f)}
-                    className={`rounded-xl py-2 text-xs font-bold uppercase tracking-wide transition ${eventFilter === f ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
+                    className={`rounded-xl py-2 text-xs font-bold uppercase tracking-wide transition ${eventFilter === f ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}
+                    style={
+                      eventFilter === f
+                        ? { backgroundColor: brandColor }
+                        : undefined
+                    }>
                     {f}
                   </button>
                 ))}
@@ -1484,9 +1808,16 @@ const deleteLeagueGame = async () => {
 
             {/* Form */}
             {formMode !== 'none' && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-3">
+              <div className="rounded-2xl p-4 space-y-3"
+              style={{
+                  border: `1px solid ${brandColor}4D`,
+                  backgroundColor: `${brandColor}0D`,
+                }}
+              >
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold"
+                       style={{ color: brandColor }}
+                      >
                     {editingEventId
                       ? `Editing ${formMode === 'practice' ? 'Practice' : 'Game'}`
                       : `New ${formMode === 'practice' ? 'Practice' : 'Game'}`}
@@ -1501,7 +1832,7 @@ const deleteLeagueGame = async () => {
                   <label className="text-xs text-slate-400">Title</label>
                   <input type="text" value={eventForm.title}
                     onChange={e => setEventForm({ ...eventForm, title: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 {formMode === 'game' && (
@@ -1510,7 +1841,7 @@ const deleteLeagueGame = async () => {
                       <label className="text-xs text-slate-400">Type</label>
                       <select value={eventForm.eventType}
                         onChange={e => setEventForm({ ...eventForm, eventType: e.target.value as 'game' | 'tournament', opponent: '', opponentTeamId: '' })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
                         <option value="game">Game</option>
                         <option value="tournament">Tournament</option>
                       </select>
@@ -1530,7 +1861,7 @@ const deleteLeagueGame = async () => {
                               opponent: team?.name ?? '',
                             })
                           }}
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
                         >
                           <option value="">— Pick an MSBL team —</option>
                           {allTeams
@@ -1545,7 +1876,7 @@ const deleteLeagueGame = async () => {
                           value={eventForm.opponent}
                           onChange={e => setEventForm({ ...eventForm, opponent: e.target.value })}
                           placeholder="Tournament opponent name"
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
                         />
                       )}
                     </div>
@@ -1556,8 +1887,13 @@ const deleteLeagueGame = async () => {
                         {(['away', 'home'] as const).map(loc => (
                           <button key={loc} onClick={() => setEventForm({ ...eventForm, isHome: loc === 'home' })}
                             className={`rounded-xl py-2 text-xs font-bold transition ${
-                              eventForm.isHome === (loc === 'home') ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400'
-                            }`}>
+                              eventForm.isHome === (loc === 'home') ? 'text-white' : 'bg-white/10 text-slate-400'
+                            }`}
+                            style={
+                              eventForm.isHome === (loc === 'home')
+                                ? { backgroundColor: brandColor }
+                                : undefined
+                            }>
                             {loc === 'home' ? '🏠 Home' : '✈️ Away'}
                           </button>
                         ))}
@@ -1570,14 +1906,14 @@ const deleteLeagueGame = async () => {
                   <label className="text-xs text-slate-400">Date & Time</label>
                   <input type="datetime-local" value={eventForm.startsAt}
                     onChange={e => setEventForm({ ...eventForm, startsAt: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs text-slate-400">Field</label>
                   <select value={eventForm.fieldId}
                     onChange={e => setEventForm({ ...eventForm, fieldId: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
                     <option value="">— No field —</option>
                     {fields.map(f => (
                       <option key={f.id} value={f.id}>{f.name}</option>
@@ -1591,13 +1927,13 @@ const deleteLeagueGame = async () => {
                       <label className="text-xs text-slate-400">Travel min</label>
                       <input type="number" value={eventForm.travelMinutes}
                         onChange={e => setEventForm({ ...eventForm, travelMinutes: e.target.value })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs text-slate-400">Travel mi</label>
                       <input type="number" value={eventForm.travelMiles}
                         onChange={e => setEventForm({ ...eventForm, travelMiles: e.target.value })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                     </div>
                   </div>
                 )}
@@ -1606,18 +1942,20 @@ const deleteLeagueGame = async () => {
                   <label className="text-xs text-slate-400">Notes</label>
                   <textarea value={eventForm.notes} rows={2}
                     onChange={e => setEventForm({ ...eventForm, notes: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs text-slate-400">Gear (comma separated)</label>
                   <input type="text" value={eventForm.gearNotes}
                     onChange={e => setEventForm({ ...eventForm, gearNotes: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 <button onClick={saveEvent} disabled={eventSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                  >
                   {eventSaving ? 'Saving...' : (editingEventId ? 'Save Changes' : 'Create Event')}
                 </button>
 
@@ -1682,7 +2020,7 @@ const deleteLeagueGame = async () => {
       <div>
         <label className="text-xs text-slate-400">Away Team</label>
         <select value={leagueAwayTeamId} onChange={e => setLeagueAwayTeamId(e.target.value)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
           <option value="">— Pick a team —</option>
           {allTeams.map(t => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -1693,7 +2031,7 @@ const deleteLeagueGame = async () => {
       <div>
         <label className="text-xs text-slate-400">Home Team</label>
         <select value={leagueHomeTeamId} onChange={e => setLeagueHomeTeamId(e.target.value)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
           <option value="">— Pick a team —</option>
           {allTeams.map(t => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -1705,13 +2043,13 @@ const deleteLeagueGame = async () => {
         <label className="text-xs text-slate-400">Date & Time</label>
         <input type="datetime-local" value={leaguePlayedAt}
           onChange={e => setLeaguePlayedAt(e.target.value)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
       </div>
 
       <div>
         <label className="text-xs text-slate-400">Status</label>
         <select value={leagueStatus} onChange={e => setLeagueStatus(e.target.value as any)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
           <option value="final">Final</option>
           <option value="scheduled">Scheduled</option>
           <option value="forfeit">Forfeit</option>
@@ -1726,20 +2064,22 @@ const deleteLeagueGame = async () => {
             <label className="text-xs text-slate-400">Away Score</label>
             <input type="number" value={leagueAwayScore} min={0}
               onChange={e => setLeagueAwayScore(e.target.value)}
-              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
           </div>
           <div>
             <label className="text-xs text-slate-400">Home Score</label>
             <input type="number" value={leagueHomeScore} min={0}
               onChange={e => setLeagueHomeScore(e.target.value)}
-              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
           </div>
         </div>
       )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={saveLeagueGame} disabled={leagueSaving}
-          className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+          className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+          style={{ backgroundColor: brandColor }}
+          >
           {leagueSaving ? 'Saving...' : leagueEditingId ? 'Save Changes' : 'Create Game'}
         </button>
         {leagueEditingId && (
@@ -1820,14 +2160,16 @@ const deleteLeagueGame = async () => {
                     ] as [keyof Standing, number][]).map(([field, val]) => (
                       <input key={field} type="number" value={val}
                         onChange={ev => updateStanding(team.id, field, ev.target.value)}
-                        className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                        className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                     ))}
                   </div>
                 </div>
               )
             })}
             <button onClick={saveStandings} disabled={standingsSaving}
-              className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+              className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+              style={{ backgroundColor: brandColor }}
+              >
               {standingsSaving ? 'Saving...' : 'Save Standings'}
             </button>
             {standingsMsg && <p className="text-sm text-center">{standingsMsg}</p>}

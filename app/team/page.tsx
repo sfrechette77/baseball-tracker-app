@@ -8,6 +8,8 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { Skeleton, RowSkeleton } from '@/components/Skeleton'
+import { getDashboardTeamAdminAssignments, type DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
+import { useActiveOrg } from '@/components/org-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -40,7 +42,13 @@ type LeagueGameRow = {
   events: { id: string }[]
 }
 
-type SubView = 'standings' | 'results' | 'roster'
+type SubView = 'overview' |'standings' | 'results' | 'roster'
+
+type TeamOverviewEvent = {
+  id: string
+  event_type: string | null
+  result: string | null
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -98,18 +106,108 @@ function TeamPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color ?? '#dc2626'
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const [teamAdminAssignments, setTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
+  const [teamAdminsLoading, setTeamAdminsLoading] = useState(true)
+  const [overviewPlayerCount, setOverviewPlayerCount] = useState<number | null>(null)
+  const [overviewEvents, setOverviewEvents] = useState<TeamOverviewEvent[]>([])
+
+  const overviewRecord = useMemo(() => overviewEvents.reduce(
+    (acc, e) => {
+      if (e.result === 'win') acc.wins++
+      else if (e.result === 'loss') acc.losses++
+      else if (e.result === 'tie') acc.ties++
+      return acc
+    },
+    { wins: 0, losses: 0, ties: 0 }
+  ), [overviewEvents])
+
+  const overviewLeagueRecord = useMemo(() => overviewEvents
+    .filter(e => e.event_type !== 'tournament')
+    .reduce(
+      (acc, e) => {
+        if (e.result === 'win') acc.wins++
+        else if (e.result === 'loss') acc.losses++
+        else if (e.result === 'tie') acc.ties++
+        return acc
+      },
+      { wins: 0, losses: 0, ties: 0 }
+    ), [overviewEvents])
+
+  const overviewWinPct = (() => {
+    const total = overviewRecord.wins + overviewRecord.losses + overviewRecord.ties
+    if (total === 0) return '—'
+    return ((overviewRecord.wins + overviewRecord.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
+  })()
 
   // Read sub-view from URL, default to standings
   const viewParam = searchParams.get('view')
   const view: SubView =
-    viewParam === 'roster' || viewParam === 'results' ? viewParam : 'standings'
+    viewParam === 'standings' || viewParam === 'results' || viewParam === 'roster'
+      ? viewParam
+      : 'overview'
 
   const setView = (next: SubView) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('view', next)
-    router.replace(url.pathname + url.search, { scroll: false })
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', next)
+  router.replace(url.pathname + url.search, { scroll: false })
   }
+
+  useEffect(() => {
+    const loadTeamAdmins = async () => {
+      setTeamAdminsLoading(true)
+
+      const result = await getDashboardTeamAdminAssignments()
+
+      if (result.ok) {
+        setTeamAdminAssignments(
+          result.assignments.filter(a => a.team_id === currentTeam.id)
+        )
+      }
+
+      setTeamAdminsLoading(false)
+    }
+
+    loadTeamAdmins()
+  }, [currentTeam.id])
+
+  useEffect(() => {
+    const loadPlayerCount = async () => {
+      if (!teamSeasonId) {
+        setOverviewPlayerCount(0)
+        return
+      }
+
+      const supabase = createClient()
+
+      const { count } = await supabase
+        .from('players')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_season_id', teamSeasonId)
+
+      setOverviewPlayerCount(count ?? 0)
+    }
+
+    loadPlayerCount()
+  }, [teamSeasonId])
+
+  useEffect(() => {
+    const loadOverviewEvents = async () => {
+      const supabase = createClient()
+
+      const { data } = await supabase
+        .from('events')
+        .select('id, event_type, result')
+        .eq('team_id', currentTeam.id)
+        .not('result', 'is', null)
+
+      setOverviewEvents((data ?? []) as TeamOverviewEvent[])
+    }
+
+    loadOverviewEvents()
+  }, [currentTeam.id])
 
   if (teamSeasonNotFound) {
     return (
@@ -131,9 +229,14 @@ function TeamPageInner() {
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p className="text-xl tracking-[0.1em] font-bold"
+            style={{ color: brandColor }}
+            >
+              2026
+            </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">
-          {view === 'standings' ? 'Standings'
+          {view === 'overview' ? 'Team'
+            : view === 'standings' ? 'Standings'
             : view === 'results' ? 'Results'
             : 'Roster'}
         </h1>
@@ -143,17 +246,26 @@ function TeamPageInner() {
       {/* Toggle */}
       <div className="mx-auto max-w-sm px-4 pt-4">
         <div className="flex gap-1 rounded-full bg-white/5 border border-white/10 p-1">
-          {(['standings', 'results', 'roster'] as const).map((key) => {
-            const label = key === 'standings' ? 'Standings'
-              : key === 'results' ? 'Results'
-              : 'Roster'
+          {(['overview', 'standings', 'results', 'roster'] as const).map((key) => {
+           const label = key === 'overview' ? 'Overview'
+            : key === 'standings' ? 'Standings'
+            : key === 'results' ? 'Results'
+            : 'Roster'
+            const brandColor = org?.primary_color || '#dc2626'
             return (
               <button
                 key={key}
                 onClick={() => setView(key)}
                 className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
-                  view === key ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'
+                  view === key
+                  ? 'text-white'
+                  : 'text-slate-400 hover:text-white'
                 }`}
+                style={
+                  view === key
+                    ? { backgroundColor: brandColor }
+                    : undefined
+                }
               >
                 {label}
               </button>
@@ -162,7 +274,106 @@ function TeamPageInner() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+          <div className="mx-auto max-w-sm space-y-4 px-4 pt-4">
+            {view === 'overview' && (
+              <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <div className="flex items-center gap-4">
+                  {org?.logo_url && (
+                    <img
+                      src={org.logo_url}
+                      alt={org.name ?? 'Organization logo'}
+                      className="h-16 w-16 object-contain"
+                    />
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[10px] uppercase tracking-wide font-semibold"
+                      style={{ color: brandColor }}
+                    >
+                      Team Overview
+                    </p>
+                    <h2 className="mt-1 text-lg font-extrabold text-white">
+                      {currentTeam.fullName}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {currentTeam.division}
+                    </p>
+                  </div>
+                </div>
+              </div>  
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}>
+                Record
+            </p>
+
+            <p className="mt-3 text-xs text-slate-400 tabular-nums">
+              <span className="text-slate-500">PCT </span>
+              <span className="text-white font-semibold">{overviewWinPct}</span>
+
+              <span className="mx-2 text-slate-700">·</span>
+
+              <span className="text-slate-500">Overall </span>
+              <span className="text-slate-300 font-semibold">
+                {overviewRecord.wins}–{overviewRecord.losses}
+                {overviewRecord.ties > 0 ? `–${overviewRecord.ties}` : ''}
+              </span>
+
+              <span className="mx-2 text-slate-700">·</span>
+
+              <span className="text-slate-500">League </span>
+              <span className="text-slate-300 font-semibold">
+                {overviewLeagueRecord.wins}–{overviewLeagueRecord.losses}
+                {overviewLeagueRecord.ties > 0 ? `–${overviewLeagueRecord.ties}` : ''}
+              </span>
+            </p>
+          </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <p className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}>
+                Roster
+              </p>
+
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-3xl font-extrabold text-white">
+                  {overviewPlayerCount ?? '—'}
+                </span>
+                <span className="pb-1 text-sm text-slate-400">
+                  players
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <p className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}>
+                Team Admins
+                </p>
+              {teamAdminsLoading ? (
+                <p className="mt-2 text-sm text-slate-400">Loading team admins...</p>
+              ) : teamAdminAssignments.length === 0 ? (
+                <p className="mt-2 text-sm text-yellow-300">No team admin assigned.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {teamAdminAssignments.map(admin => (
+                    <div key={admin.membership_id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                      <p className="text-sm font-semibold text-white">
+                        {admin.full_name || admin.email || 'Unnamed admin'}
+                      </p>
+                      {admin.email && (
+                        <p className="text-xs text-slate-500">{admin.email}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {view === 'standings' && (
           <StandingsView division={currentTeam.division} currentTeamId={currentTeam.id} />
         )}
@@ -482,6 +693,9 @@ function ResultsView({ division }: { division: string }) {
 // ─── Roster sub-view ──────────────────────────────────────────────────────
 
 function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string | null; teamSeasonLoading: boolean }) {
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color ?? '#dc2626'
+  
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -548,7 +762,9 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
       {sortedPlayers.map((player) => (
         <Link key={player.id} href={`/player/${player.id}`}>
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 font-bold text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full font-bold text-white"
+                  style={{ backgroundColor: brandColor }}
+                >
               {player.jersey_number ?? '?'}
             </div>
             <div className="flex-1">

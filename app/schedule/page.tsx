@@ -8,6 +8,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { RowSkeleton } from '@/components/Skeleton'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -84,6 +85,8 @@ export default function SchedulePage() {
   const [filter, setFilter] = useState<FilterKey>('upcoming')
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     // Wait until team_season is resolved — don't enter the try/finally
@@ -164,33 +167,13 @@ export default function SchedulePage() {
     }, {})
   }, [filteredEvents])
 
-  const record = useMemo(() => events.reduce(
-    (acc, e) => {
-      if (e.result === 'win') acc.wins++
-      else if (e.result === 'loss') acc.losses++
-      else if (e.result === 'tie') acc.ties++
-      return acc
-    },
-    { wins: 0, losses: 0, ties: 0 }
-  ), [events])
-
-  const leagueRecord = useMemo(() => events
-    .filter(e => e.result !== null && e.event_type !== 'tournament')
-    .reduce(
-      (acc, e) => {
-        if (e.result === 'win') acc.wins++
-        else if (e.result === 'loss') acc.losses++
-        else if (e.result === 'tie') acc.ties++
-        return acc
-      },
-      { wins: 0, losses: 0, ties: 0 }
-    ), [events])
-
   if (loading) {
     return (
       <main className="min-h-screen bg-black pb-32 text-white">
         <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-          <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+          <p className="text-xl tracking-[0.1em] font-bold"
+          style={{ color: brandColor }}
+          >2026</p>
           <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
         </div>
         <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
@@ -228,34 +211,15 @@ export default function SchedulePage() {
     practices: 'No practices scheduled.',
   }[filter]
 
-  const winPct = (() => {
-    const total = record.wins + record.losses + record.ties
-    if (total === 0) return '—'
-    return ((record.wins + record.ties * 0.5) / total).toFixed(3).replace(/^0/, '')
-  })()
-
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
 
       {/* Page title with record subtitle */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p className="text-xl tracking-[0.1em] font-bold"
+            style={{ color: brandColor }}
+        >2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Schedule</h1>
-
-        <p className="mt-3 text-xs text-slate-400 tabular-nums">
-          <span className="text-slate-500">PCT </span>
-          <span className="text-white font-semibold">{winPct}</span>
-          <span className="mx-2 text-slate-700">·</span>
-          <span className="text-slate-500">Overall </span>
-          <span className="text-slate-300 font-semibold">
-            {record.wins}–{record.losses}{record.ties > 0 ? `–${record.ties}` : ''}
-          </span>
-          <span className="mx-2 text-slate-700">·</span>
-          <span className="text-slate-500">League </span>
-          <span className="text-slate-300 font-semibold">
-            {leagueRecord.wins}–{leagueRecord.losses}{leagueRecord.ties > 0 ? `–${leagueRecord.ties}` : ''}
-          </span>
-        </p>
       </div>
 
       {/* Content */}
@@ -279,9 +243,17 @@ export default function SchedulePage() {
                 onClick={() => setFilter(f.key)}
                 className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold transition ${
                   isActive
-                    ? 'bg-red-600 border-red-600 text-white'
+                    ? 'text-white'
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
                 }`}
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: brandColor,
+                        borderColor: brandColor,
+                      }
+                    : undefined
+                }
               >
                 {f.label}
               </button>

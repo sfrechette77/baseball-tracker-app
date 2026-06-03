@@ -10,6 +10,7 @@ import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { PushSubscribeButton } from '@/components/push-subscribe-button'
 import { BottomNav } from '@/components/BottomNav'
 import { EventCardSkeleton, RowSkeleton } from '@/components/Skeleton'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -222,8 +223,8 @@ function StatusBanner({ event }: { event: EventRow }) {
 
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
-function EventCard({ event, weather, now, featured = false }: {
-  event: EventRow; weather?: WeatherSummary; now: Date; featured?: boolean
+function EventCard({ event, weather, now, featured = false, brandColor = '#dc2626' }: {
+  event: EventRow; weather?: WeatherSummary; now: Date; featured?: boolean; brandColor?: string
 }) {
   const eventTime = new Date(event.starts_at)
   const field = getPrimaryField(event.fields)
@@ -243,14 +244,18 @@ function EventCard({ event, weather, now, featured = false }: {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
       {featured && (
-        <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">
+        <p className="mb-2 text-[10px] uppercase tracking-[0.25em] font-semibold"
+          style={{ color: brandColor}}
+          >
           ⚾ Next Up
         </p>
       )}
 
       {featured && isGameDay && isGame ? (
         <div className="rounded-xl bg-white/10 border border-white/20 p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-red-300 font-semibold">
+          <p className="text-xs uppercase tracking-[0.2em] font-semibold"
+          style={{ color: brandColor }}
+          >
             {event.event_type === 'tournament' ? '🏆 Tournament Day' : '⚾ Game Day'}
           </p>
           <h2 className="mt-1 text-2xl font-bold text-white">Today&apos;s Game</h2>
@@ -316,7 +321,9 @@ function EventCard({ event, weather, now, featured = false }: {
         <p className="text-sm text-slate-400">{address || 'Address not available'}</p>
         {address && (
           <a href={directionsUrl} target="_blank" rel="noreferrer"
-            className="mt-2 inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition">
+            className="mt-2 inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition"
+            style={{ backgroundColor: brandColor }}
+            >
             Directions ↗
           </a>
         )}
@@ -369,6 +376,8 @@ export default function HomePage() {
   const [now, setNow] = useState(new Date())
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, arrivalBufferMinutes, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
@@ -524,6 +533,7 @@ export default function HomePage() {
       weather={weatherByEvent[featuredEvent.id]}
       now={now}
       featured
+      brandColor={brandColor}
     />
   </section>
 ) : error ? (

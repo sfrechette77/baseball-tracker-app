@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { sendMessage } from '../../app/actions/chat'
+import { useActiveOrg } from '@/components/org-context'
 
 const MAX_BODY_LENGTH = 2000
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
@@ -20,6 +21,8 @@ export function MessageComposer({ teamId, onSent }: Props) {
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   const canSend = (body.trim().length > 0 || imageFile !== null) && !isPending
 
@@ -149,7 +152,7 @@ export function MessageComposer({ teamId, onSent }: Props) {
           rows={1}
           maxLength={MAX_BODY_LENGTH}
           disabled={isPending}
-          className="flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 disabled:opacity-50"
+          className="flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400 disabled:opacity-50"
           style={{ minHeight: '40px', maxHeight: '120px' }}
         />
 
@@ -157,7 +160,8 @@ export function MessageComposer({ teamId, onSent }: Props) {
         <button
           onClick={handleSend}
           disabled={!canSend}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
+          style={{ backgroundColor: brandColor }}
           aria-label="Send"
         >
           {isPending ? '...' : '→'}
