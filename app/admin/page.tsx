@@ -145,7 +145,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
           <input type="password" placeholder="Enter password" value={input}
             onChange={e => { setInput(e.target.value); setError(false) }}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500" />
+            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-slate-400" />
           {error && <p className="text-red-400 text-sm">Incorrect password</p>}
           <button onClick={handleSubmit}
             className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition">
@@ -166,6 +166,8 @@ export default function AdminPage() {
   const { membership, loading: orgLoading } = useActiveOrg()
   const isOrgAdmin = membership?.role === 'org_admin'
   const isTeamAdmin = membership?.role === 'team_admin'
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -990,7 +992,11 @@ const visibleAdminTabs = isOrgAdmin
       <div className="bg-black px-4 pt-8 pb-4 border-b border-white/10">
         <div className="mx-auto max-w-sm flex items-center justify-between">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Admin</p>
+            <p className="text-[10px] uppercase tracking-[0.25em] font-semibold"
+                style={{ color: brandColor }}
+                >
+                  Admin
+                </p>
             <h1 className="text-xl font-extrabold text-white">Organization Console</h1>
           </div>
           <button onClick={() => { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }}
@@ -1003,7 +1009,9 @@ const visibleAdminTabs = isOrgAdmin
         <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
           {visibleAdminTabs.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
+              className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}
+              style={tab === key ? { backgroundColor: brandColor } : undefined}
+              >
               {label}
             </button>
           ))}
@@ -1219,13 +1227,15 @@ const visibleAdminTabs = isOrgAdmin
                               setMemberDefaultTeamId(m.teams.find(t => t.is_default)?.id ?? m.teams[0]?.id ?? '')
                               setMembersMsg(null)
                             }}
-                            className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
+                            className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white transition"
+                            style={{ backgroundColor: brandColor }}
                           >
                             Edit Teams
                           </button>
                           <button
                             onClick={() => startPromoteMember(m)}
-                            className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition"
+                            className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white transition"
+                            style={{ backgroundColor: brandColor }}
                           >
                             Make Admin
                           </button>
@@ -1423,7 +1433,7 @@ const visibleAdminTabs = isOrgAdmin
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pick a Game to Broadcast</p>
               <select value={statusEventId} onChange={e => { setStatusEventId(e.target.value); setStatusMsg(null) }}
-                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-slate-400">
                 <option value="">— Pick a game —</option>
                 {events
                   .filter(e => new Date(e.starts_at).getTime() >= Date.now() - 24 * 60 * 60 * 1000)
@@ -1467,8 +1477,17 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 {/* Draft new status */}
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-4">
-                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Set Broadcast</p>
+                <div className="rounded-2xl p-4 space-y-4"
+                      style={{
+                        border: `1px solid ${brandColor}4D`,
+                        backgroundColor: `${brandColor}0D`,
+                      }}
+                    >
+                  <p className="text-[10px] uppercase tracking-wide font-semibold"
+                      style={{ color: brandColor }}
+                  >
+                    Set Broadcast
+                  </p>
                   <div className="grid grid-cols-1 gap-2">
                     {([
                       { key: 'on', label: '🟢 Game On', desc: 'Show up as scheduled', cls: 'border-green-500/40 bg-green-500/10' },
@@ -1501,11 +1520,13 @@ const visibleAdminTabs = isOrgAdmin
                     <textarea value={statusDraftMessage} rows={2}
                       placeholder="Coaches arriving at 8am to evaluate, decision by 9am"
                       onChange={e => setStatusDraftMessage(e.target.value)}
-                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                   </div>
 
                   <button onClick={saveStatus} disabled={statusSaving || !statusDraftStatus === undefined}
-                    className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                    className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                    >
                     {statusSaving ? 'Broadcasting...' : 'Save & Broadcast'}
                   </button>
                   {statusMsg && <p className="text-sm text-center">{statusMsg}</p>}
@@ -1561,7 +1582,7 @@ const visibleAdminTabs = isOrgAdmin
                 setThemInnings(Array(7).fill(0))
                 setIsHome(false)
               }}
-                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-slate-400">
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
@@ -1634,7 +1655,7 @@ const visibleAdminTabs = isOrgAdmin
                           next[idx] = Number(e.target.value)
                           setUsInnings(next)
                         }}
-                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
+                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                     ))}
                   </div>
                   <div className="grid grid-cols-9 gap-1 items-center">
@@ -1648,7 +1669,7 @@ const visibleAdminTabs = isOrgAdmin
                           next[idx] = Number(e.target.value)
                           setThemInnings(next)
                         }}
-                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500 w-full" />
+                        className="rounded-lg bg-white/10 border border-white/10 px-0 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                     ))}
                   </div>
                   <div className="flex justify-between rounded-xl bg-white/5 px-4 py-2">
@@ -1658,7 +1679,9 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 <button onClick={saveScore} disabled={scoreSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                  >
                   {scoreSaving ? 'Saving...' : 'Save Score + Box Score'}
                 </button>
                 {scoreMsg && <p className="text-sm text-center">{scoreMsg}</p>}
@@ -1673,7 +1696,7 @@ const visibleAdminTabs = isOrgAdmin
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Select Game</p>
               <select value={statsEventId} onChange={e => { setStatsEventId(e.target.value); setStatsMsg(null) }}
-                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-red-500">
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:slate-400">
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
@@ -1699,7 +1722,7 @@ const visibleAdminTabs = isOrgAdmin
                             const v = e.target.value
                             setPlayerStats(prev => ({ ...prev, [player.id]: { ...prev[player.id], batting_order_position: v === '' ? null : Number(v) } }))
                           }}
-                          className="w-16 rounded-lg bg-white/10 border border-white/10 px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                          className="w-16 rounded-lg bg-white/10 border border-white/10 px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                       </div>
                       <p className="text-[10px] text-slate-500 uppercase tracking-wide">Batting</p>
                       <div className="grid grid-cols-5 gap-1">
@@ -1715,7 +1738,7 @@ const visibleAdminTabs = isOrgAdmin
                             <p className="text-[9px] text-slate-500 text-center">{label}</p>
                             <input type="number" value={val}
                               onChange={e => updateStat(player.id, field, e.target.value)}
-                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                           </div>
                         ))}
                       </div>
@@ -1733,7 +1756,7 @@ const visibleAdminTabs = isOrgAdmin
                             <p className="text-[9px] text-slate-500 text-center">{label}</p>
                             <input type="number" value={val}
                               onChange={e => updateStat(player.id, field, e.target.value)}
-                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                           </div>
                         ))}
                       </div>
@@ -1742,7 +1765,9 @@ const visibleAdminTabs = isOrgAdmin
                 })}
 
                 <button onClick={saveStats} disabled={statsSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                  >
                   {statsSaving ? 'Saving...' : 'Save All Stats'}
                 </button>
                 {statsMsg && <p className="text-sm text-center">{statsMsg}</p>}
@@ -1759,7 +1784,12 @@ const visibleAdminTabs = isOrgAdmin
               <div className="grid grid-cols-3 gap-2">
                 {(['upcoming', 'past', 'all'] as const).map(f => (
                   <button key={f} onClick={() => setEventFilter(f)}
-                    className={`rounded-xl py-2 text-xs font-bold uppercase tracking-wide transition ${eventFilter === f ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}>
+                    className={`rounded-xl py-2 text-xs font-bold uppercase tracking-wide transition ${eventFilter === f ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}
+                    style={
+                      eventFilter === f
+                        ? { backgroundColor: brandColor }
+                        : undefined
+                    }>
                     {f}
                   </button>
                 ))}
@@ -1778,9 +1808,16 @@ const visibleAdminTabs = isOrgAdmin
 
             {/* Form */}
             {formMode !== 'none' && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-3">
+              <div className="rounded-2xl p-4 space-y-3"
+              style={{
+                  border: `1px solid ${brandColor}4D`,
+                  backgroundColor: `${brandColor}0D`,
+                }}
+              >
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold"
+                       style={{ color: brandColor }}
+                      >
                     {editingEventId
                       ? `Editing ${formMode === 'practice' ? 'Practice' : 'Game'}`
                       : `New ${formMode === 'practice' ? 'Practice' : 'Game'}`}
@@ -1795,7 +1832,7 @@ const visibleAdminTabs = isOrgAdmin
                   <label className="text-xs text-slate-400">Title</label>
                   <input type="text" value={eventForm.title}
                     onChange={e => setEventForm({ ...eventForm, title: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 {formMode === 'game' && (
@@ -1804,7 +1841,7 @@ const visibleAdminTabs = isOrgAdmin
                       <label className="text-xs text-slate-400">Type</label>
                       <select value={eventForm.eventType}
                         onChange={e => setEventForm({ ...eventForm, eventType: e.target.value as 'game' | 'tournament', opponent: '', opponentTeamId: '' })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
                         <option value="game">Game</option>
                         <option value="tournament">Tournament</option>
                       </select>
@@ -1824,7 +1861,7 @@ const visibleAdminTabs = isOrgAdmin
                               opponent: team?.name ?? '',
                             })
                           }}
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
                         >
                           <option value="">— Pick an MSBL team —</option>
                           {allTeams
@@ -1839,7 +1876,7 @@ const visibleAdminTabs = isOrgAdmin
                           value={eventForm.opponent}
                           onChange={e => setEventForm({ ...eventForm, opponent: e.target.value })}
                           placeholder="Tournament opponent name"
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
                         />
                       )}
                     </div>
@@ -1850,8 +1887,13 @@ const visibleAdminTabs = isOrgAdmin
                         {(['away', 'home'] as const).map(loc => (
                           <button key={loc} onClick={() => setEventForm({ ...eventForm, isHome: loc === 'home' })}
                             className={`rounded-xl py-2 text-xs font-bold transition ${
-                              eventForm.isHome === (loc === 'home') ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400'
-                            }`}>
+                              eventForm.isHome === (loc === 'home') ? 'text-white' : 'bg-white/10 text-slate-400'
+                            }`}
+                            style={
+                              eventForm.isHome === (loc === 'home')
+                                ? { backgroundColor: brandColor }
+                                : undefined
+                            }>
                             {loc === 'home' ? '🏠 Home' : '✈️ Away'}
                           </button>
                         ))}
@@ -1864,14 +1906,14 @@ const visibleAdminTabs = isOrgAdmin
                   <label className="text-xs text-slate-400">Date & Time</label>
                   <input type="datetime-local" value={eventForm.startsAt}
                     onChange={e => setEventForm({ ...eventForm, startsAt: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs text-slate-400">Field</label>
                   <select value={eventForm.fieldId}
                     onChange={e => setEventForm({ ...eventForm, fieldId: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
                     <option value="">— No field —</option>
                     {fields.map(f => (
                       <option key={f.id} value={f.id}>{f.name}</option>
@@ -1885,13 +1927,13 @@ const visibleAdminTabs = isOrgAdmin
                       <label className="text-xs text-slate-400">Travel min</label>
                       <input type="number" value={eventForm.travelMinutes}
                         onChange={e => setEventForm({ ...eventForm, travelMinutes: e.target.value })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs text-slate-400">Travel mi</label>
                       <input type="number" value={eventForm.travelMiles}
                         onChange={e => setEventForm({ ...eventForm, travelMiles: e.target.value })}
-                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                     </div>
                   </div>
                 )}
@@ -1900,18 +1942,20 @@ const visibleAdminTabs = isOrgAdmin
                   <label className="text-xs text-slate-400">Notes</label>
                   <textarea value={eventForm.notes} rows={2}
                     onChange={e => setEventForm({ ...eventForm, notes: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs text-slate-400">Gear (comma separated)</label>
                   <input type="text" value={eventForm.gearNotes}
                     onChange={e => setEventForm({ ...eventForm, gearNotes: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                 </div>
 
                 <button onClick={saveEvent} disabled={eventSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                  >
                   {eventSaving ? 'Saving...' : (editingEventId ? 'Save Changes' : 'Create Event')}
                 </button>
 
@@ -1976,7 +2020,7 @@ const visibleAdminTabs = isOrgAdmin
       <div>
         <label className="text-xs text-slate-400">Away Team</label>
         <select value={leagueAwayTeamId} onChange={e => setLeagueAwayTeamId(e.target.value)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
           <option value="">— Pick a team —</option>
           {allTeams.map(t => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -1987,7 +2031,7 @@ const visibleAdminTabs = isOrgAdmin
       <div>
         <label className="text-xs text-slate-400">Home Team</label>
         <select value={leagueHomeTeamId} onChange={e => setLeagueHomeTeamId(e.target.value)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
           <option value="">— Pick a team —</option>
           {allTeams.map(t => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -1999,13 +2043,13 @@ const visibleAdminTabs = isOrgAdmin
         <label className="text-xs text-slate-400">Date & Time</label>
         <input type="datetime-local" value={leaguePlayedAt}
           onChange={e => setLeaguePlayedAt(e.target.value)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
       </div>
 
       <div>
         <label className="text-xs text-slate-400">Status</label>
         <select value={leagueStatus} onChange={e => setLeagueStatus(e.target.value as any)}
-          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500">
+          className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
           <option value="final">Final</option>
           <option value="scheduled">Scheduled</option>
           <option value="forfeit">Forfeit</option>
@@ -2020,20 +2064,22 @@ const visibleAdminTabs = isOrgAdmin
             <label className="text-xs text-slate-400">Away Score</label>
             <input type="number" value={leagueAwayScore} min={0}
               onChange={e => setLeagueAwayScore(e.target.value)}
-              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
           </div>
           <div>
             <label className="text-xs text-slate-400">Home Score</label>
             <input type="number" value={leagueHomeScore} min={0}
               onChange={e => setLeagueHomeScore(e.target.value)}
-              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+              className="w-full mt-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
           </div>
         </div>
       )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={saveLeagueGame} disabled={leagueSaving}
-          className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+          className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+          style={{ backgroundColor: brandColor }}
+          >
           {leagueSaving ? 'Saving...' : leagueEditingId ? 'Save Changes' : 'Create Game'}
         </button>
         {leagueEditingId && (
@@ -2114,14 +2160,16 @@ const visibleAdminTabs = isOrgAdmin
                     ] as [keyof Standing, number][]).map(([field, val]) => (
                       <input key={field} type="number" value={val}
                         onChange={ev => updateStanding(team.id, field, ev.target.value)}
-                        className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-red-500" />
+                        className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
                     ))}
                   </div>
                 </div>
               )
             })}
             <button onClick={saveStandings} disabled={standingsSaving}
-              className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+              className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+              style={{ backgroundColor: brandColor }}
+              >
               {standingsSaving ? 'Saving...' : 'Save Standings'}
             </button>
             {standingsMsg && <p className="text-sm text-center">{standingsMsg}</p>}
