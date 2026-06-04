@@ -166,9 +166,22 @@ export default function AdminPage() {
   const { membership, loading: orgLoading } = useActiveOrg()
   const isOrgAdmin = membership?.role === 'org_admin'
   const isTeamAdmin = membership?.role === 'team_admin'
-  const { org } = useActiveOrg()
 
+  const { org } = useActiveOrg()
   const brandColor = org?.primary_color || '#dc2626'
+
+  const signupLink =
+    org?.slug && typeof window !== 'undefined'
+      ? `${window.location.origin}/o/${org.slug}/signup`
+      : ''
+
+  const [settingsName, setSettingsName] = useState('')
+  const [settingsLogoUrl, setSettingsLogoUrl] = useState('')
+  const [settingsPrimaryColor, setSettingsPrimaryColor] = useState('#dc2626')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
+  const [settingsCopied, setSettingsCopied] = useState(false)
+
   useEffect(() => {
     if (!org) return
 
@@ -176,12 +189,6 @@ export default function AdminPage() {
     setSettingsLogoUrl(org.logo_url ?? '')
     setSettingsPrimaryColor(org.primary_color ?? '#dc2626')
   }, [org])
-
-  const [settingsName, setSettingsName] = useState('')
-  const [settingsLogoUrl, setSettingsLogoUrl] = useState('')
-  const [settingsPrimaryColor, setSettingsPrimaryColor] = useState('#dc2626')
-  const [settingsSaving, setSettingsSaving] = useState(false)
-  const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
 
   const saveOrgSettings = async () => {
     if (!org || !isOrgAdmin) return
@@ -210,6 +217,21 @@ export default function AdminPage() {
     setSettingsMsg('✅ Organization settings saved. Refresh if the new branding does not appear immediately.')
   }
   
+  const copySignupLink = async () => {
+    if (!signupLink) return
+
+    try {
+      await navigator.clipboard.writeText(signupLink)
+      setSettingsCopied(true)
+
+      setTimeout(() => {
+        setSettingsCopied(false)
+      }, 2000)
+    } catch {
+      setSettingsMsg('❌ Could not copy signup link')
+    }
+  }
+
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
   const [selectedEventId, setSelectedEventId] = useState('')
@@ -1160,16 +1182,28 @@ const visibleAdminTabs = isOrgAdmin
 
               <div className="space-y-2">
                 <label className="text-xs text-slate-400">Signup Link</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={
-                    org?.slug
-                      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/o/${org.slug}/signup`
-                      : ''
-                  }
-                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-400"
-                />
+                <p className="text-[11px] text-slate-500">
+                  Share this link with parents, coaches, and players so they can request access.
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={signupLink}
+                    className="min-w-0 flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-400"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={copySignupLink}
+                    disabled={!signupLink}
+                    className="rounded-xl px-4 py-2 text-xs font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {settingsCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
               </div>
 
               <button
