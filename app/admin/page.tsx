@@ -181,6 +181,7 @@ export default function AdminPage() {
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
   const [settingsCopied, setSettingsCopied] = useState(false)
+  const [settingsLogoUploading, setSettingsLogoUploading] = useState(false)
 
   useEffect(() => {
     if (!org) return
@@ -230,6 +231,39 @@ export default function AdminPage() {
     } catch {
       setSettingsMsg('❌ Could not copy signup link')
     }
+  }
+
+  const uploadOrgLogo = async (file: File) => {
+    if (!org || !isOrgAdmin) return
+
+    setSettingsLogoUploading(true)
+    setSettingsMsg(null)
+
+    const supabase = createClient()
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png'
+    const filePath = `organizations/${org.id}/logo-${Date.now()}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('organization-logos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      setSettingsLogoUploading(false)
+      setSettingsMsg(`❌ Logo upload failed: ${uploadError.message}`)
+      return
+    }
+
+    const { data } = supabase.storage
+      .from('organization-logos')
+      .getPublicUrl(filePath)
+
+    setSettingsLogoUrl(data.publicUrl)
+    setSettingsLogoUploading(false)
+    setSettingsMsg('✅ Logo uploaded. Click Save Organization Settings to apply it.')
   }
 
   // Events
@@ -1095,7 +1129,7 @@ const visibleAdminTabs = isOrgAdmin
               }}
             >
               <p
-                className="text-[10px] uppercase tracking-wide font-semibold"
+                className="text-xs uppercase tracking-wide font-semibold"
                 style={{ color: brandColor }}
               >
                 Organization Settings
@@ -1124,15 +1158,36 @@ const visibleAdminTabs = isOrgAdmin
                 </p>
               </div>
 
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white">Branding</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Customize how this organization appears throughout the app.
+                </p>
+              </div>
+
               <div className="space-y-2">
-                <label className="text-xs text-slate-400">Logo URL</label>
-                <input
-                  type="text"
-                  value={settingsLogoUrl}
-                  onChange={e => setSettingsLogoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"
-                />
+                <label className="text-xs text-slate-400">Upload Logo</label>
+                <p className="text-[11px] text-slate-500">
+                  Choose a PNG, JPG, or WebP logo. After upload, click Save Organization Settings.
+                </p>
+
+                <label className="block cursor-pointer rounded-xl px-3 py-3 text-center text-sm font-bold text-white transition disabled:opacity-50"
+                        style={{ backgroundColor: brandColor }}
+                >
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={settingsLogoUploading}
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      uploadOrgLogo(file)
+                      e.currentTarget.value = ''
+                    }}
+                  />
+                  {settingsLogoUploading ? 'Uploading logo...' : 'Choose Logo File'}
+                </label>
               </div>
 
               {settingsLogoUrl && (
@@ -1168,24 +1223,16 @@ const visibleAdminTabs = isOrgAdmin
                     </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] text-slate-500">Advanced: hex color</label>
-                  <input
-                    type="text"
-                    value={settingsPrimaryColor}
-                    onChange={e => setSettingsPrimaryColor(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
-                  />
-                </div>
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white">Access</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Share the signup link with parents, coaches, and players so they can request access.
+                </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs text-slate-400">Signup Link</label>
-                <p className="text-[11px] text-slate-500">
-                  Share this link with parents, coaches, and players so they can request access.
-                </p>
-
                 <div className="flex gap-2">
                   <input
                     type="text"
