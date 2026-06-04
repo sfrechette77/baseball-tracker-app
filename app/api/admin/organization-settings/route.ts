@@ -53,7 +53,9 @@ export async function PATCH(req: Request) {
     .select('role')
     .eq('organization_id', organizationId)
     .eq('user_id', user.id)
-    .single()
+    .eq('role', 'org_admin')
+    .limit(1)
+    .maybeSingle()
 
     if (membershipError || membership?.role !== 'org_admin') {
     return NextResponse.json(
