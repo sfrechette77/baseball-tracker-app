@@ -183,6 +183,10 @@ export default function AdminPage() {
   const [settingsCopied, setSettingsCopied] = useState(false)
   const [settingsLogoUploading, setSettingsLogoUploading] = useState(false)
 
+  const [settingsSeasonName, setSettingsSeasonName] = useState('')
+  const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
+  const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
+
   useEffect(() => {
     if (!org) return
 
@@ -265,6 +269,42 @@ export default function AdminPage() {
     setSettingsLogoUploading(false)
     setSettingsMsg('✅ Logo uploaded. Click Save Organization Settings to apply it.')
   }
+
+  useEffect(() => {
+    if (!org || !isOrgAdmin) return
+
+    const loadCurrentSeason = async () => {
+      setSettingsSeasonLoading(true)
+      setSettingsSeasonMsg(null)
+
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from('seasons')
+        .select('id, name, is_current')
+        .eq('organization_id', org.id)
+        .eq('is_current', true)
+        .limit(1)
+        .maybeSingle()
+
+      setSettingsSeasonLoading(false)
+
+      if (error) {
+        setSettingsSeasonMsg(`❌ ${error.message}`)
+        return
+      }
+
+      if (!data) {
+        setSettingsSeasonName('')
+        setSettingsSeasonMsg('No active season found for this organization.')
+        return
+      }
+
+      setSettingsSeasonName(data.name ?? '')
+    }
+
+    loadCurrentSeason()
+  }, [org, isOrgAdmin])
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -1251,6 +1291,33 @@ const visibleAdminTabs = isOrgAdmin
                     {settingsCopied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
+
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white">Season</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  The active season controls schedules, rosters, stats, and standings.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                {settingsSeasonLoading ? (
+                  <p className="text-sm text-slate-400">Loading active season...</p>
+                ) : settingsSeasonName ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-white">{settingsSeasonName}</p>
+                    <span
+                      className="inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Active
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    {settingsSeasonMsg ?? 'No active season found.'}
+                  </p>
+                )}
+              </div>  
               </div>
 
               <button
