@@ -66,7 +66,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings'
+type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
 
 type Field = {
   id: string
@@ -167,8 +167,49 @@ export default function AdminPage() {
   const isOrgAdmin = membership?.role === 'org_admin'
   const isTeamAdmin = membership?.role === 'team_admin'
   const { org } = useActiveOrg()
-  const brandColor = org?.primary_color || '#dc2626'
 
+  const brandColor = org?.primary_color || '#dc2626'
+  useEffect(() => {
+    if (!org) return
+
+    setSettingsName(org.name ?? '')
+    setSettingsLogoUrl(org.logo_url ?? '')
+    setSettingsPrimaryColor(org.primary_color ?? '#dc2626')
+  }, [org])
+
+  const [settingsName, setSettingsName] = useState('')
+  const [settingsLogoUrl, setSettingsLogoUrl] = useState('')
+  const [settingsPrimaryColor, setSettingsPrimaryColor] = useState('#dc2626')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
+
+  const saveOrgSettings = async () => {
+    if (!org || !isOrgAdmin) return
+
+    setSettingsSaving(true)
+    setSettingsMsg(null)
+
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('organizations')
+      .update({
+        name: settingsName.trim(),
+        logo_url: settingsLogoUrl.trim() || null,
+        primary_color: settingsPrimaryColor.trim() || '#dc2626',
+      })
+      .eq('id', org.id)
+
+    setSettingsSaving(false)
+
+    if (error) {
+      setSettingsMsg(`❌ ${error.message}`)
+      return
+    }
+
+    setSettingsMsg('✅ Organization settings saved. Refresh if the new branding does not appear immediately.')
+  }
+  
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
   const [selectedEventId, setSelectedEventId] = useState('')
@@ -306,8 +347,8 @@ export default function AdminPage() {
   }, [password, currentTeam.id])
 
   // Load dashboard snapshot when Dashboard tab is active
-useEffect(() => {
-  if (!password || tab !== 'dashboard') return
+  useEffect(() => {
+    if (!password || tab !== 'dashboard') return
 
   const load = async () => {
     setDashboardLoading(true)
@@ -978,6 +1019,7 @@ const deleteLeagueGame = async () => {
   { key: 'events', label: '📅 Events' },
   { key: 'league', label: '⚾ League' },
   { key: 'standings', label: '📋 Standings' },
+  { key: 'settings', label: '⚙️ Settings' },
 ] as const
 
 const teamAdminAllowedTabs: Tab[] = ['status', 'score', 'stats', 'events']
@@ -1019,6 +1061,116 @@ const visibleAdminTabs = isOrgAdmin
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
+
+        {/* ── Settings Tab ─────────────────────────────────────────────── */}
+        {tab === 'settings' && isOrgAdmin && (
+          <div className="space-y-4">
+            <div
+              className="rounded-2xl p-4 space-y-4"
+              style={{
+                border: `1px solid ${brandColor}4D`,
+                backgroundColor: `${brandColor}0D`,
+              }}
+            >
+              <p
+                className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}
+              >
+                Organization Settings
+              </p>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Organization Name</label>
+                <input
+                  type="text"
+                  value={settingsName}
+                  onChange={e => setSettingsName(e.target.value)}
+                  className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Slug</label>
+                <input
+                  type="text"
+                  value={org?.slug ?? ''}
+                  disabled
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-500"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Slug editing is disabled for now because it affects signup links.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Logo URL</label>
+                <input
+                  type="text"
+                  value={settingsLogoUrl}
+                  onChange={e => setSettingsLogoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              {settingsLogoUrl && (
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="mb-2 text-xs text-slate-400">Logo Preview</p>
+                  <img
+                    src={settingsLogoUrl}
+                    alt="Organization logo preview"
+                    className="h-16 w-16 rounded-xl object-contain bg-white"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Primary Color</label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={settingsPrimaryColor}
+                    onChange={e => setSettingsPrimaryColor(e.target.value)}
+                    className="h-11 w-14 rounded-xl border border-white/10 bg-white/10"
+                  />
+                  <input
+                    type="text"
+                    value={settingsPrimaryColor}
+                    onChange={e => setSettingsPrimaryColor(e.target.value)}
+                    className="flex-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Signup Link</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    org?.slug
+                      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/o/${org.slug}/signup`
+                      : ''
+                  }
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-400"
+                />
+              </div>
+
+              <button
+                onClick={saveOrgSettings}
+                disabled={settingsSaving || !settingsName.trim()}
+                className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                style={{ backgroundColor: settingsPrimaryColor || brandColor }}
+              >
+                {settingsSaving ? 'Saving...' : 'Save Organization Settings'}
+              </button>
+
+              {settingsMsg && (
+                <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Dashboard Tab ─────────────────────────────────────────────── */}
          {tab === 'dashboard' && (
