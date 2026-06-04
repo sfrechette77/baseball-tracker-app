@@ -1126,18 +1126,34 @@ const visibleAdminTabs = isOrgAdmin
 
               <div className="space-y-2">
                 <label className="text-xs text-slate-400">Primary Color</label>
-                <div className="flex gap-2">
+                <p className="text-[11px] text-slate-500">
+                  Click the color box to choose the organization’s main app color.
+                </p>
+
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
                   <input
                     type="color"
                     value={settingsPrimaryColor}
                     onChange={e => setSettingsPrimaryColor(e.target.value)}
-                    className="h-11 w-14 rounded-xl border border-white/10 bg-white/10"
+                    className="h-12 w-16 cursor-pointer rounded-lg border border-white/20 bg-transparent"
+                    title="Click to choose a color"
                   />
+
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">App highlight color</p>
+                    <p className="text-xs text-slate-400">
+                      Used for buttons, tabs, navigation, chat bubbles, and highlights.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] text-slate-500">Advanced: hex color</label>
                   <input
                     type="text"
                     value={settingsPrimaryColor}
                     onChange={e => setSettingsPrimaryColor(e.target.value)}
-                    className="flex-1 rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
                   />
                 </div>
               </div>
