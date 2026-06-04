@@ -201,26 +201,37 @@ export default function AdminPage() {
     setSettingsSaving(true)
     setSettingsMsg(null)
 
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('organizations')
-      .update({
-        name: settingsName.trim(),
-        logo_url: settingsLogoUrl.trim() || null,
-        primary_color: settingsPrimaryColor.trim() || '#dc2626',
+    try {
+      const response = await fetch('/api/admin/organization-settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          organizationId: org.id,
+          name: settingsName.trim(),
+          logoUrl: settingsLogoUrl.trim() || null,
+          primaryColor: settingsPrimaryColor.trim() || '#dc2626',
+        }),
       })
-      .eq('id', org.id)
 
-    setSettingsSaving(false)
+      const result = await response.json()
 
-    if (error) {
-      setSettingsMsg(`❌ ${error.message}`)
-      return
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save organization settings.')
+      }
+
+      setSettingsMsg('Organization settings saved.')
+    } catch (err) {
+      setSettingsMsg(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save organization settings.'
+      )
+    } finally {
+      setSettingsSaving(false)
     }
-
-    setSettingsMsg('✅ Organization settings saved. Refresh if the new branding does not appear immediately.')
-  }
+}
   
   const copySignupLink = async () => {
     if (!signupLink) return
