@@ -472,6 +472,13 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password, currentTeam?.id])
   
+    useEffect(() => {
+    if (!password || tab !== 'dashboard') return
+    if (isOrgAdmin) return
+    if (!currentTeam?.id) return
+
+    loadTeamAdminDashboard()
+  }, [password, tab, isOrgAdmin, currentTeam?.id])
 
   // Load dashboard snapshot when Dashboard tab is active
   useEffect(() => {
@@ -1433,6 +1440,79 @@ const visibleAdminTabs = isOrgAdmin
                   <span className="text-sm text-gray-500">Team Admin</span>
                 )}
               </div>
+            
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900">Next Event</h3>
+
+                <button
+                  type="button"
+                  onClick={() => setTab('events')}
+                  className="text-sm font-medium"
+                  style={{ color: brandColor }}
+                >
+                  View events
+                </button>
+              </div>
+
+              {teamDashboardLoading ? (
+                <p className="text-sm text-gray-500">Loading next event...</p>
+              ) : teamDashboardNextEvent ? (
+                <div className="space-y-2">
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {teamDashboardNextEvent.title || 'Team event'}
+                    </p>
+
+                    {teamDashboardNextEvent.event_type && (
+                      <p className="text-sm text-gray-500">
+                        {teamDashboardNextEvent.event_type}
+                      </p>
+                    )}
+                  </div>
+
+                  {teamDashboardNextEvent.starts_at && (
+                    <p className="text-sm text-gray-700">
+                      {new Date(teamDashboardNextEvent.starts_at).toLocaleString([], {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+
+                  {teamDashboardNextEvent.location && (
+                    <p className="text-sm text-gray-600">
+                      {teamDashboardNextEvent.location}
+                    </p>
+                  )}
+
+                  {teamDashboardNextEvent.opponent && (
+                    <p className="text-sm text-gray-600">
+                      Opponent: {teamDashboardNextEvent.opponent}
+                    </p>
+                  )}
+
+                  {teamDashboardNextEvent.status && (
+                    <span
+                      className="inline-flex rounded-full px-2 py-1 text-xs font-medium text-white"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      {teamDashboardNextEvent.status}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl bg-gray-50 p-3">
+                  <p className="text-sm font-medium text-gray-900">No upcoming events</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Add a game, practice, or team event from the Events tab.
+                  </p>
+                </div>
+              )}
+            </div>
 
               <p className="text-sm text-gray-600">
                 Quick view of what needs attention for your team.
