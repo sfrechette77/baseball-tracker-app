@@ -116,6 +116,16 @@ function formatDate(dateStr: string) {
   }).format(new Date(dateStr))
 }
 
+type TeamDashboardEvent = {
+  id: string
+  title: string | null
+  event_type: string | null
+  starts_at: string | null
+  location: string | null
+  status: string | null
+  opponent: string | null
+}
+
 // ─── Password Gate ────────────────────────────────────────────────────────────
 
 function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
@@ -186,6 +196,7 @@ export default function AdminPage() {
   const [settingsSeasonName, setSettingsSeasonName] = useState('')
   const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
   const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
+  
 
   useEffect(() => {
     if (!org) return
@@ -317,6 +328,8 @@ export default function AdminPage() {
     loadCurrentSeason()
   }, [org, isOrgAdmin])
 
+    
+
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
   const [selectedEventId, setSelectedEventId] = useState('')
@@ -375,6 +388,12 @@ export default function AdminPage() {
   const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
   const [dashboardTeamHealthCounts, setDashboardTeamHealthCounts] = useState<DashboardTeamHealthCounts[]>([])
 
+// Team admin dashboard tab
+  const [teamDashboardLoading, setTeamDashboardLoading] = useState(false)
+  const [teamDashboardMsg, setTeamDashboardMsg] = useState<string | null>(null)
+  const [teamDashboardNextEvent, setTeamDashboardNextEvent] = useState<TeamDashboardEvent | null>(null)
+  const [teamDashboardPlayers, setTeamDashboardPlayers] = useState<any[]>([]) 
+
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
@@ -421,10 +440,10 @@ export default function AdminPage() {
     const supabase = createClient()
     const [{ data: eventsForScore }, { data: allEventsData }] = await Promise.all([
       supabase.from('events').select('id, title, opponent, starts_at, event_type, team_score, opponent_score, result')
-        .eq('team_id', currentTeam.id)
+        .eq('team_id', currentTeam?.id)
         .neq('event_type', 'practice').order('starts_at', { ascending: false }),
       supabase.from('events').select('id, title, opponent, event_type, starts_at, field_id, is_home, travel_minutes, travel_miles, notes, gear_notes, status, team_score')
-        .eq('team_id', currentTeam.id)
+        .eq('team_id', currentTeam?.id)
         .order('starts_at', { ascending: false }),
     ])
     setEvents((eventsForScore ?? []) as EventRow[])
@@ -451,7 +470,8 @@ export default function AdminPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password, currentTeam.id])
+  }, [password, currentTeam?.id])
+  
 
   // Load dashboard snapshot when Dashboard tab is active
   useEffect(() => {
@@ -531,6 +551,41 @@ export default function AdminPage() {
 
   load()
 }, [password, tab])
+
+  const loadTeamAdminDashboard = async () => {
+    if (!currentTeam?.id) return
+
+    setTeamDashboardLoading(true)
+    setTeamDashboardMsg(null)
+
+    const supabase = createClient()
+
+    const today = new Date().toISOString()
+
+    const { data: eventsData, error: eventsError } = await supabase
+      .from('events')
+      .select('id, title, event_type, starts_at, location, status, opponent')
+      .eq('team_id', currentTeam.id)
+      .gte('starts_at', today)
+      .order('starts_at', { ascending: true })
+      .limit(1)
+
+    const { data: playersData, error: playersError } = await supabase
+      .from('players')
+      .select('id, name, jersey_number, position')
+      .eq('team_id', currentTeam.id)
+      .order('name', { ascending: true })
+
+    if (eventsError || playersError) {
+      setTeamDashboardMsg(
+        eventsError?.message || playersError?.message || 'Failed to load dashboard.'
+      )
+    }
+
+    setTeamDashboardNextEvent(eventsData?.[0] ?? null)
+    setTeamDashboardPlayers(playersData ?? [])
+    setTeamDashboardLoading(false)
+  }
 
   // Load pending memberships + org teams when Pending tab is active
   useEffect(() => {
@@ -1129,7 +1184,7 @@ const deleteLeagueGame = async () => {
   { key: 'settings', label: '⚙️ Settings' },
 ] as const
 
-const teamAdminAllowedTabs: Tab[] = ['status', 'score', 'stats', 'events']
+const teamAdminAllowedTabs: Tab[] = ['dashboard', 'status', 'score', 'stats', 'events']
 
 const visibleAdminTabs = isOrgAdmin
   ? allAdminTabs
@@ -1348,7 +1403,7 @@ const visibleAdminTabs = isOrgAdmin
         )}
 
         {/* ── Dashboard Tab ─────────────────────────────────────────────── */}
-         {tab === 'dashboard' && (
+         {tab === 'dashboard' && isOrgAdmin && (
           <DashboardTab
             dashboardLoading={dashboardLoading}
             dashboardMsg={dashboardMsg}
@@ -1367,7 +1422,97 @@ const visibleAdminTabs = isOrgAdmin
             formatDate={formatDate}
             setTab={setTab}
           />
-        )} 
+        )}
+        
+        {tab === 'dashboard' && !isOrgAdmin && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Team Dashboard</h2>
+                {currentTeam?.id && (
+                  <span className="text-sm text-gray-500">Team Admin</span>
+                )}
+              </div>
+
+              <p className="text-sm text-gray-600">
+                Quick view of what needs attention for your team.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-base font-semibold text-gray-900">Quick Actions</h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTab('status')}
+                  className="rounded-xl border px-3 py-3 text-sm font-medium"
+                  style={{ borderColor: brandColor, color: brandColor }}
+                >
+                  Set Status
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTab('score')}
+                  className="rounded-xl border px-3 py-3 text-sm font-medium"
+                  style={{ borderColor: brandColor, color: brandColor }}
+                >
+                  Enter Score
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTab('events')}
+                  className="rounded-xl border px-3 py-3 text-sm font-medium"
+                  style={{ borderColor: brandColor, color: brandColor }}
+                >
+                  Manage Events
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTab('stats')}
+                  className="rounded-xl border px-3 py-3 text-sm font-medium"
+                  style={{ borderColor: brandColor, color: brandColor }}
+                >
+                  Enter Stats
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-base font-semibold text-gray-900">Roster Health</h3>
+
+              {teamDashboardLoading ? (
+                <p className="text-sm text-gray-500">Loading roster...</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-gray-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {teamDashboardPlayers.length}
+                    </p>
+                    <p className="text-xs text-gray-500">Players</p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {teamDashboardPlayers.filter(player => !player.jersey_number).length}
+                    </p>
+                    <p className="text-xs text-gray-500">Missing #</p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {teamDashboardPlayers.filter(player => !player.position).length}
+                    </p>
+                    <p className="text-xs text-gray-500">Missing Pos</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Pending Tab ────────────────────────────────────────────────── */}
         {tab === 'pending' && (
