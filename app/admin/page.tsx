@@ -1217,7 +1217,7 @@ const visibleAdminTabs = isOrgAdmin
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-5 gap-1">
           {visibleAdminTabs.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}
@@ -1431,165 +1431,178 @@ const visibleAdminTabs = isOrgAdmin
           />
         )}
         
-        {tab === 'dashboard' && !isOrgAdmin && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Team Dashboard</h2>
-                {currentTeam?.id && (
-                  <span className="text-sm text-gray-500">Team Admin</span>
-                )}
-              </div>
-            
-            <div className="rounded-2xl border bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-gray-900">Next Event</h3>
+        {tab === 'dashboard' && isOrgAdmin && (
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                      Coach Center
+                    </p>
+                    <h2 className="mt-1 text-l font-black tracking-tight text-white">
+                      Team Dashboard
+                    </h2>
+                  </div>
+
+                  <span
+                    className="rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide"
+                    style={{ borderColor: brandColor, color: brandColor }}
+                  >
+                    Team Admin
+                  </span>
+                </div>
+
+
+            </div>
+
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/30 p-4">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="flex h-12 w-12 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${brandColor}20`, color: brandColor }}
+                  >
+                    📅
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="font-black text-white">
+                      No upcoming events scheduled
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-400">
+                      Add a game, practice, or team event to keep families informed.
+                    </p>
+                  </div>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => setTab('events')}
-                  className="text-sm font-medium"
+                  className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-white"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  Add Event
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
+              <div className="mb-5 flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg"
                   style={{ color: brandColor }}
                 >
-                  View events
-                </button>
+                  ⚡
+                </div>
+                <h3 className="text-lg font-black text-white">Quick Actions</h3>
               </div>
-
-              {teamDashboardLoading ? (
-                <p className="text-sm text-gray-500">Loading next event...</p>
-              ) : teamDashboardNextEvent ? (
-                <div className="space-y-2">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {teamDashboardNextEvent.title || 'Team event'}
-                    </p>
-
-                    {teamDashboardNextEvent.event_type && (
-                      <p className="text-sm text-gray-500">
-                        {teamDashboardNextEvent.event_type}
-                      </p>
-                    )}
-                  </div>
-
-                  {teamDashboardNextEvent.starts_at && (
-                    <p className="text-sm text-gray-700">
-                      {new Date(teamDashboardNextEvent.starts_at).toLocaleString([], {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  )}
-
-                  {teamDashboardNextEvent.location && (
-                    <p className="text-sm text-gray-600">
-                      {teamDashboardNextEvent.location}
-                    </p>
-                  )}
-
-                  {teamDashboardNextEvent.opponent && (
-                    <p className="text-sm text-gray-600">
-                      Opponent: {teamDashboardNextEvent.opponent}
-                    </p>
-                  )}
-
-                  {teamDashboardNextEvent.status && (
-                    <span
-                      className="inline-flex rounded-full px-2 py-1 text-xs font-medium text-white"
-                      style={{ backgroundColor: brandColor }}
-                    >
-                      {teamDashboardNextEvent.status}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-xl bg-gray-50 p-3">
-                  <p className="text-sm font-medium text-gray-900">No upcoming events</p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Add a game, practice, or team event from the Events tab.
-                  </p>
-                </div>
-              )}
-            </div>
-
-              <p className="text-sm text-gray-600">
-                Quick view of what needs attention for your team.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-base font-semibold text-gray-900">Quick Actions</h3>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setTab('status')}
-                  className="rounded-xl border px-3 py-3 text-sm font-medium"
-                  style={{ borderColor: brandColor, color: brandColor }}
-                >
-                  Set Status
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTab('score')}
-                  className="rounded-xl border px-3 py-3 text-sm font-medium"
-                  style={{ borderColor: brandColor, color: brandColor }}
-                >
-                  Enter Score
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTab('events')}
-                  className="rounded-xl border px-3 py-3 text-sm font-medium"
-                  style={{ borderColor: brandColor, color: brandColor }}
-                >
-                  Manage Events
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTab('stats')}
-                  className="rounded-xl border px-3 py-3 text-sm font-medium"
-                  style={{ borderColor: brandColor, color: brandColor }}
-                >
-                  Enter Stats
-                </button>
+                {[
+                  { label: 'Set Status', icon: '📋', nextTab: 'status' as Tab },
+                  { label: 'Enter Score', icon: '🏆', nextTab: 'score' as Tab },
+                  { label: 'Manage Events', icon: '📅', nextTab: 'events' as Tab },
+                  { label: 'Enter Stats', icon: '📊', nextTab: 'stats' as Tab },
+                ].map(action => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => setTab(action.nextTab)}
+                    className="flex min-h-[56px] items-center justify-center gap-2 rounded-xl border bg-black/20 px-3 py-2 text-sm font-semibold transition hover:bg-white/5"
+                    style={{ borderColor: brandColor, color: brandColor }}
+                  >
+                    <span className="text-lg">{action.icon}</span>
+                    {action.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-base font-semibold text-gray-900">Roster Health</h3>
-
-              {teamDashboardLoading ? (
-                <p className="text-sm text-gray-500">Loading roster...</p>
-              ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {teamDashboardPlayers.length}
-                    </p>
-                    <p className="text-xs text-gray-500">Players</p>
-                  </div>
-
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {teamDashboardPlayers.filter(player => !player.jersey_number).length}
-                    </p>
-                    <p className="text-xs text-gray-500">Missing #</p>
-                  </div>
-
-                  <div className="rounded-xl bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {teamDashboardPlayers.filter(player => !player.position).length}
-                    </p>
-                    <p className="text-xs text-gray-500">Missing Pos</p>
-                  </div>
+            <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
+              <div className="mb-5 flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg"
+                  style={{ color: brandColor }}
+                >
+                  👥
                 </div>
-              )}
+                <h3 className="text-lg font-black text-white">Roster Health</h3>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  {
+                    label: 'Players',
+                    value: teamDashboardPlayers.length,
+                    icon: '👤',
+                  },
+                  {
+                    label: 'Missing #',
+                    value: teamDashboardPlayers.filter(player => !player.jersey_number).length,
+                    icon: '!',
+                  },
+                  {
+                    label: 'Missing Pos',
+                    value: teamDashboardPlayers.filter(player => !player.position).length,
+                    icon: '👕',
+                  },
+                ].map(stat => (
+                  <div
+                    key={stat.label}
+                    className="rounded-xl border border-white/10 bg-black/30 p-2 text-center"
+                  >
+                    <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-black text-slate-300">
+                      {stat.icon}
+                    </div>
+                    <p className="text-2xl font-black text-white">{stat.value}</p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-400">{stat.label}</p>
+                  </div>
+                ))}
+                <div className="mt-4 space-y-2">
+                  {teamDashboardPlayers.filter(p => !p.jersey_number).length > 0 && (
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                      <span className="text-sm text-amber-300">
+                        ⚠ {teamDashboardPlayers.filter(p => !p.jersey_number).length} player(s) missing jersey numbers
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => window.location.href = '/team'}
+                        className="text-xs font-bold text-amber-300"
+                      >
+                        Fix →
+                      </button>
+                    </div>
+                  )}
+
+                  {teamDashboardPlayers.filter(p => !p.position).length > 0 && (
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                      <span className="text-sm text-amber-300">
+                        ⚠ {teamDashboardPlayers.filter(p => !p.position).length} player(s) missing positions
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => window.location.href = '/team'}
+                        className="text-xs font-bold text-amber-300"
+                      >
+                        Fix →
+                      </button>
+                    </div>
+                  )}
+                  {teamDashboardPlayers.length > 0 &&
+                    teamDashboardPlayers.every(
+                      p => p.jersey_number && p.position
+                    ) && (
+                      <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+                        <p className="text-sm text-emerald-300">
+                          ✅ Roster looks healthy
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -2553,8 +2566,9 @@ const visibleAdminTabs = isOrgAdmin
         )}
 
         {/* ── League Tab ─────────────────────────────────────────────────────── */}
-{tab === 'league' && (
-  <>
+        {tab === 'league' && (
+      <>
+
     {/* Form */}
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
       <div className="flex items-center justify-between">
