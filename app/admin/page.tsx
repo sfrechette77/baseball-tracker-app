@@ -1517,6 +1517,14 @@ const visibleAdminTabs = isOrgAdmin
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => (window.location.href = '/team')}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition hover:bg-white/5"
+                style={{ borderColor: brandColor, color: brandColor }}
+              >
+                👥 View Roster
+              </button>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">

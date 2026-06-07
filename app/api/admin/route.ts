@@ -111,6 +111,19 @@ export async function POST(req: NextRequest) {
     return null
   }
 
+  const verifyTeamAccess = async (): Promise<string | null> => {
+    if (!teamId) return 'Missing teamId'
+
+    const { data, error } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('id', teamId)
+      .maybeSingle()
+
+    if (error || !data) return 'Team not found'
+    return null
+  }
+
   try {
     // ── Save full game state atomically ─────────────────────────────────────
     if (action === 'save_game') {
@@ -252,6 +265,11 @@ export async function POST(req: NextRequest) {
       }
       if (!teamId) {
         return NextResponse.json({ error: 'Missing teamId' }, { status: 400 })
+      }
+
+      const teamAccessError = await verifyTeamAccess()
+      if (teamAccessError) {
+        return NextResponse.json({ error: teamAccessError }, { status: 403 })
       }
 
       // Check if this is an MSBL game with an opponent team selected
