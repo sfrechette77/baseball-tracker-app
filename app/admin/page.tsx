@@ -1431,7 +1431,7 @@ const visibleAdminTabs = isOrgAdmin
           />
         )}
         
-        {tab === 'dashboard' && isOrgAdmin && (
+        {tab === 'dashboard' && isTeamAdmin && (
           <div className="space-y-5">
             <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
               <div className="mb-5">

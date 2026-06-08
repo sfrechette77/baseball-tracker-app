@@ -218,12 +218,12 @@ export async function getApprovedParents(): Promise<
   if (!guard.ok) return { ok: false, error: guard.error }
 
   const { data: memberships, error: memError } = await supabase
-    .from('memberships')
-    .select('id, user_id, organization_id, created_at')
-    .eq('organization_id', guard.membership.organization_id)
-    .eq('role', 'parent')
-    .eq('status', 'approved')
-    .order('created_at', { ascending: true })
+  .from('memberships')
+  .select('id, user_id, organization_id, role, created_at')
+  .eq('organization_id', guard.membership.organization_id)
+  .in('role', ['parent', 'team_admin'])
+  .eq('status', 'approved')
+  .order('created_at', { ascending: true })
 
   if (memError) return { ok: false, error: memError.message }
   if (!memberships || memberships.length === 0) return { ok: true, members: [] }
