@@ -63,6 +63,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
           `)
           .eq('user_id', user.id)
           .eq('status', 'approved')
+          .in('role', ['org_admin', 'team_admin'])
           .limit(1)
 
         if (cancelled) return

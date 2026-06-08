@@ -66,7 +66,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings'
+type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
 
 type Field = {
   id: string
@@ -114,6 +114,16 @@ function formatDate(dateStr: string) {
     month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit'
   }).format(new Date(dateStr))
+}
+
+type TeamDashboardEvent = {
+  id: string
+  title: string | null
+  event_type: string | null
+  starts_at: string | null
+  location: string | null
+  status: string | null
+  opponent: string | null
 }
 
 // ─── Password Gate ────────────────────────────────────────────────────────────
@@ -166,8 +176,159 @@ export default function AdminPage() {
   const { membership, loading: orgLoading } = useActiveOrg()
   const isOrgAdmin = membership?.role === 'org_admin'
   const isTeamAdmin = membership?.role === 'team_admin'
+
   const { org } = useActiveOrg()
   const brandColor = org?.primary_color || '#dc2626'
+
+  const signupLink =
+    org?.slug && typeof window !== 'undefined'
+      ? `${window.location.origin}/o/${org.slug}/signup`
+      : ''
+
+  const [settingsName, setSettingsName] = useState('')
+  const [settingsLogoUrl, setSettingsLogoUrl] = useState('')
+  const [settingsPrimaryColor, setSettingsPrimaryColor] = useState('#dc2626')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
+  const [settingsCopied, setSettingsCopied] = useState(false)
+  const [settingsLogoUploading, setSettingsLogoUploading] = useState(false)
+
+  const [settingsSeasonName, setSettingsSeasonName] = useState('')
+  const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
+  const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
+  
+
+  useEffect(() => {
+    if (!org) return
+
+    setSettingsName(org.name ?? '')
+    setSettingsLogoUrl(org.logo_url ?? '')
+    setSettingsPrimaryColor(org.primary_color ?? '#dc2626')
+  }, [org])
+
+  const saveOrgSettings = async () => {
+    if (!org || !isOrgAdmin) return
+
+    setSettingsSaving(true)
+    setSettingsMsg(null)
+
+    try {
+      const response = await fetch('/api/admin/organization-settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          organizationId: org.id,
+          name: settingsName.trim(),
+          logoUrl: settingsLogoUrl.trim() || null,
+          primaryColor: settingsPrimaryColor.trim() || '#dc2626',
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save organization settings.')
+      }
+
+      setSettingsMsg('Organization settings saved.')
+    } catch (err) {
+      setSettingsMsg(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save organization settings.'
+      )
+    } finally {
+      setSettingsSaving(false)
+    }
+}
+  
+  const copySignupLink = async () => {
+    if (!signupLink) return
+
+    try {
+      await navigator.clipboard.writeText(signupLink)
+      setSettingsCopied(true)
+
+      setTimeout(() => {
+        setSettingsCopied(false)
+      }, 2000)
+    } catch {
+      setSettingsMsg('❌ Could not copy signup link')
+    }
+  }
+
+  const uploadOrgLogo = async (file: File) => {
+    if (!org || !isOrgAdmin) return
+
+    setSettingsLogoUploading(true)
+    setSettingsMsg(null)
+
+    const supabase = createClient()
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png'
+    const filePath = `organizations/${org.id}/logo-${Date.now()}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('organization-logos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      setSettingsLogoUploading(false)
+      setSettingsMsg(`❌ Logo upload failed: ${uploadError.message}`)
+      return
+    }
+
+    const { data } = supabase.storage
+      .from('organization-logos')
+      .getPublicUrl(filePath)
+
+    setSettingsLogoUrl(data.publicUrl)
+    setSettingsLogoUploading(false)
+    setSettingsMsg('✅ Logo uploaded. Click Save Organization Settings to apply it.')
+  }
+
+  useEffect(() => {
+    if (!org || !isOrgAdmin) return
+
+    const loadCurrentSeason = async () => {
+      setSettingsSeasonLoading(true)
+      setSettingsSeasonMsg(null)
+
+      const supabase = createClient()
+
+      const { data, error } = await supabase
+        .from('seasons')
+        .select('id, name, is_current')
+        .eq('organization_id', org.id)
+        .eq('is_current', true)
+        .limit(1)
+        .maybeSingle()
+
+      setSettingsSeasonLoading(false)
+
+      if (error) {
+        setSettingsSeasonMsg(`❌ ${error.message}`)
+        return
+      }
+
+      if (!data) {
+        setSettingsSeasonName('')
+        setSettingsSeasonMsg('No active season found for this organization.')
+        return
+      }
+
+      setSettingsSeasonName(data.name ?? '')
+    }
+
+    loadCurrentSeason()
+  }, [org, isOrgAdmin])
+
+    
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -227,6 +388,12 @@ export default function AdminPage() {
   const [dashboardTeamAdminAssignments, setDashboardTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
   const [dashboardTeamHealthCounts, setDashboardTeamHealthCounts] = useState<DashboardTeamHealthCounts[]>([])
 
+// Team admin dashboard tab
+  const [teamDashboardLoading, setTeamDashboardLoading] = useState(false)
+  const [teamDashboardMsg, setTeamDashboardMsg] = useState<string | null>(null)
+  const [teamDashboardNextEvent, setTeamDashboardNextEvent] = useState<TeamDashboardEvent | null>(null)
+  const [teamDashboardPlayers, setTeamDashboardPlayers] = useState<any[]>([]) 
+
 // Pending approvals tab
   const [pendingList, setPendingList] = useState<PendingMembership[]>([])
   const [pendingLoading, setPendingLoading] = useState(false)
@@ -273,10 +440,10 @@ export default function AdminPage() {
     const supabase = createClient()
     const [{ data: eventsForScore }, { data: allEventsData }] = await Promise.all([
       supabase.from('events').select('id, title, opponent, starts_at, event_type, team_score, opponent_score, result')
-        .eq('team_id', currentTeam.id)
+        .eq('team_id', currentTeam?.id)
         .neq('event_type', 'practice').order('starts_at', { ascending: false }),
       supabase.from('events').select('id, title, opponent, event_type, starts_at, field_id, is_home, travel_minutes, travel_miles, notes, gear_notes, status, team_score')
-        .eq('team_id', currentTeam.id)
+        .eq('team_id', currentTeam?.id)
         .order('starts_at', { ascending: false }),
     ])
     setEvents((eventsForScore ?? []) as EventRow[])
@@ -303,11 +470,19 @@ export default function AdminPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password, currentTeam.id])
+  }, [password, currentTeam?.id])
+  
+    useEffect(() => {
+    if (!password || tab !== 'dashboard') return
+    if (isOrgAdmin) return
+    if (!currentTeam?.id) return
+
+    loadTeamAdminDashboard()
+  }, [password, tab, isOrgAdmin, currentTeam?.id])
 
   // Load dashboard snapshot when Dashboard tab is active
-useEffect(() => {
-  if (!password || tab !== 'dashboard') return
+  useEffect(() => {
+    if (!password || tab !== 'dashboard') return
 
   const load = async () => {
     setDashboardLoading(true)
@@ -383,6 +558,41 @@ useEffect(() => {
 
   load()
 }, [password, tab])
+
+  const loadTeamAdminDashboard = async () => {
+    if (!currentTeam?.id) return
+
+    setTeamDashboardLoading(true)
+    setTeamDashboardMsg(null)
+
+    const supabase = createClient()
+
+    const today = new Date().toISOString()
+
+    const { data: eventsData, error: eventsError } = await supabase
+      .from('events')
+      .select('id, title, event_type, starts_at, location, status, opponent')
+      .eq('team_id', currentTeam.id)
+      .gte('starts_at', today)
+      .order('starts_at', { ascending: true })
+      .limit(1)
+
+    const { data: playersData, error: playersError } = await supabase
+      .from('players')
+      .select('id, name, jersey_number, position')
+      .eq('team_id', currentTeam.id)
+      .order('name', { ascending: true })
+
+    if (eventsError || playersError) {
+      setTeamDashboardMsg(
+        eventsError?.message || playersError?.message || 'Failed to load dashboard.'
+      )
+    }
+
+    setTeamDashboardNextEvent(eventsData?.[0] ?? null)
+    setTeamDashboardPlayers(playersData ?? [])
+    setTeamDashboardLoading(false)
+  }
 
   // Load pending memberships + org teams when Pending tab is active
   useEffect(() => {
@@ -978,9 +1188,10 @@ const deleteLeagueGame = async () => {
   { key: 'events', label: '📅 Events' },
   { key: 'league', label: '⚾ League' },
   { key: 'standings', label: '📋 Standings' },
+  { key: 'settings', label: '⚙️ Settings' },
 ] as const
 
-const teamAdminAllowedTabs: Tab[] = ['status', 'score', 'stats', 'events']
+const teamAdminAllowedTabs: Tab[] = ['dashboard', 'status', 'score', 'stats', 'events']
 
 const visibleAdminTabs = isOrgAdmin
   ? allAdminTabs
@@ -1006,7 +1217,7 @@ const visibleAdminTabs = isOrgAdmin
         </div>
 
         {/* Tabs */}
-        <div className="mx-auto max-w-sm mt-4 grid grid-cols-4 gap-1">
+        <div className="mx-auto max-w-sm mt-4 grid grid-cols-5 gap-1">
           {visibleAdminTabs.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`rounded-xl py-2 text-xs font-bold transition ${tab === key ? 'text-white' : 'bg-white/10 text-slate-400 hover:bg-white/20'}`}
@@ -1020,8 +1231,186 @@ const visibleAdminTabs = isOrgAdmin
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
 
+        {/* ── Settings Tab ─────────────────────────────────────────────── */}
+        {tab === 'settings' && isOrgAdmin && (
+          <div className="space-y-4">
+            <div
+              className="rounded-2xl p-4 space-y-4"
+              style={{
+                border: `1px solid ${brandColor}4D`,
+                backgroundColor: `${brandColor}0D`,
+              }}
+            >
+              <p
+                className="text-xs uppercase tracking-wide font-semibold"
+                style={{ color: brandColor }}
+              >
+                Organization Settings
+              </p>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Organization Name</label>
+                <input
+                  type="text"
+                  value={settingsName}
+                  onChange={e => setSettingsName(e.target.value)}
+                  className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Slug</label>
+                <input
+                  type="text"
+                  value={org?.slug ?? ''}
+                  disabled
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-500"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Slug editing is disabled for now because it affects signup links.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white">Branding</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Customize how this organization appears throughout the app.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Upload Logo</label>
+                <p className="text-[11px] text-slate-500">
+                  Choose a PNG, JPG, or WebP logo. After upload, click Save Organization Settings.
+                </p>
+
+                <label className="block cursor-pointer rounded-xl px-3 py-3 text-center text-sm font-bold text-white transition disabled:opacity-50"
+                        style={{ backgroundColor: brandColor }}
+                >
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={settingsLogoUploading}
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      uploadOrgLogo(file)
+                      e.currentTarget.value = ''
+                    }}
+                  />
+                  {settingsLogoUploading ? 'Uploading logo...' : 'Choose Logo File'}
+                </label>
+              </div>
+
+              {settingsLogoUrl && (
+                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                  <p className="mb-2 text-xs text-slate-400">Logo Preview</p>
+                  <img
+                    src={settingsLogoUrl}
+                    alt="Organization logo preview"
+                    className="h-16 w-16 rounded-xl object-contain bg-white"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Primary Color</label>
+                <p className="text-[11px] text-slate-500">
+                  Click the color box to choose the organization’s main app color.
+                </p>
+
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                  <input
+                    type="color"
+                    value={settingsPrimaryColor}
+                    onChange={e => setSettingsPrimaryColor(e.target.value)}
+                    className="h-12 w-16 cursor-pointer rounded-lg border border-white/20 bg-transparent"
+                    title="Click to choose a color"
+                  />
+
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">App highlight color</p>
+                    <p className="text-xs text-slate-400">
+                      Used for buttons, tabs, navigation, chat bubbles, and highlights.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white">Access</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Share the signup link with parents, coaches, and players so they can request access.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={signupLink}
+                    className="min-w-0 flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-400"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={copySignupLink}
+                    disabled={!signupLink}
+                    className="rounded-xl px-4 py-2 text-xs font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {settingsCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+
+              <div className="pt-4 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white">Season</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  The active season controls schedules, rosters, stats, and standings.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                {settingsSeasonLoading ? (
+                  <p className="text-sm text-slate-400">Loading active season...</p>
+                ) : settingsSeasonName ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-white">{settingsSeasonName}</p>
+                    <span
+                      className="inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Active
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    {settingsSeasonMsg ?? 'No active season found.'}
+                  </p>
+                )}
+              </div>  
+              </div>
+
+              <button
+                onClick={saveOrgSettings}
+                disabled={settingsSaving || !settingsName.trim()}
+                className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                style={{ backgroundColor: settingsPrimaryColor || brandColor }}
+              >
+                {settingsSaving ? 'Saving...' : 'Save Organization Settings'}
+              </button>
+
+              {settingsMsg && (
+                <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Dashboard Tab ─────────────────────────────────────────────── */}
-         {tab === 'dashboard' && (
+         {tab === 'dashboard' && isOrgAdmin && (
           <DashboardTab
             dashboardLoading={dashboardLoading}
             dashboardMsg={dashboardMsg}
@@ -1040,7 +1429,191 @@ const visibleAdminTabs = isOrgAdmin
             formatDate={formatDate}
             setTab={setTab}
           />
-        )} 
+        )}
+        
+        {tab === 'dashboard' && isOrgAdmin && (
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                      Coach Center
+                    </p>
+                    <h2 className="mt-1 text-l font-black tracking-tight text-white">
+                      Team Dashboard
+                    </h2>
+                  </div>
+
+                  <span
+                    className="rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide"
+                    style={{ borderColor: brandColor, color: brandColor }}
+                  >
+                    Team Admin
+                  </span>
+                </div>
+
+
+            </div>
+
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/30 p-4">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="flex h-12 w-12 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${brandColor}20`, color: brandColor }}
+                  >
+                    📅
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="font-black text-white">
+                      No upcoming events scheduled
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-400">
+                      Add a game, practice, or team event to keep families informed.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setTab('events')}
+                  className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-white"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  Add Event
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
+              <div className="mb-5 flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg"
+                  style={{ color: brandColor }}
+                >
+                  ⚡
+                </div>
+                <h3 className="text-lg font-black text-white">Quick Actions</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Set Status', icon: '📋', nextTab: 'status' as Tab },
+                  { label: 'Enter Score', icon: '🏆', nextTab: 'score' as Tab },
+                  { label: 'Manage Events', icon: '📅', nextTab: 'events' as Tab },
+                  { label: 'Enter Stats', icon: '📊', nextTab: 'stats' as Tab },
+                ].map(action => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => setTab(action.nextTab)}
+                    className="flex min-h-[56px] items-center justify-center gap-2 rounded-xl border bg-black/20 px-3 py-2 text-sm font-semibold transition hover:bg-white/5"
+                    style={{ borderColor: brandColor, color: brandColor }}
+                  >
+                    <span className="text-lg">{action.icon}</span>
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => (window.location.href = '/team')}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition hover:bg-white/5"
+                style={{ borderColor: brandColor, color: brandColor }}
+              >
+                👥 View Roster
+              </button>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
+              <div className="mb-5 flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg"
+                  style={{ color: brandColor }}
+                >
+                  👥
+                </div>
+                <h3 className="text-lg font-black text-white">Roster Health</h3>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  {
+                    label: 'Players',
+                    value: teamDashboardPlayers.length,
+                    icon: '👤',
+                  },
+                  {
+                    label: 'Missing #',
+                    value: teamDashboardPlayers.filter(player => !player.jersey_number).length,
+                    icon: '!',
+                  },
+                  {
+                    label: 'Missing Pos',
+                    value: teamDashboardPlayers.filter(player => !player.position).length,
+                    icon: '👕',
+                  },
+                ].map(stat => (
+                  <div
+                    key={stat.label}
+                    className="rounded-xl border border-white/10 bg-black/30 p-2 text-center"
+                  >
+                    <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-black text-slate-300">
+                      {stat.icon}
+                    </div>
+                    <p className="text-2xl font-black text-white">{stat.value}</p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-400">{stat.label}</p>
+                  </div>
+                ))}
+                <div className="mt-4 space-y-2">
+                  {teamDashboardPlayers.filter(p => !p.jersey_number).length > 0 && (
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                      <span className="text-sm text-amber-300">
+                        ⚠ {teamDashboardPlayers.filter(p => !p.jersey_number).length} player(s) missing jersey numbers
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => window.location.href = '/team'}
+                        className="text-xs font-bold text-amber-300"
+                      >
+                        Fix →
+                      </button>
+                    </div>
+                  )}
+
+                  {teamDashboardPlayers.filter(p => !p.position).length > 0 && (
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                      <span className="text-sm text-amber-300">
+                        ⚠ {teamDashboardPlayers.filter(p => !p.position).length} player(s) missing positions
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => window.location.href = '/team'}
+                        className="text-xs font-bold text-amber-300"
+                      >
+                        Fix →
+                      </button>
+                    </div>
+                  )}
+                  {teamDashboardPlayers.length > 0 &&
+                    teamDashboardPlayers.every(
+                      p => p.jersey_number && p.position
+                    ) && (
+                      <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+                        <p className="text-sm text-emerald-300">
+                          ✅ Roster looks healthy
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Pending Tab ────────────────────────────────────────────────── */}
         {tab === 'pending' && (
@@ -2001,8 +2574,9 @@ const visibleAdminTabs = isOrgAdmin
         )}
 
         {/* ── League Tab ─────────────────────────────────────────────────────── */}
-{tab === 'league' && (
-  <>
+        {tab === 'league' && (
+      <>
+
     {/* Form */}
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
       <div className="flex items-center justify-between">
