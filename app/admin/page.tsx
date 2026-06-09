@@ -2004,11 +2004,11 @@ const visibleAdminTabs = isOrgAdmin
         {tab === 'status' && (
           <>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pick a Game to Broadcast</p>
+              <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pick an event to Broadcast</p>
               <select value={statusEventId} onChange={e => { setStatusEventId(e.target.value); setStatusMsg(null) }}
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:border-slate-400">
-                <option value="">— Pick a game —</option>
-                {events
+                <option value="">— Pick an event —</option>
+                {allEvents
                   .filter(e => new Date(e.starts_at).getTime() >= Date.now() - 24 * 60 * 60 * 1000)
                   .reverse()
                   .map(e => (
@@ -2065,7 +2065,7 @@ const visibleAdminTabs = isOrgAdmin
                     {([
                       { key: 'on', label: '🟢 Game On', desc: 'Show up as scheduled', cls: 'border-green-500/40 bg-green-500/10' },
                       { key: 'watching', label: '🟡 Watching', desc: 'Monitoring — decision pending', cls: 'border-amber-500/40 bg-amber-500/10' },
-                      { key: 'off', label: '🔴 Off / Canceled', desc: 'Game is off', cls: 'border-red-500/40 bg-red-500/10' },
+                      { key: 'off', label: '🔴 Off / Canceled', desc: 'Event is off', cls: 'border-red-500/40 bg-red-500/10' },
                     ] as const).map(({ key, label, desc, cls }) => (
                       <button key={key} onClick={() => setStatusDraftStatus(key)}
                         className={`rounded-xl border-2 p-3 text-left transition ${
