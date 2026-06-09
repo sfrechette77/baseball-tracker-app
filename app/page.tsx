@@ -254,6 +254,11 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
   const isGameDay = isSameChicagoDay(eventTime, new Date())
   const isGame = event.event_type === 'game' || event.event_type === 'tournament'
   const isPractice = event.event_type === 'practice'
+  const isOff = event.display_status === 'off'
+  const eventTypeLabel =
+    isPractice ? 'Practice'
+    : event.event_type === 'tournament' ? 'Tournament'
+    : 'Game'
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
@@ -280,11 +285,23 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
           {score && <p className={`mt-2 text-xl font-bold ${score.className}`}>{score.text}</p>}
         </div>
       ) : featured && isGameDay && isPractice ? (
-        <div className="rounded-xl bg-blue-600/20 border border-blue-500/30 p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-300 font-semibold">🏋️ Practice Day</p>
-          <h2 className="mt-1 text-2xl font-bold text-white">Practice Today</h2>
+        <div className={`rounded-xl border p-4 ${
+          isOff
+            ? 'bg-red-500/10 border-red-500/40'
+            : 'bg-blue-600/20 border-blue-500/30'
+        }`}>
+          <p className={`text-xs uppercase tracking-[0.2em] font-semibold ${
+            isOff ? 'text-red-300' : 'text-blue-300'
+          }`}>
+            {isOff ? '🔴 Practice Off' : '🏋️ Practice Day'}
+          </p>
+          <h2 className="mt-1 text-2xl font-bold text-white">
+            {isOff ? 'Practice Canceled' : 'Practice Today'}
+          </h2>
           <p className="mt-1 text-sm text-slate-300">{formatChicagoTime(eventTime)}</p>
-          <p className="mt-1 text-sm text-slate-400">{event.title}</p>
+          <p className="mt-1 text-sm text-slate-400">
+            {isOff && event.status_message ? event.status_message : event.title}
+          </p>
         </div>
       ) : (
         <>
@@ -295,7 +312,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
         </>
       )}
 
-      {!isCompleted && (
+      {!isCompleted && !isOff && (
         <div className="mt-4 grid grid-cols-4 gap-2">
           {[
             { val: countdown.days, label: 'Days' },
@@ -524,11 +541,11 @@ export default function HomePage() {
       {/* Content */}
       <div className="mx-auto max-w-sm space-y-4 px-4 pt-6">
 
+      {/* Push notification subscribe button */}
+        <PushSubscribeButton />  
+
         {/* Status banner — appears only if a broadcast has been set */}
         {featuredEvent && <StatusBanner event={featuredEvent} />}
-
-        {/* Push notification subscribe button */}
-        <PushSubscribeButton />
 
         {/* Next Up */}
         {teamSeasonNotFound && (
