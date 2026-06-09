@@ -388,14 +388,20 @@ export async function POST(req: NextRequest) {
         // Fetch event details for the push payload
         const { data: eventDetails } = await supabase
           .from('events')
-          .select('team_id, opponent')
+          .select('team_id, opponent, event_type')
           .eq('id', eventId)
           .single()
 
         if (eventDetails?.team_id) {
-          const statusLabel = displayStatus === 'on' ? '🟢 Game On'
-            : displayStatus === 'watching' ? '🟡 Watching'
-            : '🔴 Game Off'
+          const eventTypeLabel =
+            eventDetails.event_type === 'practice' ? 'Practice'
+            : eventDetails.event_type === 'tournament' ? 'Tournament'
+            : 'Game'
+
+          const statusLabel =
+            displayStatus === 'on' ? `🟢 ${eventTypeLabel} On`
+            : displayStatus === 'watching' ? `🟡 Watching ${eventTypeLabel}`
+            : `🔴 ${eventTypeLabel} Off`
           const opponentSuffix = eventDetails.opponent ? ` vs ${eventDetails.opponent}` : ''
           const title = `${statusLabel}${opponentSuffix}`
           const pushMessage = message || ''
