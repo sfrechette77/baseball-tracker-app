@@ -419,18 +419,40 @@ export default function EventPage() {
 
         {/* Broadcast status banner — shown when set */}
         {event.display_status && (() => {
+          const eventTypeLabel =
+            event.event_type === 'practice'
+              ? 'Practice'
+              : event.event_type === 'tournament'
+                ? 'Tournament'
+                : 'Game'
+
           const config = {
-            on: { label: '🟢 Game On', cls: 'border-green-500/40 bg-green-500/10 text-green-400' },
-            watching: { label: '🟡 Watching', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
-            off: { label: '🔴 Game Off', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
+            on: {
+              label: `🟢 ${eventTypeLabel} On`,
+              cls: 'border-green-500/40 bg-green-500/10 text-green-400',
+            },
+            watching: {
+              label: `🟡 Watching ${eventTypeLabel}`,
+              cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+            },
+            off: {
+              label: `🔴 ${eventTypeLabel} Off`,
+              cls: 'border-red-500/40 bg-red-500/10 text-red-400',
+            },
           }[event.display_status as 'on' | 'watching' | 'off']
+
           if (!config) return null
+
           return (
             <div className={`rounded-2xl border-2 p-4 ${config.cls.split(' ').slice(0, 2).join(' ')}`}>
-              <p className={`font-bold ${config.cls.split(' ').slice(2).join(' ')}`}>{config.label}</p>
+              <p className={`font-bold ${config.cls.split(' ').slice(2).join(' ')}`}>
+                {config.label}
+              </p>
+
               {event.status_message && (
                 <p className="mt-1 text-sm text-slate-300">{event.status_message}</p>
               )}
+
               {event.status_updated_at && (
                 <p className="mt-2 text-xs text-slate-500">
                   Updated {formatRelativeTime(new Date(event.status_updated_at))}

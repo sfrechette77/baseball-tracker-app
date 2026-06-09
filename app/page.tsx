@@ -379,6 +379,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
 function PastGameRow({ event }: { event: EventRow }) {
   const score = getScoreDisplay(event)
   const eventTime = new Date(event.starts_at)
+
   return (
     <Link href={`/event/${event.id}`}>
       <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 px-4 py-3 hover:bg-white/10 transition">
@@ -388,8 +389,11 @@ function PastGameRow({ event }: { event: EventRow }) {
           </p>
           <p className="text-xs text-slate-500">{formatChicagoShortDate(eventTime)}</p>
         </div>
+
         {score && (
-          <span className={`text-sm font-bold ${score.className}`}>{score.text}</span>
+          <span className={`text-sm font-bold ${score.className}`}>
+            {score.text}
+          </span>
         )}
       </div>
     </Link>
