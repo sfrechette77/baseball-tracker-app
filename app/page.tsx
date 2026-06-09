@@ -198,11 +198,25 @@ function formatRelativeTime(date: Date): string {
 function StatusBanner({ event }: { event: EventRow }) {
   if (!event.display_status) return null
 
-  const config = {
-    on: { label: '🟢 Game On', cls: 'border-green-500/40 bg-green-500/10 text-green-400' },
-    watching: { label: '🟡 Watching', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
-    off: { label: '🔴 Game Off', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
-  }[event.display_status as 'on' | 'watching' | 'off']
+  const eventTypeLabel =
+  event.event_type === 'practice' ? 'Practice'
+  : event.event_type === 'tournament' ? 'Tournament'
+  : 'Game'
+
+const config = {
+  on: {
+    label: `🟢 ${eventTypeLabel} On`,
+    cls: 'border-green-500/40 bg-green-500/10 text-green-400',
+  },
+  watching: {
+    label: `🟡 Watching ${eventTypeLabel}`,
+    cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+  },
+  off: {
+    label: `🔴 ${eventTypeLabel} Off`,
+    cls: 'border-red-500/40 bg-red-500/10 text-red-400',
+  },
+}[event.display_status as 'on' | 'watching' | 'off']
 
   if (!config) return null
 
