@@ -578,6 +578,13 @@ export default function AdminPage() {
       .order('starts_at', { ascending: true })
       .limit(1)
 
+    console.log('Team dashboard events query:', {
+      teamId: currentTeam.id,
+      today,
+      eventsData,
+      eventsError,
+    })
+
     const { data: playersData, error: playersError } = await supabase
       .from('players')
       .select('id, name, jersey_number, position')
