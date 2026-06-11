@@ -118,10 +118,10 @@ function formatDate(dateStr: string) {
 
 type TeamDashboardEvent = {
   id: string
-  title: string | null
+  title: string
   event_type: string | null
   starts_at: string | null
-  location: string | null
+  field_id: string | null
   status: string | null
   opponent: string | null
 }
@@ -572,7 +572,7 @@ export default function AdminPage() {
 
     const { data: eventsData, error: eventsError } = await supabase
       .from('events')
-      .select('id, title, event_type, starts_at, location, status, opponent')
+      .select('id, title, event_type, starts_at, status, opponent, field_id')
       .eq('team_id', currentTeam.id)
       .gte('starts_at', today)
       .order('starts_at', { ascending: true })
