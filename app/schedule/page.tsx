@@ -295,9 +295,11 @@ export default function SchedulePage() {
                           event.display_status === 'watching' ? 'text-amber-400' :
                           'text-red-400'
                         }`}>
-                          {event.display_status === 'on' ? '🟢 Game On' :
-                           event.display_status === 'watching' ? '🟡 Watching' :
-                           '🔴 Game Off'}
+                          {event.display_status === 'on'
+                            ? `🟢 ${event.event_type === 'practice' ? 'Practice' : event.event_type === 'tournament' ? 'Tournament' : 'Game'} On`
+                            : event.display_status === 'watching'
+                              ? `🟡 Watching ${event.event_type === 'practice' ? 'Practice' : event.event_type === 'tournament' ? 'Tournament' : 'Game'}`
+                              : `🔴 ${event.event_type === 'practice' ? 'Practice' : event.event_type === 'tournament' ? 'Tournament' : 'Game'} Off`}
                         </p>
                       )}
                       {score && (
