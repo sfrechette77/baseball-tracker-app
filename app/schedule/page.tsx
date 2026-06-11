@@ -301,7 +301,16 @@ export default function SchedulePage() {
                         </p>
                       )}
                       {score && (
-                        <p className={`mt-1 text-sm font-bold ${score.className}`}>{score.text}</p>
+                        <p
+                          className={`mt-1 text-sm font-bold ${score.className}`}
+                          style={
+                            score.text.startsWith('L')
+                              ? { color: '#f87171' }
+                              : undefined
+                          }
+                        >
+                          {score.text}
+                        </p>
                       )}
                       {field?.name && (
                         <p className="mt-1 text-xs text-slate-500">📍 {field.name}</p>

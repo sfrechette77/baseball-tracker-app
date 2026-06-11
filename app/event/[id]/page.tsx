@@ -406,7 +406,16 @@ export default function EventPage() {
 
           {!isPractice && score && (
             <div className="mt-4 rounded-xl bg-white/10 border border-white/10 p-4 text-center">
-              <p className={`text-4xl font-extrabold tabular-nums ${score.className}`}>{score.text}</p>
+              <p
+                className={`text-4xl font-extrabold tabular-nums ${score.className}`}
+                style={
+                  score.text.startsWith('L')
+                    ? { color: '#f87171' }
+                    : undefined
+                }
+              >
+                {score.text}
+              </p>
               {event.opponent && (
                 <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
               )}

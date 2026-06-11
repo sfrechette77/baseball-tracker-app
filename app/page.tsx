@@ -391,7 +391,14 @@ function PastGameRow({ event }: { event: EventRow }) {
         </div>
 
         {score && (
-          <span className={`text-sm font-bold ${score.className}`}>
+          <span
+            className={`text-sm font-bold ${score.className}`}
+            style={
+              score.text.startsWith('L')
+                ? { color: '#f87171' }
+                : undefined
+            }
+          >
             {score.text}
           </span>
         )}
