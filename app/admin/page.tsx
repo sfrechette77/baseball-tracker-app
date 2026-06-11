@@ -561,6 +561,7 @@ export default function AdminPage() {
 
   const loadTeamAdminDashboard = async () => {
     if (!currentTeam?.id) return
+    console.log('Team admin dashboard loading for team:', currentTeam)
 
     setTeamDashboardLoading(true)
     setTeamDashboardMsg(null)
