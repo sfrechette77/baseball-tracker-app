@@ -561,7 +561,6 @@ export default function AdminPage() {
 
   const loadTeamAdminDashboard = async () => {
     if (!currentTeam?.id) return
-    console.log('Team admin dashboard loading for team:', currentTeam)
 
     setTeamDashboardLoading(true)
     setTeamDashboardMsg(null)
@@ -577,13 +576,6 @@ export default function AdminPage() {
       .gte('starts_at', today)
       .order('starts_at', { ascending: true })
       .limit(1)
-
-    console.log('Team dashboard events query:', {
-      teamId: currentTeam.id,
-      today,
-      eventsData,
-      eventsError,
-    })
 
     const { data: playersData, error: playersError } = await supabase
       .from('players')
@@ -1474,13 +1466,38 @@ const visibleAdminTabs = isOrgAdmin
                   </div>
 
                   <div className="flex-1">
-                    <p className="font-black text-white">
-                      No upcoming events scheduled
-                    </p>
+                    {teamDashboardNextEvent ? (
+                      <>
+                        <p className="font-black text-white">
+                          {teamDashboardNextEvent.event_type === 'practice'
+                            ? 'Next Practice'
+                            : teamDashboardNextEvent.event_type === 'tournament'
+                              ? 'Next Tournament'
+                              : 'Next Game'}
+                        </p>
 
-                    <p className="mt-1 text-sm text-slate-400">
-                      Add a game, practice, or team event to keep families informed.
-                    </p>
+                        <p className="mt-1 text-sm text-slate-300">
+                          {teamDashboardNextEvent.title}
+                          {teamDashboardNextEvent.opponent ? ` vs ${teamDashboardNextEvent.opponent}` : ''}
+                        </p>
+
+                        {teamDashboardNextEvent.starts_at && (
+                          <p className="mt-1 text-sm text-slate-400">
+                            {formatDate(teamDashboardNextEvent.starts_at)}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-black text-white">
+                          No upcoming events scheduled
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-400">
+                          Add a game, practice, or team event to keep families informed.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1490,7 +1507,7 @@ const visibleAdminTabs = isOrgAdmin
                   className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-white"
                   style={{ backgroundColor: brandColor }}
                 >
-                  Add Event
+                  {teamDashboardNextEvent ? 'View Events' : 'Add Event'}
                 </button>
               </div>
             </div>
