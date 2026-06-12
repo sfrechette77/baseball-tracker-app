@@ -166,6 +166,34 @@ export async function POST(req: NextRequest) {
     return null
   }
 
+  const verifyOrgAdminAccess = async (): Promise<string | null> => {
+    if (!teamId) return 'Missing teamId'
+
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('id, organization_id')
+      .eq('id', teamId)
+      .maybeSingle()
+
+    if (teamError || !team) return 'Team not found'
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('memberships')
+      .select('id')
+      .eq('organization_id', team.organization_id)
+      .eq('user_id', user.id)
+      .eq('status', 'approved')
+      .eq('role', 'org_admin')
+      .limit(1)
+      .maybeSingle()
+
+    if (membershipError || !membership) {
+      return 'Org admin access required'
+    }
+
+    return null
+  }
+
   try {
     // ── Save full game state atomically ─────────────────────────────────────
     if (action === 'save_game') {
@@ -635,6 +663,10 @@ export async function POST(req: NextRequest) {
 
     // ── Standings (cross-team, no ownership check) ──────────────────────────
     if (action === 'update_standing') {
+      const orgAdminError = await verifyOrgAdminAccess()
+      if (orgAdminError) {
+        return NextResponse.json({ error: orgAdminError }, { status: 403 })
+      }
       const { standingId, wins, losses, ties, gamesPlayed, runsFor, runsAgainst } = body
       const { error } = await supabase
         .from('standings')
