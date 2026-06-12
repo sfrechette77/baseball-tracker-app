@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -95,32 +96,73 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const authSupabase = await createServerClient()
+
+  const {
+    data: { user },
+    error: userError,
+  } = await authSupabase.auth.getUser()
+
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabase = getSupabase()
 
   // Helper: verify an event belongs to the team that's trying to modify it.
   // Used by update_event and delete_event to prevent cross-team edits.
   const verifyEventOwnership = async (eventId: string): Promise<string | null> => {
     if (!teamId) return 'Missing teamId'
+
     const { data, error } = await supabase
       .from('events')
       .select('team_id')
       .eq('id', eventId)
       .single()
+
     if (error || !data) return 'Event not found'
     if (data.team_id !== teamId) return 'Event does not belong to current team'
+
+    const teamAccessError = await verifyTeamAccess()
+    if (teamAccessError) return teamAccessError
+
     return null
   }
 
   const verifyTeamAccess = async (): Promise<string | null> => {
     if (!teamId) return 'Missing teamId'
 
-    const { data, error } = await supabase
+    const { data: team, error: teamError } = await supabase
       .from('teams')
-      .select('id')
+      .select('id, organization_id')
       .eq('id', teamId)
       .maybeSingle()
 
-    if (error || !data) return 'Team not found'
+    if (teamError || !team) return 'Team not found'
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('memberships')
+      .select('id, role, status')
+      .eq('organization_id', team.organization_id)
+      .eq('user_id', user.id)
+      .eq('status', 'approved')
+      .in('role', ['org_admin', 'team_admin'])
+      .limit(1)
+      .maybeSingle()
+
+    if (membershipError || !membership) return 'You do not have access to this organization'
+
+    if (membership.role === 'org_admin') return null
+
+    const { data: teamAdmin, error: teamAdminError } = await supabase
+      .from('team_admins')
+      .select('id')
+      .eq('membership_id', membership.id)
+      .eq('team_id', teamId)
+      .maybeSingle()
+
+    if (teamAdminError || !teamAdmin) return 'You do not have access to this team'
+
     return null
   }
 
@@ -431,6 +473,12 @@ export async function POST(req: NextRequest) {
       if (!teamId) {
         return NextResponse.json({ error: 'Missing teamId' }, { status: 400 })
       }
+
+      const teamAccessError = await verifyTeamAccess()
+      if (teamAccessError) {
+        return NextResponse.json({ error: teamAccessError }, { status: 403 })
+      }
+
       const { data, error } = await supabase
         .from('events')
         .insert({
