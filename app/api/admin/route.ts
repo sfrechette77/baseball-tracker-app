@@ -683,6 +683,10 @@ export async function POST(req: NextRequest) {
 
     // ── Create a league game (and auto-create matching event if current team plays) ───
 if (action === 'create_league_game') {
+  const orgAdminError = await verifyOrgAdminAccess()
+  if (orgAdminError) {
+    return NextResponse.json({ error: orgAdminError }, { status: 403 })
+  }
   const { homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status, fieldId } = body
   if (!homeTeamId || !awayTeamId || !playedAt) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -758,6 +762,10 @@ if (action === 'create_league_game') {
  
 // ── Update a league game (and sync linked event if exists) ───────────────────────
 if (action === 'update_league_game') {
+  const orgAdminError = await verifyOrgAdminAccess()
+  if (orgAdminError) {
+    return NextResponse.json({ error: orgAdminError }, { status: 403 })
+  }
   const { leagueGameId, homeTeamId, awayTeamId, playedAt, homeScore, awayScore, status, fieldId } = body
   if (!leagueGameId) {
     return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
@@ -878,6 +886,10 @@ if (action === 'update_league_game') {
  
 // ── Delete a league game (cascade to linked event) ───────────────────────────────
 if (action === 'delete_league_game') {
+  const orgAdminError = await verifyOrgAdminAccess()
+    if (orgAdminError) {
+      return NextResponse.json({ error: orgAdminError }, { status: 403 })
+    }
   const { leagueGameId } = body
   if (!leagueGameId) {
     return NextResponse.json({ error: 'Missing leagueGameId' }, { status: 400 })
