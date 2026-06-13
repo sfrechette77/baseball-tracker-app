@@ -479,7 +479,16 @@ function StandingsView({ division, currentTeamId }: { division: string; currentT
                 {calcPct(team.wins, team.losses, team.ties)}
               </td>
               <td className="py-3 pl-2 pr-4 text-center tabular-nums">
-                <span className={diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-slate-400'}>
+                <span
+                  className={diff === 0 ? 'text-slate-400' : undefined}
+                  style={
+                    diff > 0
+                      ? { color: '#4ade80' }
+                      : diff < 0
+                        ? { color: '#f87171' }
+                        : undefined
+                  }
+                >
                   {diff > 0 ? `+${diff}` : diff}
                 </span>
               </td>
