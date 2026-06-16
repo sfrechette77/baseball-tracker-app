@@ -7,6 +7,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { RowSkeleton } from '@/components/Skeleton'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -29,6 +30,8 @@ export default function RosterPage() {
   const [loading, setLoading] = useState(true)
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     // Wait until team_season is resolved — don't enter the try/finally
@@ -77,7 +80,7 @@ export default function RosterPage() {
     return (
       <main className="min-h-screen bg-black pb-32 text-white">
         <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-          <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+          <p className="text-xl tracking-[0.1em] text-slate-400 font-bold">2026</p>
           <h1 className="text-3xl font-extrabold text-white mt-1">Roster</h1>
         </div>
         <div className="mx-auto max-w-sm space-y-2 px-4 pt-4">
@@ -95,7 +98,12 @@ export default function RosterPage() {
 
       {/* Page title */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p
+          className="text-xl tracking-[0.1em] font-bold"
+          style={{ color: brandColor }}
+        >
+          2026
+        </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Roster</h1>
       </div>
 

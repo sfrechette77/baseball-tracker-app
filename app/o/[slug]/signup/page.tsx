@@ -24,11 +24,16 @@ export default async function SignupPage({ params }: Props) {
     notFound()
   }
 
+  const brandColor = org.primary_color || '#dc2626'
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white p-6">
       <div className="w-full max-w-sm space-y-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-red-400 font-semibold">
+          <p
+            className="text-xs uppercase tracking-[0.25em] font-semibold"
+            style={{ color: brandColor }}
+          >
             Join the team
           </p>
           <h1 className="mt-1 text-2xl font-extrabold">{org.name}</h1>
@@ -42,7 +47,11 @@ export default async function SignupPage({ params }: Props) {
 
         <p className="text-xs text-slate-500 text-center">
           Already approved?{' '}
-          <a href="/login" className="text-red-400 hover:text-red-300">
+          <a
+            href="/login"
+            className="font-semibold"
+            style={{ color: brandColor }}
+          >
             Sign in here
           </a>
         </p>

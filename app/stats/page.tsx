@@ -133,7 +133,12 @@ export default function StatsPage() {
     return (
       <main className="min-h-screen bg-black pb-32 text-white">
         <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-          <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+          <p
+            className="text-xl tracking-[0.1em] font-bold"
+            style={{ color: brandColor }}
+          >
+            2026
+          </p>
           <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
         </div>
 

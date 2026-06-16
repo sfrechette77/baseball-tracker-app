@@ -41,7 +41,7 @@ function MessagesPageSkeleton() {
   return (
     <main className="min-h-screen bg-black pb-32 text-white">
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p className="text-xl tracking-[0.1em] text-slate-400 font-bold">2026</p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Messages</h1>
       </div>
       <div className="mx-auto max-w-sm px-4 pt-4">
@@ -60,8 +60,7 @@ function MessagesPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
-  const { membership, loading: orgLoading } = useActiveOrg()
-  const { org } = useActiveOrg()
+  const { membership, loading: orgLoading, org } = useActiveOrg()
   const brandColor = org?.primary_color || '#dc2626'
 
   const viewParam = searchParams.get('view')

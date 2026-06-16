@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Skeleton } from '@/components/Skeleton'
 import { BottomNav } from '@/components/BottomNav'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -69,6 +70,8 @@ export default function PlayerPage() {
   const [player, setPlayer] = useState<Player | null>(null)
   const [stats, setStats] = useState<StatRow[]>([])
   const [loading, setLoading] = useState(true)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     const load = async () => {
@@ -200,7 +203,13 @@ export default function PlayerPage() {
       <main className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
           <p className="text-white font-bold">Player not found</p>
-          <Link href="/team?view=roster" className="mt-3 inline-block text-sm text-red-400">← Roster</Link>
+          <Link
+            href="/team?view=roster"
+            className="mt-3 inline-block text-sm font-semibold"
+            style={{ color: brandColor }}
+          >
+            ← Roster
+          </Link>
         </div>
       </main>
     )
@@ -218,11 +227,19 @@ export default function PlayerPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-red-600 text-2xl font-extrabold text-white">
+            <div
+              className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl text-2xl font-extrabold text-white"
+              style={{ backgroundColor: brandColor }}
+            >
               {player.jersey_number ?? '—'}
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">2026 Stats</p>
+              <p
+                className="text-[10px] uppercase tracking-[0.25em] font-semibold"
+                style={{ color: brandColor }}
+              >
+                2026 Stats
+              </p>
               <h1 className="text-xl font-extrabold text-white leading-tight">{player.name}</h1>
               {player.position && <p className="text-sm text-slate-400">{player.position}</p>}
             </div>

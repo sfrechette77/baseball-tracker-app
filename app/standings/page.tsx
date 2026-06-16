@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { BottomNav } from '@/components/BottomNav'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -166,6 +167,8 @@ export default function StandingsPage() {
   const [activeTab, setActiveTab] = useState<'standings' | 'results' | 'rules'>('standings')
   const [loading, setLoading] = useState(true)
   const { currentTeam } = useCurrentTeam()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     const load = async () => {
@@ -262,7 +265,12 @@ export default function StandingsPage() {
 
       {/* Page title */}
       <div className="mx-auto max-w-sm px-4 pt-6 pb-2">
-        <p className="text-xl tracking-[0.1em] text-red-400 font-bold">2026</p>
+        <p
+          className="text-xl tracking-[0.1em] font-bold"
+          style={{ color: brandColor }}
+        >
+          2026
+        </p>
         <h1 className="text-xl font-extrabold text-white mt-1">Mid Suburban Baseball League</h1>
         <p className="text-sm text-slate-400 mt-1">{currentTeam.division}</p>
       </div>
@@ -279,9 +287,10 @@ export default function StandingsPage() {
               onClick={() => setActiveTab(key)}
               className={`rounded-full px-5 py-2 text-sm font-bold transition ${
                 activeTab === key
-                  ? 'bg-red-600 text-white'
+                  ? 'text-white'
                   : 'bg-white/5 text-slate-400 hover:bg-white/10'
               }`}
+              style={activeTab === key ? { backgroundColor: brandColor } : undefined}
             >
               {label}
             </button>
