@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, ReactNode } from 'react'
 import { useCurrentTeam } from '@/components/team-context'
+import { useActiveOrg } from '@/components/org-context'
 
 function ChevronDownIcon() {
   return (
@@ -22,6 +23,8 @@ export function Header({ userMenu }: { userMenu: ReactNode }) {
   const { currentTeam, setCurrentTeamId, availableTeams } = useCurrentTeam()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -102,13 +105,18 @@ export function Header({ userMenu }: { userMenu: ReactNode }) {
                       }}
                       className={`w-full text-left px-4 py-2.5 text-sm transition ${
                         isActive
-                          ? 'bg-red-600/20 text-white font-semibold'
+                          ? 'text-white font-semibold'
                           : 'text-slate-300 hover:bg-white/5'
                       }`}
-                    >
+                      style={isActive ? { backgroundColor: `${brandColor}33` } : undefined}
+                                          >
                       <div className="flex items-center justify-between gap-2">
                         <span>{team.fullName}</span>
-                        {isActive && <span className="text-red-400 text-xs">✓</span>}
+                        {isActive && (
+                          <span className="text-xs" style={{ color: brandColor }}>
+                            ✓
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         {team.division}

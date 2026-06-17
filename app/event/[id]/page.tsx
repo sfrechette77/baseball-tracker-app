@@ -8,6 +8,7 @@ import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
 import { PICKABLE_TEAMS } from '@/lib/teams'
 import { Skeleton } from '@/components/Skeleton'
 import { BottomNav } from '@/components/BottomNav'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -109,6 +110,9 @@ function normalizeEvent(event: RawEventRow): EventRow {
     fields: normalizeFieldRelation(event.fields),
   }
 }
+
+const { org } = useActiveOrg()
+const brandColor = org?.primary_color || '#dc2626'
 
 function formatAddress(field: FieldRow | null) {
   return [field?.address_line, field?.city, field?.state, field?.postal_code]
@@ -272,8 +276,18 @@ export default function EventPage() {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-          <p className="text-white font-bold">Event not found</p>
-          <Link href="/schedule" className="mt-3 inline-block text-sm text-red-400 hover:text-red-300">
+          <Link
+            href="/schedule"
+            className="mt-3 inline-block text-sm font-semibold"
+            style={{ color: brandColor }}
+          >
+            ← Back to Schedule
+          </Link>
+          <Link
+            href="/schedule"
+            className="mt-3 inline-block text-sm font-semibold"
+            style={{ color: brandColor }}
+          >
             ← Back to Schedule
           </Link>
         </div>
@@ -329,7 +343,10 @@ export default function EventPage() {
             </Link>
           </div>
 
-          <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">
+          <p
+            className="text-[10px] uppercase tracking-[0.25em] font-semibold"
+            style={{ color: brandColor }}
+          >
             {isPractice ? '🏋️ Practice' : event.event_type === 'tournament' ? '🏆 Tournament' : '⚾ Game'}
           </p>
           <h1 className="mt-1 text-2xl font-extrabold text-white leading-tight">{event.title}</h1>
@@ -561,7 +578,8 @@ export default function EventPage() {
           <p className="text-sm text-slate-400">{address || 'Address not available'}</p>
           {address && (
             <a href={directionsUrl} target="_blank" rel="noreferrer"
-              className="mt-2 inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition">
+              className="mt-2 inline-block rounded-full px-4 py-1.5 text-xs font-bold text-white transition"
+              style={{ backgroundColor: brandColor }}>
               Directions ↗
             </a>
           )}
