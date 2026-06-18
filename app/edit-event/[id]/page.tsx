@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Skeleton } from '@/components/Skeleton'
 import { BottomNav } from '@/components/BottomNav'
+import { useActiveOrg } from '@/components/org-context'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -43,7 +44,7 @@ function toLocalDateTimeInput(utcString: string) {
 }
 
 function inputClass() {
-  return 'w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500'
+  return 'w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none'
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ export default function EditEventPage() {
   const params = useParams()
   const router = useRouter()
   const eventId = params.id as string
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   const [form, setForm] = useState<EventForm>({
     title: '', opponent: '', event_type: 'game', starts_at: '',
@@ -171,7 +174,12 @@ export default function EditEventPage() {
               <Image src="/Elite.png" alt="Elite Baseball" fill className="object-contain drop-shadow-lg" />
             </div>
           </div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-red-400 font-semibold">Edit Event</p>
+          <p
+            className="text-[10px] uppercase tracking-[0.25em] font-semibold"
+            style={{ color: brandColor }}
+          >
+            Edit Event
+          </p>
           <h1 className="mt-1 text-2xl font-extrabold text-white leading-tight">{form.title || 'Event'}</h1>
         </div>
       </div>
@@ -182,7 +190,13 @@ export default function EditEventPage() {
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2">
           <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Title</p>
           <input value={form.title} onChange={e => set('title', e.target.value)}
-            placeholder="Event title" className={inputClass()} />
+            placeholder="Event title" className={inputClass()} 
+            onFocus={e => {
+              e.currentTarget.style.borderColor = brandColor
+            }}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = ''
+            }}/>
         </div>
 
         {/* Type + Status */}
@@ -190,7 +204,13 @@ export default function EditEventPage() {
           <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Event Type</p>
             <select value={form.event_type} onChange={e => set('event_type', e.target.value)}
-              className={inputClass()}>
+              className={inputClass()}
+              onFocus={e => {
+                e.currentTarget.style.borderColor = brandColor
+              }}
+              onBlur={e => {
+                e.currentTarget.style.borderColor = ''
+              }}>
               <option value="game">Game</option>
               <option value="practice">Practice</option>
               <option value="tournament">Tournament</option>
@@ -199,7 +219,13 @@ export default function EditEventPage() {
           <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Status</p>
             <select value={form.status} onChange={e => set('status', e.target.value)}
-              className={inputClass()}>
+              className={inputClass()}
+              onFocus={e => {
+                e.currentTarget.style.borderColor = brandColor
+              }}
+              onBlur={e => {
+                e.currentTarget.style.borderColor = ''
+              }}>
               <option value="confirmed">Confirmed</option>
               <option value="tentative">Tentative</option>
               <option value="postponed">Postponed</option>
@@ -214,7 +240,13 @@ export default function EditEventPage() {
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Opponent</p>
             <input value={form.opponent} onChange={e => set('opponent', e.target.value)}
-              placeholder="Opponent name" className={inputClass()} />
+              placeholder="Opponent name" className={inputClass()}
+              onFocus={e => {
+                e.currentTarget.style.borderColor = brandColor
+              }}
+              onBlur={e => {
+                e.currentTarget.style.borderColor = ''
+              }}/>
           </div>
         )}
 
@@ -222,7 +254,13 @@ export default function EditEventPage() {
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2">
           <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Date & Time (Chicago)</p>
           <input type="datetime-local" value={form.starts_at} onChange={e => set('starts_at', e.target.value)}
-            className={inputClass()} />
+            className={inputClass()} 
+            onFocus={e => {
+              e.currentTarget.style.borderColor = brandColor
+            }}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = ''
+            }}/>
         </div>
 
         {/* Travel */}
@@ -230,12 +268,24 @@ export default function EditEventPage() {
           <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Travel Minutes</p>
             <input type="number" value={form.travel_minutes} onChange={e => set('travel_minutes', e.target.value)}
-              placeholder="e.g. 45" className={inputClass()} />
+              placeholder="e.g. 45" className={inputClass()}
+              onFocus={e => {
+                e.currentTarget.style.borderColor = brandColor
+              }}
+              onBlur={e => {
+                e.currentTarget.style.borderColor = ''
+              }} />
           </div>
           <div className="space-y-2">
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Travel Miles</p>
             <input type="number" value={form.travel_miles} onChange={e => set('travel_miles', e.target.value)}
-              placeholder="e.g. 30" className={inputClass()} />
+              placeholder="e.g. 30" className={inputClass()} 
+              onFocus={e => {
+                e.currentTarget.style.borderColor = brandColor
+              }}
+              onBlur={e => {
+                e.currentTarget.style.borderColor = ''
+              }}/>
           </div>
         </div>
 
@@ -244,7 +294,13 @@ export default function EditEventPage() {
           <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Gear Notes</p>
           <p className="text-[10px] text-slate-600">Separate items with commas</p>
           <input value={form.gear_notes} onChange={e => set('gear_notes', e.target.value)}
-            placeholder="e.g. Helmet, Bat, Cleats" className={inputClass()} />
+            placeholder="e.g. Helmet, Bat, Cleats" className={inputClass()}
+            onFocus={e => {
+              e.currentTarget.style.borderColor = brandColor
+            }}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = ''
+            }} />
         </div>
 
         {/* Notes */}
@@ -256,8 +312,12 @@ export default function EditEventPage() {
         </div>
 
         {/* Save */}
-        <button onClick={save} disabled={saving}
-          className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+          style={{ backgroundColor: brandColor }}
+        >
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
 

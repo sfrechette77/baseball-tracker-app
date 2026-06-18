@@ -1679,15 +1679,19 @@ const visibleAdminTabs = isOrgAdmin
                       {!isApproving && (
                         <button
                           onClick={() => startApprove(p.id)}
-                          className="w-full rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition"
+                          className="w-full rounded-xl py-2 text-sm font-bold text-white transition"
+                          style={{ backgroundColor: settingsPrimaryColor }}
                         >
                           Approve
                         </button>
                       )}
 
                       {isApproving && (
-                        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-3">
-                          <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+                        <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
+                          <p
+                            className="text-[10px] uppercase tracking-wide font-semibold"
+                            style={{ color: settingsPrimaryColor }}
+                          >
                             Assign teams
                           </p>
                           <p className="text-xs text-slate-400">
@@ -1724,7 +1728,10 @@ const visibleAdminTabs = isOrgAdmin
                                           onChange={() => setApproveDefaultTeamId(t.id)}
                                           className="h-3 w-3"
                                         />
-                                        <span className={isDefault ? 'text-red-400 font-semibold' : 'text-slate-500'}>
+                                        <span
+                                          className={isDefault ? 'font-semibold' : 'text-slate-500'}
+                                          style={isDefault ? { color: settingsPrimaryColor } : undefined}
+                                        >
                                           Default
                                         </span>
                                       </label>
@@ -1739,7 +1746,8 @@ const visibleAdminTabs = isOrgAdmin
                             <button
                               onClick={submitApprove}
                               disabled={approveSaving || approveTeamIds.size === 0 || !approveDefaultTeamId}
-                              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50"
+                              className="flex-1 rounded-xl py-2 text-sm font-bold text-white transition disabled:opacity-50"
+                              style={{ backgroundColor: settingsPrimaryColor }}
                             >
                               {approveSaving ? 'Saving…' : 'Confirm'}
                             </button>
@@ -1847,8 +1855,13 @@ const visibleAdminTabs = isOrgAdmin
                       )}
 
                       {isEditing && (
-                        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 space-y-3">
-                          <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Edit team access</p>
+                        <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
+                          <p
+                            className="text-[10px] uppercase tracking-wide font-semibold"
+                            style={{ color: settingsPrimaryColor }}
+                          >
+                            Edit team access
+                          </p>
                           {orgTeams.length === 0 ? (
                             <p className="text-xs text-amber-400">No teams found.</p>
                           ) : (
@@ -1886,7 +1899,10 @@ const visibleAdminTabs = isOrgAdmin
                                           onChange={() => setMemberDefaultTeamId(t.id)}
                                           className="h-3 w-3"
                                         />
-                                        <span className={isDefault ? 'text-red-400 font-semibold' : 'text-slate-500'}>
+                                        <span
+                                          className={isDefault ? 'font-semibold' : 'text-slate-500'}
+                                          style={isDefault ? { color: settingsPrimaryColor } : undefined}
+                                        >
                                           Default
                                         </span>
                                       </label>
@@ -1920,7 +1936,8 @@ const visibleAdminTabs = isOrgAdmin
                                 setMembersMsg('✅ Teams updated')
                               }}
                               disabled={memberSaving || memberTeamIds.size === 0 || !memberDefaultTeamId}
-                              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700 transition disabled:opacity-50"
+                              className="flex-1 rounded-xl py-2 text-sm font-bold text-white transition disabled:opacity-50"
+                              style={{ backgroundColor: settingsPrimaryColor }}
                             >
                               {memberSaving ? 'Saving…' : 'Save'}
                             </button>
@@ -2121,8 +2138,8 @@ const visibleAdminTabs = isOrgAdmin
                       className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400" />
                   </div>
 
-                  <button onClick={saveStatus} disabled={statusSaving || !statusDraftStatus === undefined}
-                    className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  <button onClick={saveStatus} disabled={statusSaving || statusDraftStatus === undefined}
+                    className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
                     style={{ backgroundColor: brandColor }}
                     >
                     {statusSaving ? 'Broadcasting...' : 'Save & Broadcast'}
@@ -2224,10 +2241,18 @@ const visibleAdminTabs = isOrgAdmin
                     <p className="text-xs text-slate-400 mb-2">Game Location</p>
                     <div className="grid grid-cols-2 gap-2">
                       {(['away', 'home'] as const).map(loc => (
-                        <button key={loc} onClick={() => setIsHome(loc === 'home')}
+                        <button
+                          key={loc}
+                          onClick={() => setIsHome(loc === 'home')}
                           className={`rounded-xl py-3 text-sm font-bold transition ${
-                            isHome === (loc === 'home') ? 'bg-red-600 text-white' : 'bg-white/10 text-slate-400'
-                          }`}>
+                            isHome === (loc === 'home') ? 'text-white' : 'bg-white/10 text-slate-400'
+                          }`}
+                          style={
+                            isHome === (loc === 'home')
+                              ? { backgroundColor: brandColor }
+                              : undefined
+                          }
+                        >
                           {loc === 'home' ? '🏠 Home' : '✈️ Away'}
                         </button>
                       ))}
@@ -2277,7 +2302,7 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 <button onClick={saveScore} disabled={scoreSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                   >
                   {scoreSaving ? 'Saving...' : 'Save Score + Box Score'}
@@ -2363,7 +2388,7 @@ const visibleAdminTabs = isOrgAdmin
                 })}
 
                 <button onClick={saveStats} disabled={statsSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                   >
                   {statsSaving ? 'Saving...' : 'Save All Stats'}
@@ -2551,7 +2576,7 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 <button onClick={saveEvent} disabled={eventSaving}
-                  className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                   >
                   {eventSaving ? 'Saving...' : (editingEventId ? 'Save Changes' : 'Create Event')}
@@ -2575,7 +2600,12 @@ const visibleAdminTabs = isOrgAdmin
               ) : (
                 filteredEvents.map(ev => (
                   <button key={ev.id} onClick={() => editEvent(ev)}
-                    className={`w-full text-left rounded-xl px-3 py-2 transition ${editingEventId === ev.id ? 'bg-red-500/20' : 'hover:bg-white/10'}`}>
+                    className={`w-full text-left rounded-xl px-3 py-2 transition ${editingEventId === ev.id ? '' : 'hover:bg-white/10'}`}
+                    style={
+                      editingEventId === ev.id
+                        ? { backgroundColor: `${brandColor}33` }
+                        : undefined
+                    }>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-white truncate">
@@ -2676,7 +2706,7 @@ const visibleAdminTabs = isOrgAdmin
 
       <div className="flex gap-2 pt-2">
         <button onClick={saveLeagueGame} disabled={leagueSaving}
-          className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+          className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
           style={{ backgroundColor: brandColor }}
           >
           {leagueSaving ? 'Saving...' : leagueEditingId ? 'Save Changes' : 'Create Game'}
@@ -2766,7 +2796,7 @@ const visibleAdminTabs = isOrgAdmin
               )
             })}
             <button onClick={saveStandings} disabled={standingsSaving}
-              className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+              className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
               style={{ backgroundColor: brandColor }}
               >
               {standingsSaving ? 'Saving...' : 'Save Standings'}
