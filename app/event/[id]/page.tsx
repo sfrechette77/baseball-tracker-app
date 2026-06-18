@@ -111,9 +111,6 @@ function normalizeEvent(event: RawEventRow): EventRow {
   }
 }
 
-const { org } = useActiveOrg()
-const brandColor = org?.primary_color || '#dc2626'
-
 function formatAddress(field: FieldRow | null) {
   return [field?.address_line, field?.city, field?.state, field?.postal_code]
     .filter(Boolean).join(', ')
@@ -195,6 +192,8 @@ export default function EventPage() {
   const [boxScores, setBoxScores] = useState<BoxScoreRow[]>([])
   const [playerStats, setPlayerStats] = useState<PlayerStatRow[]>([])
   const [loading, setLoading] = useState(true)
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     const loadEvent = async () => {
