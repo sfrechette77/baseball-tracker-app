@@ -88,10 +88,16 @@ export function Composer({ teamId, onPosted }: Props) {
       <textarea
         value={body}
         onChange={e => setBody(e.target.value)}
+        onFocus={e => {
+          e.currentTarget.style.borderColor = brandColor
+        }}
+        onBlur={e => {
+          e.currentTarget.style.borderColor = ''
+        }}
         placeholder="Post an update to the team…"
         rows={3}
         disabled={isPending}
-        className="w-full resize-none rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-red-500 focus:outline-none"
+        className="w-full resize-none rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none"
       />
 
       {imagePreview && (

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { addReaction, removeReaction } from '../../app/actions/chat'
 import type { ReactionSummary } from '../../app/actions/chat'
+import { useActiveOrg } from '@/components/org-context'
 
 export const AVAILABLE_EMOJIS = ['👍', '❤️', '🎉', '⚾', '🔥'] as const
 
@@ -17,6 +18,8 @@ type Props = {
 export function MessageReactionBar({ messageId, reactions, myReactions, onChange }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   // Optimistic state — local copy that updates instantly. The server confirms
   // in the background; on failure we ask the parent to re-fetch.
@@ -77,11 +80,19 @@ export function MessageReactionBar({ messageId, reactions, myReactions, onChange
             key={r.emoji}
             onClick={() => handleToggle(r.emoji)}
             disabled={isPending}
-            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition ${
+            className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
               isMine
-                ? 'bg-red-600/20 border border-red-500/40 text-white'
-                : 'bg-white/10 border border-white/10 text-slate-300 hover:bg-white/15'
+                ? 'text-white'
+                : 'border-white/10 bg-white/10 text-slate-300 hover:bg-white/15'
             }`}
+            style={
+              isMine
+                ? {
+                    backgroundColor: `${brandColor}33`,
+                    borderColor: `${brandColor}66`,
+                  }
+                : undefined
+            }
           >
             <span className="text-xs">{r.emoji}</span>
             <span className="tabular-nums">{r.count}</span>

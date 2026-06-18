@@ -352,7 +352,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
         <p className="text-sm text-slate-400">{address || 'Address not available'}</p>
         {address && (
           <a href={directionsUrl} target="_blank" rel="noreferrer"
-            className="mt-2 inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition"
+            className="mt-2 inline-block rounded-full px-4 py-1.5 text-xs font-bold text-white transition"
             style={{ backgroundColor: brandColor }}
             >
             Directions ↗

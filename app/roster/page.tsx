@@ -126,7 +126,10 @@ export default function RosterPage() {
           sortedPlayers.map(player => (
             <Link key={player.id} href={`/player/${player.id}`}>
               <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition">
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-red-600 font-extrabold text-white text-lg">
+                <div
+                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl font-extrabold text-white text-lg"
+                  style={{ backgroundColor: brandColor }}
+                >
                   {player.jersey_number ?? '—'}
                 </div>
                 <div className="min-w-0 flex-1">

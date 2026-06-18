@@ -1,5 +1,6 @@
 import type { OrgTeam } from '@/app/actions/admin'
 import type { DashboardEvent, DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
+import { useActiveOrg } from '@/components/org-context'
 
 type Props = {
   dashboardLoading: boolean
@@ -38,10 +39,16 @@ export function DashboardTab({
   formatDate,
   setTab,
 }: Props) {
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-        <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">
+        <p
+          className="text-[10px] uppercase tracking-wide font-semibold"
+          style={{ color: brandColor }}
+        >
           Organization Dashboard
         </p>
         <h2 className="mt-1 text-lg font-extrabold text-white">
@@ -95,7 +102,8 @@ export function DashboardTab({
             {dashboardPendingCount !== null && dashboardPendingCount > 0 && (
               <button
                 onClick={() => setTab('pending')}
-                className="w-full rounded-xl bg-red-600 px-4 py-3 text-left text-sm font-bold text-white hover:bg-red-700 transition"
+                className="w-full rounded-xl px-4 py-3 text-left text-sm font-bold text-white transition"
+                style={{ backgroundColor: brandColor }}
               >
                 {dashboardPendingCount} parent{dashboardPendingCount === 1 ? '' : 's'} waiting for approval
               </button>

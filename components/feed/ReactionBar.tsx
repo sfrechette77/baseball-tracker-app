@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { addReaction, removeReaction } from '../../app/actions/feed'
 import type { ReactionSummary } from '../../app/actions/feed'
+import { useActiveOrg } from '@/components/org-context'
 
 export const AVAILABLE_EMOJIS = ['👍', '❤️', '🎉', '⚾', '🔥'] as const
 
@@ -16,6 +17,8 @@ type Props = {
 export function ReactionBar({ postId, reactions, myReactions, onChange }: Props) {
   const [showPicker, setShowPicker] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { org } = useActiveOrg()
+  const brandColor = org?.primary_color || '#dc2626'
 
   // Optimistic state — local copy that updates immediately
   // (server confirms in the background)
@@ -23,7 +26,7 @@ export function ReactionBar({ postId, reactions, myReactions, onChange }: Props)
   const [localMyReactions, setLocalMyReactions] = useState(myReactions)
 
   const handleToggle = (emoji: string) => {
-    const alreadyReacted = localMyReactions.includes(emoji)
+  const alreadyReacted = localMyReactions.includes(emoji)
 
     // Optimistic update
     if (alreadyReacted) {
@@ -77,11 +80,19 @@ export function ReactionBar({ postId, reactions, myReactions, onChange }: Props)
             key={r.emoji}
             onClick={() => handleToggle(r.emoji)}
             disabled={isPending}
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+            className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
               isMine
-                ? 'bg-red-600/20 border border-red-500/40 text-white'
-                : 'bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10'
+                ? 'text-white'
+                : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
             }`}
+            style={
+              isMine
+                ? {
+                    backgroundColor: `${brandColor}33`,
+                    borderColor: `${brandColor}66`,
+                  }
+                : undefined
+            }
           >
             <span>{r.emoji}</span>
             <span className="tabular-nums">{r.count}</span>
