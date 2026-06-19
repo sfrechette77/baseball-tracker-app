@@ -319,7 +319,14 @@ export default function StandingsPage() {
                   const isUs = team.id === currentTeam.id
                   const diff = team.runs_for - team.runs_against
                   return (
-                    <tr key={team.id} className={isUs ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
+                    <tr
+                      key={team.id}
+                      className={isUs ? 'border-l-2' : ''}
+                      style={isUs ? {
+                        backgroundColor: `${brandColor}1A`,
+                        borderLeftColor: brandColor,
+                      } : undefined}
+                    >
                       <td className="py-3 pl-4 pr-2">
                         <span className={`text-sm ${isUs ? 'font-bold text-white' : 'text-slate-300'}`}>
                           {team.team_name}

@@ -375,7 +375,11 @@ function TeamPageInner() {
           </div>
         )}
         {view === 'standings' && (
-          <StandingsView division={currentTeam.division} currentTeamId={currentTeam.id} />
+          <StandingsView
+            division={currentTeam.division}
+            currentTeamId={currentTeam.id}
+            brandColor={brandColor}
+          />
         )}
         {view === 'results' && (
           <ResultsView division={currentTeam.division} />
@@ -392,7 +396,15 @@ function TeamPageInner() {
 
 // ─── Standings sub-view ───────────────────────────────────────────────────
 
-function StandingsView({ division, currentTeamId }: { division: string; currentTeamId: string }) {
+function StandingsView({
+  division,
+  currentTeamId,
+  brandColor,
+}: {
+  division: string
+  currentTeamId: string
+  brandColor: string
+}) {
   const [standings, setStandings] = useState<StandingRow[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -466,7 +478,14 @@ function StandingsView({ division, currentTeamId }: { division: string; currentT
           const isUs = team.id === currentTeamId
           const diff = team.runs_for - team.runs_against
           return (
-            <tr key={team.id} className={isUs ? 'bg-red-600/10 border-l-2 border-l-red-500' : ''}>
+            <tr
+              key={team.id}
+              className={isUs ? 'border-l-2' : ''}
+              style={isUs ? {
+                backgroundColor: `${brandColor}1A`,
+                borderLeftColor: brandColor,
+              } : undefined}
+            >
               <td className="py-3 pl-4 pr-2">
                 <span className={`text-sm ${isUs ? 'font-bold text-white' : 'text-slate-300'}`}>
                   {team.team_name}

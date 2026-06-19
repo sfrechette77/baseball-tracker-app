@@ -447,7 +447,7 @@ export default function EventPage() {
                     return (
                       <>
                         {topRow && (
-                          <tr className={topIsUs ? 'bg-red-600/5' : ''}>
+                          <tr style={topIsUs ? { backgroundColor: `${brandColor}12` } : undefined}>
                             <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[180px]">
                               {topIsUs
                                 ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
@@ -463,8 +463,9 @@ export default function EventPage() {
                             </td>
                           </tr>
                         )}
+
                         {bottomRow && (
-                          <tr className={bottomIsUs ? 'bg-red-600/5' : ''}>
+                          <tr style={bottomIsUs ? { backgroundColor: `${brandColor}12` } : undefined}>
                             <td className="py-3 pl-4 pr-2 text-xs truncate max-w-[180px]">
                               {bottomIsUs
                                 ? <span className="font-bold text-white">{getTeamLabel(event.team)}</span>
