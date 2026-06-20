@@ -1838,6 +1838,7 @@ const visibleAdminTabs = isOrgAdmin
                           >
                             Edit Teams
                           </button>
+
                           <button
                             onClick={() => startPromoteMember(m)}
                             className="rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white transition"
@@ -1845,6 +1846,7 @@ const visibleAdminTabs = isOrgAdmin
                           >
                             Make Admin
                           </button>
+                          
                           <button
                             onClick={() => { setRemovingMemberId(m.id); setMembersMsg(null) }}
                             className="rounded-xl border border-red-500/40 bg-transparent px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 transition"
