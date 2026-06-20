@@ -16,7 +16,7 @@ export type PickableTeam = {
 export const PICKABLE_TEAMS: PickableTeam[] = [
   {
     id: '4beb0750-1883-4b56-a386-db280675036c',
-    label: 'Moore',
+    label: 'Elite - 11U Moore',
     fullName: 'Chicago Elite 11U - Moore',
     division: '11U American Division',
   },
