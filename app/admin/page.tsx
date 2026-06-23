@@ -1209,16 +1209,16 @@ const deleteLeagueGame = async () => {
   })
 
   const allAdminTabs = [
-  { key: 'dashboard', label: '🏠 Dashboard' },
-  { key: 'pending', label: '👋 Pending' },
-  { key: 'members', label: '👥 Members' },
-  { key: 'status', label: '📡 Status' },
-  { key: 'score', label: '🏆 Score' },
-  { key: 'stats', label: '📊 Stats' },
-  { key: 'events', label: '📅 Events' },
-  { key: 'league', label: '⚾ League' },
-  { key: 'standings', label: '📋 Standings' },
-  { key: 'settings', label: '⚙️ Settings' },
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'members', label: 'Members' },
+  { key: 'status', label: 'Status' },
+  { key: 'score', label: 'Score' },
+  { key: 'stats', label: 'Stats' },
+  { key: 'events', label: 'Events' },
+  { key: 'league', label: 'League' },
+  { key: 'standings', label: 'Standings' },
+  { key: 'settings', label: 'Settings' },
 ] as const
 
 const teamAdminAllowedTabs: Tab[] = ['dashboard', 'status', 'score', 'stats', 'events']
