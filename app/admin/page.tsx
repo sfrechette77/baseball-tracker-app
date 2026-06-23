@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
@@ -416,6 +416,9 @@ export default function AdminPage() {
   const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
   const [promoteTeamIds, setPromoteTeamIds] = useState<Set<string>>(new Set())
   const [promoteSaving, setPromoteSaving] = useState(false)
+  const [grantAdminEmail, setGrantAdminEmail] = useState('')
+  const [grantAdminTeamIds, setGrantAdminTeamIds] = useState<Set<string>>(new Set())
+  const [grantAdminSaving, setGrantAdminSaving] = useState(false)
 
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
@@ -617,22 +620,23 @@ export default function AdminPage() {
     load()
   }, [password, tab])
 
+  const reloadMembers = async () => {
+    setMembersLoading(true)
+    const [membersResult, teamsResult] = await Promise.all([
+      getApprovedParents(),
+      getOrgTeams(),
+    ])
+    if (membersResult.ok) setMembersList(membersResult.members)
+    else setMembersMsg(`❌ ${membersResult.error}`)
+    if (teamsResult.ok) setOrgTeams(teamsResult.teams)
+    setMembersLoading(false)
+  }
+
   // Load approved parents when Members tab is active
   useEffect(() => {
     if (!password || tab !== 'members') return
-    const load = async () => {
-      setMembersLoading(true)
-      setMembersMsg(null)
-      const [membersResult, teamsResult] = await Promise.all([
-        getApprovedParents(),
-        getOrgTeams(),
-      ])
-      if (membersResult.ok) setMembersList(membersResult.members)
-      else setMembersMsg(`❌ ${membersResult.error}`)
-      if (teamsResult.ok) setOrgTeams(teamsResult.teams)
-      setMembersLoading(false)
-    }
-    load()
+    setMembersMsg(null)
+    reloadMembers()
   }, [password, tab])
 
   // Load existing box scores AND is_home when score event changes
@@ -882,6 +886,32 @@ const removeTeamAdminTeam = async (memberId: string, teamId: string) => {
 
   if (membersResult.ok) setMembersList(membersResult.members)
   if (teamsResult.ok) setOrgTeams(teamsResult.teams)
+}
+
+const toggleGrantAdminTeam = (teamId: string) => {
+  const next = new Set(grantAdminTeamIds)
+  if (next.has(teamId)) next.delete(teamId)
+  else next.add(teamId)
+  setGrantAdminTeamIds(next)
+}
+
+const submitGrantTeamAdmin = async () => {
+  setGrantAdminSaving(true)
+  setMembersMsg(null)
+
+  const result = await grantTeamAdminByEmail(grantAdminEmail, Array.from(grantAdminTeamIds))
+
+  setGrantAdminSaving(false)
+
+  if (!result.ok) {
+    setMembersMsg(`❌ ${result.error}`)
+    return
+  }
+
+  setGrantAdminEmail('')
+  setGrantAdminTeamIds(new Set())
+  setMembersMsg('✅ Team admin assigned')
+  await reloadMembers()
 }
 
   const toggleApproveTeam = (teamId: string) => {
@@ -1774,6 +1804,71 @@ const visibleAdminTabs = isOrgAdmin
         {/* ── Members Tab ───────────────────────────────────────────────── */}
         {tab === 'members' && (
           <>
+            <div
+              className="rounded-2xl border bg-white/5 p-4 space-y-3 mb-4 shadow-lg"
+              style={{ borderColor: `${settingsPrimaryColor}66` }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p
+                    className="text-[10px] uppercase tracking-wide font-semibold"
+                    style={{ color: settingsPrimaryColor }}
+                  >
+                    Members Admin Tool
+                  </p>
+                  <h2 className="mt-1 text-lg font-extrabold text-white">
+                    Grant Team Admin by Email
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Add team admin access for an existing signed-up user without changing the member list actions below.
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold text-white"
+                  style={{ backgroundColor: settingsPrimaryColor }}
+                >
+                  New
+                </span>
+              </div>
+
+              <input
+                type="email"
+                value={grantAdminEmail}
+                onChange={e => setGrantAdminEmail(e.target.value)}
+                placeholder="parent@example.com"
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"
+              />
+
+              {orgTeams.length === 0 ? (
+                <p className="text-xs text-amber-400">No teams found.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {orgTeams.map(t => (
+                    <label
+                      key={t.id}
+                      className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-white cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={grantAdminTeamIds.has(t.id)}
+                        onChange={() => toggleGrantAdminTeam(t.id)}
+                      />
+                      <span className="truncate">{t.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={submitGrantTeamAdmin}
+                disabled={grantAdminSaving || grantAdminTeamIds.size === 0}
+                className="w-full rounded-xl py-2 text-sm font-bold text-white transition disabled:opacity-50"
+                style={{ backgroundColor: settingsPrimaryColor }}
+              >
+                {grantAdminSaving ? 'Adding…' : 'Add Team Admin'}
+              </button>
+            </div>
+            {membersMsg && <p className="text-sm text-center mb-4">{membersMsg}</p>}
             {membersLoading && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
                 <p className="text-slate-400 text-sm">Loading members…</p>
@@ -2040,7 +2135,6 @@ const visibleAdminTabs = isOrgAdmin
               </div>
             )}
 
-            {membersMsg && <p className="text-sm text-center mt-2">{membersMsg}</p>}
           </>
         )}
 
