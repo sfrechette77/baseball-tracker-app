@@ -394,6 +394,85 @@ export async function makeMemberTeamAdmin(
   return { ok: true }
 }
 
+
+export async function grantTeamAdminByEmail(
+  email: string,
+  teamIds: string[]
+): Promise<SimpleResult> {
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail) return { ok: false, error: 'Enter an email address' }
+  if (teamIds.length === 0) return { ok: false, error: 'Pick at least one team' }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle()
+
+  if (profileError) return { ok: false, error: profileError.message }
+  if (!profile) return { ok: false, error: 'That user needs to sign up first.' }
+
+  const uniqueTeamIds = Array.from(new Set(teamIds))
+  const { data: teamCheck, error: teamError } = await supabase
+    .from('teams')
+    .select('id')
+    .in('id', uniqueTeamIds)
+    .eq('organization_id', guard.membership.organization_id)
+
+  if (teamError) return { ok: false, error: teamError.message }
+  if (!teamCheck || teamCheck.length !== uniqueTeamIds.length) {
+    return { ok: false, error: 'One or more teams do not belong to your org' }
+  }
+
+  const { data: existingMembership, error: existingError } = await supabase
+    .from('memberships')
+    .select('id')
+    .eq('user_id', profile.id)
+    .eq('organization_id', guard.membership.organization_id)
+    .eq('role', 'team_admin')
+    .maybeSingle()
+
+  if (existingError) return { ok: false, error: existingError.message }
+
+  let membershipId = existingMembership?.id
+
+  if (!membershipId) {
+    const { data: inserted, error: insertError } = await supabase
+      .from('memberships')
+      .insert({
+        user_id: profile.id,
+        organization_id: guard.membership.organization_id,
+        role: 'team_admin',
+        status: 'approved',
+        approved_by: guard.user.id,
+        approved_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (insertError) return { ok: false, error: insertError.message }
+    membershipId = inserted.id
+  }
+
+  const rows = uniqueTeamIds.map(teamId => ({
+    membership_id: membershipId,
+    team_id: teamId,
+  }))
+
+  const { error: assignError } = await supabase
+    .from('team_admins')
+    .upsert(rows, { onConflict: 'membership_id,team_id' })
+
+  if (assignError) return { ok: false, error: assignError.message }
+
+  revalidatePath('/admin')
+  return { ok: true }
+}
+
 export async function removeMemberTeamAdmin(
   parentMembershipId: string,
   teamId: string
