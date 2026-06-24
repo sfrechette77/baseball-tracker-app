@@ -31,7 +31,11 @@ const INITIAL_STATE: TeamSeasonState = {
  * If teamId is empty/undefined, the hook stays in loading=true state
  * (caller is presumably still resolving which team to use).
  */
-export function useTeamSeason(teamId: string | undefined): TeamSeasonState {
+  export function useTeamSeason(
+    teamId: string | undefined,
+    seasonId?: string | null
+  ): TeamSeasonState {
+    
   const [state, setState] = useState<TeamSeasonState>(INITIAL_STATE)
 
   useEffect(() => {
@@ -47,7 +51,7 @@ export function useTeamSeason(teamId: string | undefined): TeamSeasonState {
 
         // Find the team_seasons row for this team in the current season.
         // We join to seasons (filter is_current=true) and teams (get arrival_buffer).
-        const { data, error } = await supabase
+        const query = supabase
           .from('team_seasons')
           .select(`
             id,
@@ -55,9 +59,10 @@ export function useTeamSeason(teamId: string | undefined): TeamSeasonState {
             seasons:season_id!inner ( is_current )
           `)
           .eq('team_id', teamId)
-          .eq('seasons.is_current', true)
-          .limit(1)
-          .maybeSingle()
+
+        const { data, error } = seasonId
+          ? await query.eq('season_id', seasonId).limit(1).maybeSingle()
+          : await query.eq('seasons.is_current', true).limit(1).maybeSingle()
 
         if (cancelled) return
 
@@ -113,7 +118,7 @@ export function useTeamSeason(teamId: string | undefined): TeamSeasonState {
     return () => {
       cancelled = true
     }
-  }, [teamId])
+  }, [teamId, seasonId])
 
   return state
 }

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
+import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
 import { BottomNav } from '@/components/BottomNav'
 import { RowSkeleton } from '@/components/Skeleton'
 import { useActiveOrg } from '@/components/org-context'
@@ -29,14 +30,21 @@ export default function RosterPage() {
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const { currentTeam } = useCurrentTeam()
-  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { seasons, currentSeasonId, loading: seasonsLoading } = useOrgSeasons()
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null)
+  const effectiveSeasonId = selectedSeasonId ?? currentSeasonId
+  const selectedSeason = seasons.find(season => season.id === effectiveSeasonId) ?? null
+  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(
+    currentTeam.id,
+    effectiveSeasonId
+  )
   const { org } = useActiveOrg()
   const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     // Wait until team_season is resolved — don't enter the try/finally
     // because finally would clear the loading state and flash empty UI
-    if (teamSeasonLoading) {
+    if (seasonsLoading || teamSeasonLoading) {
       setLoading(true)
       return
     }
@@ -59,7 +67,7 @@ export default function RosterPage() {
       }
     }
     load()
-  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound])
+  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound, seasonsLoading])
 
   // Sort by jersey number numerically. "00" sorts as 0 but after "0".
   const sortedPlayers = useMemo(() => {
@@ -102,9 +110,27 @@ export default function RosterPage() {
           className="text-xl tracking-[0.1em] font-bold"
           style={{ color: brandColor }}
         >
-          2026
+          {selectedSeason?.name ?? 'Season'}
         </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Roster</h1>
+        {seasons.length > 1 && (
+          <div className="mt-3">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Season
+            </label>
+            <select
+              value={effectiveSeasonId ?? ''}
+              onChange={e => setSelectedSeasonId(e.target.value || null)}
+              className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none"
+            >
+              {seasons.map(season => (
+                <option key={season.id} value={season.id} className="bg-slate-950 text-white">
+                  {season.name}{season.is_current ? ' · Current' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Player list */}
