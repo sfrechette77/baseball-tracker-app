@@ -621,3 +621,42 @@ export async function removeMembership(membershipId: string): Promise<SimpleResu
   revalidatePath('/admin')
   return { ok: true }
 }
+
+// ─── startNewSeason ────────────────────────────────────────────────────────
+
+export async function startNewSeason(
+  name: string,
+  startDate: string,
+  endDate: string,
+  copyRosters: boolean
+): Promise<SimpleResult> {
+  const seasonName = name.trim()
+
+  if (!seasonName) return { ok: false, error: 'Enter a season name' }
+  if (!startDate) return { ok: false, error: 'Enter a start date' }
+  if (!endDate) return { ok: false, error: 'Enter an end date' }
+  if (endDate < startDate) return { ok: false, error: 'End date must be after start date' }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { error } = await supabase.rpc('start_new_season', {
+    p_organization_id: guard.membership.organization_id,
+    p_name: seasonName,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_copy_rosters: copyRosters,
+  })
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  revalidatePath('/team')
+  revalidatePath('/schedule')
+  revalidatePath('/stats')
+  revalidatePath('/roster')
+
+  return { ok: true }
+}

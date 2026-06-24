@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail, startNewSeason } from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
@@ -196,6 +196,13 @@ export default function AdminPage() {
   const [settingsSeasonName, setSettingsSeasonName] = useState('')
   const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
   const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
+
+  const [newSeasonName, setNewSeasonName] = useState('')
+  const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
+  const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
+  const [copyRostersForward, setCopyRostersForward] = useState(false)
+  const [seasonRolloverSaving, setSeasonRolloverSaving] = useState(false)
+  const [seasonRolloverMsg, setSeasonRolloverMsg] = useState<string | null>(null)
   
 
   useEffect(() => {
@@ -258,6 +265,53 @@ export default function AdminPage() {
       setSettingsMsg('❌ Could not copy signup link')
     }
   }
+
+  const submitSeasonRollover = async () => {
+  if (!newSeasonName.trim()) {
+    setSeasonRolloverMsg('❌ Enter a season name')
+    return
+  }
+
+  if (!newSeasonStartDate || !newSeasonEndDate) {
+    setSeasonRolloverMsg('❌ Enter a start date and end date')
+    return
+  }
+
+  if (newSeasonEndDate < newSeasonStartDate) {
+    setSeasonRolloverMsg('❌ End date must be after start date')
+    return
+  }
+
+  const confirmed = window.confirm(
+    `Start ${newSeasonName.trim()} as the new active season? The current season will be archived. Old schedules, scores, stats, standings, and games will be preserved, but the app will switch current-season pages to the new season.`
+  )
+
+  if (!confirmed) return
+
+  setSeasonRolloverSaving(true)
+  setSeasonRolloverMsg(null)
+
+  const result = await startNewSeason(
+    newSeasonName,
+    newSeasonStartDate,
+    newSeasonEndDate,
+    copyRostersForward
+  )
+
+  setSeasonRolloverSaving(false)
+
+  if (!result.ok) {
+    setSeasonRolloverMsg(`❌ ${result.error}`)
+    return
+  }
+
+  setSettingsSeasonName(newSeasonName.trim())
+  setNewSeasonName('')
+  setNewSeasonStartDate('')
+  setNewSeasonEndDate('')
+  setCopyRostersForward(false)
+  setSeasonRolloverMsg('✅ New season started. Current-season pages now point to the new season.')
+}
 
   const uploadOrgLogo = async (file: File) => {
     if (!org || !isOrgAdmin) return
@@ -1419,6 +1473,82 @@ const visibleAdminTabs = isOrgAdmin
                   <p className="text-sm text-slate-400">
                     {settingsSeasonMsg ?? 'No active season found.'}
                   </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Start New Season</h4>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Archives the current season, creates fresh team-season records, and makes the new season active. Old season data is preserved, but current-season pages will switch to the new season. Historical season browsing is not available yet.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">New Season Name</label>
+                  <input
+                    type="text"
+                    value={newSeasonName}
+                    onChange={e => setNewSeasonName(e.target.value)}
+                    placeholder="Fall 2026"
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">Start Date</label>
+                    <input
+                      type="date"
+                      value={newSeasonStartDate}
+                      onChange={e => setNewSeasonStartDate(e.target.value)}
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">End Date</label>
+                    <input
+                      type="date"
+                      value={newSeasonEndDate}
+                      onChange={e => setNewSeasonEndDate(e.target.value)}
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                  <input
+                    type="checkbox"
+                    checked={copyRostersForward}
+                    onChange={e => setCopyRostersForward(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-white">Copy rosters forward</span>
+                    <span className="block text-[11px] text-slate-500">
+                      Copies player names, jersey numbers, and positions into the new season. Stats are not copied.
+                    </span>
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={submitSeasonRollover}
+                  disabled={
+                    seasonRolloverSaving ||
+                    !newSeasonName.trim() ||
+                    !newSeasonStartDate ||
+                    !newSeasonEndDate
+                  }
+                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  {seasonRolloverSaving ? 'Starting Season...' : 'Start New Season'}
+                </button>
+
+                {seasonRolloverMsg && (
+                  <p className="text-sm text-center text-slate-300">{seasonRolloverMsg}</p>
                 )}
               </div>  
               </div>
