@@ -67,6 +67,7 @@ type Standing = {
 }
 
 type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
+type SettingsSubTab = 'general' | 'branding' | 'access' | 'season'
 
 type Field = {
   id: string
@@ -172,6 +173,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
 export default function AdminPage() {
   const [password, setPassword] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('dashboard')
+  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general')
   const { currentTeam } = useCurrentTeam()
   const { membership, loading: orgLoading } = useActiveOrg()
   const isOrgAdmin = membership?.role === 'org_admin'
@@ -1332,238 +1334,298 @@ const visibleAdminTabs = isOrgAdmin
                 Organization Settings
               </p>
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400">Organization Name</label>
-                <input
-                  type="text"
-                  value={settingsName}
-                  onChange={e => setSettingsName(e.target.value)}
-                  className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
-                />
+              <div
+                role="tablist"
+                aria-label="Settings sections"
+                className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
+              >
+                {([
+                  ['general', 'General'],
+                  ['branding', 'Branding'],
+                  ['access', 'Access'],
+                  ['season', 'Season'],
+                ] as const).map(([subTab, label]) => {
+                  const isActive = settingsSubTab === subTab
+
+                  return (
+                    <button
+                      key={subTab}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setSettingsSubTab(subTab)}
+                      className="rounded-xl border px-3 py-2 text-xs font-bold transition"
+                      style={{
+                        backgroundColor: isActive ? brandColor : 'rgba(255,255,255,0.05)',
+                        borderColor: isActive ? brandColor : 'rgba(255,255,255,0.1)',
+                        color: isActive ? '#ffffff' : '#cbd5e1',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400">Slug</label>
-                <input
-                  type="text"
-                  value={org?.slug ?? ''}
-                  disabled
-                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-500"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Slug editing is disabled for now because it affects signup links.
-                </p>
-              </div>
+              {settingsSubTab === 'general' && (
+                <div role="tabpanel" className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">Organization Name</label>
+                    <input
+                      type="text"
+                      value={settingsName}
+                      onChange={e => setSettingsName(e.target.value)}
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                    />
+                  </div>
 
-              <div className="pt-4 border-t border-white/10">
-                <h3 className="text-sm font-bold text-white">Branding</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Customize how this organization appears throughout the app.
-                </p>
-              </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">Slug</label>
+                    <input
+                      type="text"
+                      value={org?.slug ?? ''}
+                      disabled
+                      className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-500"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      Slug editing is disabled for now because it affects signup links.
+                    </p>
+                  </div>
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400">Upload Logo</label>
-                <p className="text-[11px] text-slate-500">
-                  Choose a PNG, JPG, or WebP logo. After upload, click Save Organization Settings.
-                </p>
+                  <button
+                    onClick={saveOrgSettings}
+                    disabled={settingsSaving || !settingsName.trim()}
+                    className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: settingsPrimaryColor || brandColor }}
+                  >
+                    {settingsSaving ? 'Saving...' : 'Save Organization Settings'}
+                  </button>
 
-                <label className="block cursor-pointer rounded-xl px-3 py-3 text-center text-sm font-bold text-white transition disabled:opacity-50"
-                        style={{ backgroundColor: brandColor }}
-                >
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    disabled={settingsLogoUploading}
-                    onChange={e => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      uploadOrgLogo(file)
-                      e.currentTarget.value = ''
-                    }}
-                  />
-                  {settingsLogoUploading ? 'Uploading logo...' : 'Choose Logo File'}
-                </label>
-              </div>
-
-              {settingsLogoUrl && (
-                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                  <p className="mb-2 text-xs text-slate-400">Logo Preview</p>
-                  <img
-                    src={settingsLogoUrl}
-                    alt="Organization logo preview"
-                    className="h-16 w-16 rounded-xl object-contain bg-white"
-                  />
+                  {settingsMsg && (
+                    <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
+                  )}
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-xs text-slate-400">Primary Color</label>
-                <p className="text-[11px] text-slate-500">
-                  Click the color box to choose the organization’s main app color.
-                </p>
-
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                  <input
-                    type="color"
-                    value={settingsPrimaryColor}
-                    onChange={e => setSettingsPrimaryColor(e.target.value)}
-                    className="h-12 w-16 cursor-pointer rounded-lg border border-white/20 bg-transparent"
-                    title="Click to choose a color"
-                  />
-
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-white">App highlight color</p>
-                    <p className="text-xs text-slate-400">
-                      Used for buttons, tabs, navigation, chat bubbles, and highlights.
+              {settingsSubTab === 'branding' && (
+                <div role="tabpanel" className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">Upload Logo</label>
+                    <p className="text-[11px] text-slate-500">
+                      Choose a PNG, JPG, or WebP logo. After upload, click Save Organization Settings.
                     </p>
-                  </div>
-                </div>
-              </div>
 
-              <div className="pt-4 border-t border-white/10">
-                <h3 className="text-sm font-bold text-white">Access</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Share the signup link with parents, coaches, and players so they can request access.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={signupLink}
-                    className="min-w-0 flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-400"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={copySignupLink}
-                    disabled={!signupLink}
-                    className="rounded-xl px-4 py-2 text-xs font-bold text-white transition disabled:opacity-50"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    {settingsCopied ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-
-              <div className="pt-4 border-t border-white/10">
-                <h3 className="text-sm font-bold text-white">Season</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  The active season controls schedules, rosters, stats, and standings.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                {settingsSeasonLoading ? (
-                  <p className="text-sm text-slate-400">Loading active season...</p>
-                ) : settingsSeasonName ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-white">{settingsSeasonName}</p>
-                    <span
-                      className="inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                    <label
+                      className="block cursor-pointer rounded-xl px-3 py-3 text-center text-sm font-bold text-white transition disabled:opacity-50"
                       style={{ backgroundColor: brandColor }}
                     >
-                      Active
-                    </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        disabled={settingsLogoUploading}
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          uploadOrgLogo(file)
+                          e.currentTarget.value = ''
+                        }}
+                      />
+                      {settingsLogoUploading ? 'Uploading logo...' : 'Choose Logo File'}
+                    </label>
                   </div>
-                ) : (
-                  <p className="text-sm text-slate-400">
-                    {settingsSeasonMsg ?? 'No active season found.'}
-                  </p>
-                )}
-              </div>
 
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Start New Season</h4>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Archives the current season, creates fresh team-season records, and makes the new season active. Old season data is preserved, but current-season pages will switch to the new season. Historical season browsing is not available yet.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs text-slate-400">New Season Name</label>
-                  <input
-                    type="text"
-                    value={newSeasonName}
-                    onChange={e => setNewSeasonName(e.target.value)}
-                    placeholder="Fall 2026"
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <label className="text-xs text-slate-400">Start Date</label>
-                    <input
-                      type="date"
-                      value={newSeasonStartDate}
-                      onChange={e => setNewSeasonStartDate(e.target.value)}
-                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
-                    />
-                  </div>
+                  {settingsLogoUrl && (
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                      <p className="mb-2 text-xs text-slate-400">Logo Preview</p>
+                      <img
+                        src={settingsLogoUrl}
+                        alt="Organization logo preview"
+                        className="h-16 w-16 rounded-xl object-contain bg-white"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
-                    <label className="text-xs text-slate-400">End Date</label>
-                    <input
-                      type="date"
-                      value={newSeasonEndDate}
-                      onChange={e => setNewSeasonEndDate(e.target.value)}
-                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
-                    />
+                    <label className="text-xs text-slate-400">Primary Color</label>
+                    <p className="text-[11px] text-slate-500">
+                      Click the color box to choose the organization’s main app color.
+                    </p>
+
+                    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                      <input
+                        type="color"
+                        value={settingsPrimaryColor}
+                        onChange={e => setSettingsPrimaryColor(e.target.value)}
+                        className="h-12 w-16 cursor-pointer rounded-lg border border-white/20 bg-transparent"
+                        title="Click to choose a color"
+                      />
+
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-white">App highlight color</p>
+                        <p className="text-xs text-slate-400">
+                          Used for buttons, tabs, navigation, chat bubbles, and highlights.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={saveOrgSettings}
+                    disabled={settingsSaving || !settingsName.trim()}
+                    className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: settingsPrimaryColor || brandColor }}
+                  >
+                    {settingsSaving ? 'Saving...' : 'Save Organization Settings'}
+                  </button>
+
+                  {settingsMsg && (
+                    <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
+                  )}
+                </div>
+              )}
+
+              {settingsSubTab === 'access' && (
+                <div role="tabpanel" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Access</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Share the signup link with parents, coaches, and players so they can request access.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={signupLink}
+                        className="min-w-0 flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-400"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={copySignupLink}
+                        disabled={!signupLink}
+                        className="rounded-xl px-4 py-2 text-xs font-bold text-white transition disabled:opacity-50"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {settingsCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {settingsMsg && (
+                    <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
+                  )}
+                </div>
+              )}
+
+              {settingsSubTab === 'season' && (
+                <div role="tabpanel" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Season</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      The active season controls schedules, rosters, stats, and standings.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    {settingsSeasonLoading ? (
+                      <p className="text-sm text-slate-400">Loading active season...</p>
+                    ) : settingsSeasonName ? (
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-white">{settingsSeasonName}</p>
+                        <span
+                          className="inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          Active
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">
+                        {settingsSeasonMsg ?? 'No active season found.'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Start New Season</h4>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Archives the current season, creates fresh team-season records, and makes the new season active. Old season data is preserved, but current-season pages will switch to the new season. Historical season browsing is not available yet.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">New Season Name</label>
+                      <input
+                        type="text"
+                        value={newSeasonName}
+                        onChange={e => setNewSeasonName(e.target.value)}
+                        placeholder="Fall 2026"
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <label className="text-xs text-slate-400">Start Date</label>
+                        <input
+                          type="date"
+                          value={newSeasonStartDate}
+                          onChange={e => setNewSeasonStartDate(e.target.value)}
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs text-slate-400">End Date</label>
+                        <input
+                          type="date"
+                          value={newSeasonEndDate}
+                          onChange={e => setNewSeasonEndDate(e.target.value)}
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                      <input
+                        type="checkbox"
+                        checked={copyRostersForward}
+                        onChange={e => setCopyRostersForward(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-white">Copy rosters forward</span>
+                        <span className="block text-[11px] text-slate-500">
+                          Copies player names, jersey numbers, and positions into the new season. Stats are not copied.
+                        </span>
+                      </span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={submitSeasonRollover}
+                      disabled={
+                        seasonRolloverSaving ||
+                        !newSeasonName.trim() ||
+                        !newSeasonStartDate ||
+                        !newSeasonEndDate
+                      }
+                      className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      {seasonRolloverSaving ? 'Starting Season...' : 'Start New Season'}
+                    </button>
+
+                    {seasonRolloverMsg && (
+                      <p className="text-sm text-center text-slate-300">{seasonRolloverMsg}</p>
+                    )}
                   </div>
                 </div>
-
-                <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                  <input
-                    type="checkbox"
-                    checked={copyRostersForward}
-                    onChange={e => setCopyRostersForward(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="block text-sm font-semibold text-white">Copy rosters forward</span>
-                    <span className="block text-[11px] text-slate-500">
-                      Copies player names, jersey numbers, and positions into the new season. Stats are not copied.
-                    </span>
-                  </span>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={submitSeasonRollover}
-                  disabled={
-                    seasonRolloverSaving ||
-                    !newSeasonName.trim() ||
-                    !newSeasonStartDate ||
-                    !newSeasonEndDate
-                  }
-                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  {seasonRolloverSaving ? 'Starting Season...' : 'Start New Season'}
-                </button>
-
-                {seasonRolloverMsg && (
-                  <p className="text-sm text-center text-slate-300">{seasonRolloverMsg}</p>
-                )}
-              </div>  
-              </div>
-
-              <button
-                onClick={saveOrgSettings}
-                disabled={settingsSaving || !settingsName.trim()}
-                className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
-                style={{ backgroundColor: settingsPrimaryColor || brandColor }}
-              >
-                {settingsSaving ? 'Saving...' : 'Save Organization Settings'}
-              </button>
-
-              {settingsMsg && (
-                <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
               )}
             </div>
           </div>
