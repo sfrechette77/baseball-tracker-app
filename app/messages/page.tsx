@@ -7,6 +7,7 @@ import { useCurrentTeam } from '@/components/team-context'
 import { useActiveOrg } from '@/components/org-context'
 import { BottomNav } from '@/components/BottomNav'
 import { Skeleton } from '@/components/Skeleton'
+import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
 
 // Reused from Feed
 import { Composer } from '@/components/feed/Composer'
@@ -66,6 +67,9 @@ function MessagesPageInner() {
   const viewParam = searchParams.get('view')
   const view: SubView = viewParam === 'chat' ? 'chat' : 'announcements'
 
+  const { seasons, currentSeasonId } = useOrgSeasons()
+  const selectedSeason = seasons.find(season => season.id === currentSeasonId) ?? null
+
   const setView = (next: SubView) => {
     const url = new URL(window.location.href)
     url.searchParams.set('view', next)
@@ -99,7 +103,7 @@ function MessagesPageInner() {
         <p className="text-xl tracking-[0.1em] font-bold"
             style={{ color: brandColor }}
           >
-            2026
+            {selectedSeason?.name ?? 'Season'}
           </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Messages</h1>
         <p className="text-sm text-slate-400 mt-1">{currentTeam.fullName}</p>
