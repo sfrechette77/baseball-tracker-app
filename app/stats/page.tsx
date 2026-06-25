@@ -8,6 +8,7 @@ import { useTeamSeason } from '@/lib/org/useTeamSeason'
 import { BottomNav } from '@/components/BottomNav'
 import { Skeleton } from '@/components/Skeleton'
 import { useActiveOrg } from '@/components/org-context'
+import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -55,14 +56,21 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'avg' | 'hits' | 'rbi' | 'runs'>('avg')
   const { currentTeam } = useCurrentTeam()
-  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { seasons, currentSeasonId, loading: seasonsLoading } = useOrgSeasons()
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null)
+  const effectiveSeasonId = selectedSeasonId ?? currentSeasonId
+  const selectedSeason = seasons.find(season => season.id === effectiveSeasonId) ?? null
+  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(
+    currentTeam.id,
+    effectiveSeasonId
+  )
   const { org } = useActiveOrg()
   const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
     // Wait until team_season is resolved — don't enter the try/finally
     // because finally would clear the loading state and flash empty UI
-    if (teamSeasonLoading) {
+    if (seasonsLoading || teamSeasonLoading) {
       setLoading(true)
       return
     }
@@ -98,7 +106,7 @@ export default function StatsPage() {
     }
 
     load()
-  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound])
+  }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound, seasonsLoading])
 
   const playersWithStats = useMemo((): PlayerWithStats[] => {
     return players.map(player => {
@@ -137,7 +145,7 @@ export default function StatsPage() {
             className="text-xl tracking-[0.1em] font-bold"
             style={{ color: brandColor }}
           >
-            2026
+            {selectedSeason?.name ?? 'Season'}
           </p>
           <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
         </div>
@@ -194,9 +202,27 @@ export default function StatsPage() {
           className="text-xl tracking-[0.1em] font-bold"
           style={{ color: brandColor }}
         >
-          2026
+          {selectedSeason?.name ?? 'Season'}
         </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">Batting Stats</h1>
+        {seasons.length > 1 && (
+          <div className="mt-3">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Season
+            </label>
+            <select
+              value={effectiveSeasonId ?? ''}
+              onChange={e => setSelectedSeasonId(e.target.value || null)}
+              className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none"
+            >
+              {seasons.map(season => (
+                <option key={season.id} value={season.id} className="bg-slate-950 text-white">
+                  {season.name}{season.is_current ? ' · Current' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
