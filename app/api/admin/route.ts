@@ -688,6 +688,80 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    if (action === 'update_player_stats_bulk') {
+      const { eventId, stats } = body
+
+      if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
+      if (!Array.isArray(stats)) return NextResponse.json({ error: 'Stats must be an array' }, { status: 400 })
+
+      const ownershipError = await verifyEventOwnership(eventId)
+      if (ownershipError) return NextResponse.json({ error: ownershipError }, { status: 403 })
+
+      const { data: eventRow, error: eventError } = await supabase
+        .from('events')
+        .select('team_season_id')
+        .eq('id', eventId)
+        .single()
+
+      if (eventError || !eventRow?.team_season_id) {
+        return NextResponse.json({ error: 'Event season not found' }, { status: 400 })
+      }
+
+      const playerIds = stats.map((stat: any) => stat?.playerId).filter(Boolean)
+      if (playerIds.length !== stats.length) {
+        return NextResponse.json({ error: 'Every stat row must include playerId' }, { status: 400 })
+      }
+
+      const uniquePlayerIds = Array.from(new Set(playerIds))
+      const { data: playerRows, error: playersError } = await supabase
+        .from('players')
+        .select('id, team_season_id')
+        .in('id', uniquePlayerIds)
+
+      if (playersError) return NextResponse.json({ error: playersError.message }, { status: 500 })
+
+      const playersById = new Map((playerRows ?? []).map((player) => [player.id, player]))
+      const missingPlayerIds = uniquePlayerIds.filter((playerId) => !playersById.has(playerId))
+      if (missingPlayerIds.length > 0) {
+        return NextResponse.json({ error: `Player not found: ${missingPlayerIds.join(', ')}` }, { status: 400 })
+      }
+
+      const wrongSeasonPlayerIds = uniquePlayerIds.filter(
+        (playerId) => playersById.get(playerId)?.team_season_id !== eventRow.team_season_id
+      )
+      if (wrongSeasonPlayerIds.length > 0) {
+        return NextResponse.json(
+          { error: `Player does not belong to this event season: ${wrongSeasonPlayerIds.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
+      const rows = stats.map((stat: any) => ({
+        event_id: eventId,
+        player_id: stat.playerId,
+        team_season_id: eventRow.team_season_id,
+        batting_order_position: stat.batting_order_position ?? null,
+        at_bats: stat.at_bats,
+        hits: stat.hits,
+        rbi: stat.rbi,
+        runs: stat.runs,
+        walks: stat.walks ?? 0,
+        strikeouts: stat.strikeouts,
+        pitch_count: stat.pitch_count ?? 0,
+        innings_pitched: stat.innings_pitched ?? 0,
+        strikeouts_pitching: stat.strikeouts_pitching ?? 0,
+        walks_allowed: stat.walks_allowed ?? 0,
+        hits_allowed: stat.hits_allowed ?? 0,
+        earned_runs: stat.earned_runs ?? 0,
+      }))
+
+      const { error } = await supabase
+        .from('player_stats')
+        .upsert(rows, { onConflict: 'player_id,event_id' })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true })
+    }
+
     // ── Standings (cross-team, no ownership check) ──────────────────────────
     if (action === 'update_standing') {
       const orgAdminError = await verifyOrgAdminAccess()
