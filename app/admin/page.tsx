@@ -1360,7 +1360,7 @@ const visibleAdminTabs = isOrgAdmin
         </div>
       </div>
 
-      <div className="mx-auto max-w-sm px-4 pt-4 space-y-4">
+      <div className={`mx-auto px-4 pt-4 space-y-4 ${tab === 'stats' ? 'max-w-5xl' : 'max-w-sm'}`}>
 
         {/* ── Settings Tab ─────────────────────────────────────────────── */}
         {tab === 'settings' && isOrgAdmin && (
@@ -2663,62 +2663,102 @@ const visibleAdminTabs = isOrgAdmin
             </div>
 
             {statsEventId && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
-                {players.map(player => {
-                  const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
-                  return (
-                    <div key={player.id} className="space-y-1">
-                      <p className="text-xs font-semibold text-slate-300">
-                        {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <label className="text-[10px] text-slate-500 uppercase tracking-wide">Bat #</label>
-                        <input type="number" min="1" value={s.batting_order_position ?? ''}
-                          onChange={e => {
-                            const v = e.target.value
-                            setPlayerStats(prev => ({ ...prev, [player.id]: { ...prev[player.id], batting_order_position: v === '' ? null : Number(v) } }))
-                          }}
-                          className="w-16 rounded-lg bg-white/10 border border-white/10 px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
-                      </div>
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wide">Batting</p>
-                      <div className="grid grid-cols-5 gap-1">
-                        {([
-                          ['at_bats', s.at_bats, 'AB'],
-                          ['hits', s.hits, 'H'],
-                          ['rbi', s.rbi, 'RBI'],
-                          ['runs', s.runs, 'R'],
-                          ['walks', s.walks, 'BB'],
-                          ['strikeouts', s.strikeouts, 'K'],
-                        ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
-                          <div key={field} className="space-y-0.5">
-                            <p className="text-[9px] text-slate-500 text-center">{label}</p>
-                            <input type="number" value={val}
-                              onChange={e => updateStat(player.id, field, e.target.value)}
-                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wide pt-1">Pitching</p>
-                      <div className="grid grid-cols-4 gap-1">
-                        {([
-                          ['pitch_count', s.pitch_count ?? 0, 'Pitches'],
-                          ['innings_pitched', s.innings_pitched ?? 0, 'IP'],
-                          ['hits_allowed', s.hits_allowed ?? 0, 'H'],
-                          ['earned_runs', s.earned_runs ?? 0, 'ER'],
-                          ['strikeouts_pitching', s.strikeouts_pitching ?? 0, 'K'],
-                          ['walks_allowed', s.walks_allowed ?? 0, 'BB'],
-                        ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
-                          <div key={field} className="space-y-0.5">
-                            <p className="text-[9px] text-slate-500 text-center">{label}</p>
-                            <input type="number" value={val}
-                              onChange={e => updateStat(player.id, field, e.target.value)}
-                              className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-white/5 p-4 space-y-5">
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Batting</p>
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full min-w-[760px] border-collapse text-sm">
+                      <thead className="bg-white/10 text-[10px] uppercase tracking-wide text-slate-500">
+                        <tr>
+                          {['Player', 'BO', 'AB', 'H', 'R', 'RBI', 'BB', 'K'].map(header => (
+                            <th key={header} className={`px-2 py-2 font-semibold ${header === 'Player' ? 'w-56 text-left' : 'w-20 text-center'}`}>
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {players.map(player => {
+                          const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
+                          return (
+                            <tr key={player.id} className="hover:bg-white/[0.03]">
+                              <td className="px-2 py-2 text-xs font-semibold text-slate-300">
+                                {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
+                              </td>
+                              <td className="px-1 py-2">
+                                <input type="number" min="1" value={s.batting_order_position ?? ''}
+                                  onChange={e => {
+                                    const v = e.target.value
+                                    setPlayerStats(prev => ({ ...prev, [player.id]: { ...prev[player.id], batting_order_position: v === '' ? null : Number(v) } }))
+                                  }}
+                                  className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
+                              </td>
+                              {([
+                                ['at_bats', s.at_bats, 'AB'],
+                                ['hits', s.hits, 'H'],
+                                ['runs', s.runs, 'R'],
+                                ['rbi', s.rbi, 'RBI'],
+                                ['walks', s.walks, 'BB'],
+                                ['strikeouts', s.strikeouts, 'K'],
+                              ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
+                                <td key={field} className="px-1 py-2">
+                                  <label className="sr-only">{label} for {player.name}</label>
+                                  <input type="number" value={val}
+                                    onChange={e => updateStat(player.id, field, e.target.value)}
+                                    className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
+                                </td>
+                              ))}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pitching</p>
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full min-w-[680px] border-collapse text-sm">
+                      <thead className="bg-white/10 text-[10px] uppercase tracking-wide text-slate-500">
+                        <tr>
+                          {['Player', 'PC', 'IP', 'K', 'BB', 'H', 'ER'].map(header => (
+                            <th key={header} className={`px-2 py-2 font-semibold ${header === 'Player' ? 'w-56 text-left' : 'w-20 text-center'}`}>
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {players.map(player => {
+                          const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
+                          return (
+                            <tr key={player.id} className="hover:bg-white/[0.03]">
+                              <td className="px-2 py-2 text-xs font-semibold text-slate-300">
+                                {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
+                              </td>
+                              {([
+                                ['pitch_count', s.pitch_count ?? 0, 'PC'],
+                                ['innings_pitched', s.innings_pitched ?? 0, 'IP'],
+                                ['strikeouts_pitching', s.strikeouts_pitching ?? 0, 'K'],
+                                ['walks_allowed', s.walks_allowed ?? 0, 'BB'],
+                                ['hits_allowed', s.hits_allowed ?? 0, 'H'],
+                                ['earned_runs', s.earned_runs ?? 0, 'ER'],
+                              ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
+                                <td key={field} className="px-1 py-2">
+                                  <label className="sr-only">{label} for {player.name}</label>
+                                  <input type="number" value={val}
+                                    onChange={e => updateStat(player.id, field, e.target.value)}
+                                    className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
+                                </td>
+                              ))}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
                 <button onClick={saveStats} disabled={statsSaving}
                   className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
