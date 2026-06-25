@@ -526,7 +526,7 @@ export default function HomePage() {
       }
     }
     loadData()
-  }, [teamSeasonId])
+    }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound, arrivalBufferMinutes])
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
