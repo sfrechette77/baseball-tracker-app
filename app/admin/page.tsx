@@ -399,6 +399,7 @@ export default function AdminPage() {
   const [players, setPlayers] = useState<Player[]>([])
   const [statsEventId, setStatsEventId] = useState('')
   const [playerStats, setPlayerStats] = useState<Record<string, StatRow>>({})
+  const [savedPlayerStats, setSavedPlayerStats] = useState<Record<string, StatRow>>({})
   const [statsSaving, setStatsSaving] = useState(false)
   const [statsMsg, setStatsMsg] = useState<string | null>(null)
 
@@ -788,6 +789,7 @@ useEffect(() => {
       setStatsMsg('❌ Could not load this event season.')
       setPlayers([])
       setPlayerStats({})
+      setSavedPlayerStats({})
       return
     }
 
@@ -830,6 +832,7 @@ useEffect(() => {
     }
 
     setPlayerStats(map)
+    setSavedPlayerStats(map)
   }
 
   load()
@@ -925,6 +928,47 @@ useEffect(() => {
     return null
   }
 
+      const battingStatCompareFields: (keyof StatRow)[] = [
+    'batting_order_position',
+    'at_bats',
+    'hits',
+    'rbi',
+    'runs',
+    'walks',
+    'strikeouts',
+  ]
+
+  const pitchingStatCompareFields: (keyof StatRow)[] = [
+    'pitch_count',
+    'innings_pitched',
+    'strikeouts_pitching',
+    'walks_allowed',
+    'hits_allowed',
+    'earned_runs',
+  ]
+
+  const normalizeStatValue = (value: StatRow[keyof StatRow]) => value ?? 0
+
+  const playerHasUnsavedFields = (playerId: string, fields: (keyof StatRow)[]) => {
+    const current = playerStats[playerId]
+    const saved = savedPlayerStats[playerId]
+
+    if (!current && !saved) return false
+    if (!current || !saved) return true
+
+    return fields.some(field => normalizeStatValue(current[field]) !== normalizeStatValue(saved[field]))
+  }
+
+  const playerHasUnsavedBattingStats = (playerId: string) =>
+    playerHasUnsavedFields(playerId, battingStatCompareFields)
+
+  const playerHasUnsavedPitchingStats = (playerId: string) =>
+    playerHasUnsavedFields(playerId, pitchingStatCompareFields)
+
+  const hasUnsavedStats = players.some(player =>
+    playerHasUnsavedBattingStats(player.id) || playerHasUnsavedPitchingStats(player.id)
+  )
+
   const saveStats = async () => {
     if (!statsEventId) return
 
@@ -965,6 +1009,7 @@ useEffect(() => {
         return
       }
 
+      setSavedPlayerStats(playerStats)
       setStatsMsg('All stats saved!')
     } catch (err) {
       setStatsMsg(err instanceof Error ? `Error: ${err.message}` : 'Error: Could not save stats')
@@ -2772,7 +2817,11 @@ const visibleAdminTabs = isOrgAdmin
                         {players.map(player => {
                           const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
                           return (
-                            <tr key={player.id} className="hover:bg-white/[0.03]">
+                            <tr
+                              key={player.id}
+                              className={playerHasUnsavedBattingStats(player.id) ? 'border-l-2 hover:bg-white/[0.03]' : 'hover:bg-white/[0.03]'}
+                              style={playerHasUnsavedBattingStats(player.id) ? { borderLeftColor: brandColor, backgroundColor: `${brandColor}14` } : undefined}
+                            >
                               <td className="w-36 px-1 py-2 text-xs font-semibold text-slate-300">
                                 <span className="block truncate">
                                   {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
@@ -2827,7 +2876,11 @@ const visibleAdminTabs = isOrgAdmin
                         {players.map(player => {
                           const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
                           return (
-                            <tr key={player.id} className="hover:bg-white/[0.03]">
+                            <tr
+                              key={player.id}
+                              className={playerHasUnsavedPitchingStats(player.id) ? 'border-l-2 hover:bg-white/[0.03]' : 'hover:bg-white/[0.03]'}
+                              style={playerHasUnsavedPitchingStats(player.id) ? { borderLeftColor: brandColor, backgroundColor: `${brandColor}14` } : undefined}
+                            >
                               <td className="w-36 px-1 py-2 text-xs font-semibold text-slate-300">
                                 <span className="block truncate">
                                   {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
@@ -2864,6 +2917,13 @@ const visibleAdminTabs = isOrgAdmin
                     style={{ backgroundColor: brandColor }}
                   >
                     {statsSaving ? 'Saving...' : 'Save All Stats'}
+
+                    {hasUnsavedStats && (
+                      <p className="text-center text-xs font-semibold text-slate-400">
+                        Unsaved changes
+                      </p>
+                    )}
+
                   </button>
                 </div>
                 {statsMsg && (
