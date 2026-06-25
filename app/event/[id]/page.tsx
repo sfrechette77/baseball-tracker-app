@@ -272,27 +272,21 @@ export default function EventPage() {
   }
 
   if (!event) {
-    return (
-      <main className="min-h-screen bg-black flex items-center justify-center p-4">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-          <Link
-            href="/schedule"
-            className="mt-3 inline-block text-sm font-semibold"
-            style={{ color: brandColor }}
-          >
-            ← Back to Schedule
-          </Link>
-          <Link
-            href="/schedule"
-            className="mt-3 inline-block text-sm font-semibold"
-            style={{ color: brandColor }}
-          >
-            ← Back to Schedule
-          </Link>
-        </div>
-      </main>
-    )
-  }
+  return (
+    <main className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+        <p className="text-white font-bold">Event not found</p>
+        <Link
+          href="/schedule"
+          className="mt-3 inline-block text-sm font-semibold"
+          style={{ color: brandColor }}
+        >
+          ← Back to Schedule
+        </Link>
+      </div>
+    </main>
+  )
+}
 
   const isPractice = event.event_type === 'practice'
   const isGame = event.event_type === 'game' || event.event_type === 'tournament'
