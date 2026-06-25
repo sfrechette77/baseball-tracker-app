@@ -866,22 +866,45 @@ useEffect(() => {
     }
   }
   const saveStats = async () => {
-    if (!statsEventId) return
-    setStatsSaving(true)
-    setStatsMsg(null)
-    for (const [playerId, stats] of Object.entries(playerStats)) {
-      await api({
-        action: 'update_player_stats', playerId, eventId: statsEventId,
-        atBats: stats.at_bats, hits: stats.hits, rbi: stats.rbi, runs: stats.runs,
-        walks: stats.walks ?? 0, strikeouts: stats.strikeouts,
-        pitchCount: stats.pitch_count ?? 0, inningsPitched: stats.innings_pitched ?? 0,
-        strikeoutsPitching: stats.strikeouts_pitching ?? 0, walksAllowed: stats.walks_allowed ?? 0,
-        hitsAllowed: stats.hits_allowed ?? 0, earnedRuns: stats.earned_runs ?? 0, battingOrderPosition: stats.batting_order_position ?? null
-      })
+  if (!statsEventId) return
+
+  setStatsSaving(true)
+  setStatsMsg(null)
+
+  try {
+    const result = await api({
+      action: 'update_player_stats_bulk',
+      eventId: statsEventId,
+      stats: Object.entries(playerStats).map(([playerId, stats]) => ({
+        playerId,
+        batting_order_position: stats.batting_order_position ?? null,
+        at_bats: stats.at_bats ?? 0,
+        hits: stats.hits ?? 0,
+        rbi: stats.rbi ?? 0,
+        runs: stats.runs ?? 0,
+        walks: stats.walks ?? 0,
+        strikeouts: stats.strikeouts ?? 0,
+        pitch_count: stats.pitch_count ?? 0,
+        innings_pitched: stats.innings_pitched ?? 0,
+        strikeouts_pitching: stats.strikeouts_pitching ?? 0,
+        walks_allowed: stats.walks_allowed ?? 0,
+        hits_allowed: stats.hits_allowed ?? 0,
+        earned_runs: stats.earned_runs ?? 0,
+      })),
+    })
+
+    if (result?.error) {
+      setStatsMsg(`Error: ${result.error}`)
+      return
     }
+
+    setStatsMsg('All stats saved!')
+  } catch (err) {
+    setStatsMsg(err instanceof Error ? `Error: ${err.message}` : 'Error: Could not save stats')
+  } finally {
     setStatsSaving(false)
-    setStatsMsg('✅ All stats saved!')
   }
+}
 
   const saveStatus = async () => {
     if (!statusEventId) return
@@ -2776,6 +2799,11 @@ const visibleAdminTabs = isOrgAdmin
                     {statsSaving ? 'Saving...' : 'Save All Stats'}
                   </button>
                 </div>
+                {statsMsg && (
+                  <p className="text-sm text-center font-semibold text-slate-200">
+                    {statsMsg}
+                  </p>
+                )}
               </div>
             )}
           </>
