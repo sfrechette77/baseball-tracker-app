@@ -22,6 +22,38 @@ type Player = {
   name: string
   jersey_number: string | null
   position: string | null
+  team_season_id: string | null
+  season_name: string | null
+}
+
+type RawPlayer = {
+  id: string
+  name: string
+  jersey_number: string | null
+  position: string | null
+  team_season_id: string | null
+  team_season:
+    | {
+        seasons:
+          | {
+              name: string | null
+            }
+          | {
+              name: string | null
+            }[]
+          | null
+      }
+    | {
+        seasons:
+          | {
+              name: string | null
+            }
+          | {
+              name: string | null
+            }[]
+          | null
+      }[]
+    | null
 }
 
 type StatRow = {
@@ -72,13 +104,29 @@ export default function PlayerPage() {
   const [loading, setLoading] = useState(true)
   const { org } = useActiveOrg()
   const brandColor = org?.primary_color || '#dc2626'
+  const seasonName = player?.season_name ?? 'Season'
 
   useEffect(() => {
     const load = async () => {
       try {
         const supabase = createClient()
         const [{ data: playerData }, { data: statsData }] = await Promise.all([
-          supabase.from('players').select('id, name, jersey_number, position').eq('id', playerId).single(),
+          supabase
+  .from('players')
+  .select(`
+    id,
+    name,
+    jersey_number,
+    position,
+    team_season_id,
+    team_season:team_season_id (
+      seasons:season_id (
+        name
+      )
+    )
+  `)
+  .eq('id', playerId)
+  .single(),
           supabase.from('player_stats')
             .select(`id, event_id, at_bats, hits, rbi, runs, strikeouts, walks,
               pitch_count, innings_pitched, strikeouts_pitching, walks_allowed, hits_allowed, earned_runs,
@@ -86,7 +134,26 @@ export default function PlayerPage() {
             .eq('player_id', playerId)
             .order('event_id', { ascending: true })
         ])
-        setPlayer(playerData as Player)
+        const rawPlayer = playerData as RawPlayer | null
+        const teamSeason = Array.isArray(rawPlayer?.team_season)
+          ? rawPlayer?.team_season[0]
+          : rawPlayer?.team_season
+
+        const season = Array.isArray(teamSeason?.seasons)
+          ? teamSeason?.seasons[0]
+          : teamSeason?.seasons
+
+        setPlayer(rawPlayer
+          ? {
+              id: rawPlayer.id,
+              name: rawPlayer.name,
+              jersey_number: rawPlayer.jersey_number,
+              position: rawPlayer.position,
+              team_season_id: rawPlayer.team_season_id,
+              season_name: season?.name ?? null,
+            }
+          : null
+        )
         setStats((statsData ?? []) as unknown as StatRow[])
       } catch (err) {
         console.error(err)
@@ -238,7 +305,7 @@ export default function PlayerPage() {
                 className="text-[10px] uppercase tracking-[0.25em] font-semibold"
                 style={{ color: brandColor }}
               >
-                2026 Stats
+                {seasonName} Stats
               </p>
               <h1 className="text-xl font-extrabold text-white leading-tight">{player.name}</h1>
               {player.position && <p className="text-sm text-slate-400">{player.position}</p>}
