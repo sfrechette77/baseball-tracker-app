@@ -865,46 +865,113 @@ useEffect(() => {
       setScoreMsg('❌ Save failed (unknown error)')
     }
   }
+
+    const validateStatsBeforeSave = () => {
+    for (const [playerId, stats] of Object.entries(playerStats)) {
+      const player = players.find(p => p.id === playerId)
+      const playerName = player?.name ?? 'A player'
+
+      const wholeNumberFields: [keyof StatRow, string][] = [
+        ['batting_order_position', 'batting order'],
+        ['at_bats', 'at-bats'],
+        ['hits', 'hits'],
+        ['rbi', 'RBI'],
+        ['runs', 'runs'],
+        ['walks', 'walks'],
+        ['strikeouts', 'strikeouts'],
+        ['pitch_count', 'pitch count'],
+        ['strikeouts_pitching', 'pitching strikeouts'],
+        ['walks_allowed', 'walks allowed'],
+        ['hits_allowed', 'hits allowed'],
+        ['earned_runs', 'earned runs'],
+      ]
+
+      for (const [field, label] of wholeNumberFields) {
+        const rawValue = stats[field]
+        if (rawValue === null || rawValue === undefined || rawValue === '') continue
+
+        const value = Number(rawValue)
+
+        if (!Number.isFinite(value)) {
+          return `Error: ${playerName} has an invalid ${label} value.`
+        }
+
+        if (value < 0) {
+          return `Error: ${playerName} has a negative ${label} value.`
+        }
+
+        if (!Number.isInteger(value)) {
+          return `Error: ${playerName} has a non-whole-number ${label} value.`
+        }
+      }
+
+      const inningsPitched = Number(stats.innings_pitched ?? 0)
+      if (!Number.isFinite(inningsPitched)) {
+        return `Error: ${playerName} has an invalid innings pitched value.`
+      }
+
+      if (inningsPitched < 0) {
+        return `Error: ${playerName} has negative innings pitched.`
+      }
+
+      const atBats = Number(stats.at_bats ?? 0)
+      const hits = Number(stats.hits ?? 0)
+
+      if (Number.isFinite(atBats) && Number.isFinite(hits) && hits > atBats) {
+        return `Error: ${playerName} has hits greater than at-bats.`
+      }
+    }
+
+    return null
+  }
+
   const saveStats = async () => {
-  if (!statsEventId) return
+    if (!statsEventId) return
 
-  setStatsSaving(true)
-  setStatsMsg(null)
+    setStatsSaving(true)
+    setStatsMsg(null)
 
-  try {
-    const result = await api({
-      action: 'update_player_stats_bulk',
-      eventId: statsEventId,
-      stats: Object.entries(playerStats).map(([playerId, stats]) => ({
-        playerId,
-        batting_order_position: stats.batting_order_position ?? null,
-        at_bats: stats.at_bats ?? 0,
-        hits: stats.hits ?? 0,
-        rbi: stats.rbi ?? 0,
-        runs: stats.runs ?? 0,
-        walks: stats.walks ?? 0,
-        strikeouts: stats.strikeouts ?? 0,
-        pitch_count: stats.pitch_count ?? 0,
-        innings_pitched: stats.innings_pitched ?? 0,
-        strikeouts_pitching: stats.strikeouts_pitching ?? 0,
-        walks_allowed: stats.walks_allowed ?? 0,
-        hits_allowed: stats.hits_allowed ?? 0,
-        earned_runs: stats.earned_runs ?? 0,
-      })),
-    })
-
-    if (result?.error) {
-      setStatsMsg(`Error: ${result.error}`)
+    const validationError = validateStatsBeforeSave()
+    if (validationError) {
+      setStatsSaving(false)
+      setStatsMsg(validationError)
       return
     }
 
-    setStatsMsg('All stats saved!')
-  } catch (err) {
-    setStatsMsg(err instanceof Error ? `Error: ${err.message}` : 'Error: Could not save stats')
-  } finally {
-    setStatsSaving(false)
+    try {
+      const result = await api({
+        action: 'update_player_stats_bulk',
+        eventId: statsEventId,
+        stats: Object.entries(playerStats).map(([playerId, stats]) => ({
+          playerId,
+          batting_order_position: stats.batting_order_position ?? null,
+          at_bats: stats.at_bats ?? 0,
+          hits: stats.hits ?? 0,
+          rbi: stats.rbi ?? 0,
+          runs: stats.runs ?? 0,
+          walks: stats.walks ?? 0,
+          strikeouts: stats.strikeouts ?? 0,
+          pitch_count: stats.pitch_count ?? 0,
+          innings_pitched: stats.innings_pitched ?? 0,
+          strikeouts_pitching: stats.strikeouts_pitching ?? 0,
+          walks_allowed: stats.walks_allowed ?? 0,
+          hits_allowed: stats.hits_allowed ?? 0,
+          earned_runs: stats.earned_runs ?? 0,
+        })),
+      })
+
+      if (result?.error) {
+        setStatsMsg(`Error: ${result.error}`)
+        return
+      }
+
+      setStatsMsg('All stats saved!')
+    } catch (err) {
+      setStatsMsg(err instanceof Error ? `Error: ${err.message}` : 'Error: Could not save stats')
+    } finally {
+      setStatsSaving(false)
+    }
   }
-}
 
   const saveStatus = async () => {
     if (!statusEventId) return
