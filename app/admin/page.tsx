@@ -771,24 +771,69 @@ export default function AdminPage() {
   load()
 }, [password])
 
-  // Load existing stats when stats event changes
-  useEffect(() => {
-    if (!statsEventId || !password) return
-    const load = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
+// Load the selected event's season roster and existing stats when stats event changes
+useEffect(() => {
+  if (!statsEventId || !password) return
+
+  const load = async () => {
+    const supabase = createClient()
+
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .select('team_season_id')
+      .eq('id', statsEventId)
+      .single()
+
+    if (eventError || !eventData?.team_season_id) {
+      setStatsMsg('❌ Could not load this event season.')
+      setPlayers([])
+      setPlayerStats({})
+      return
+    }
+
+    const [{ data: playersData }, { data: statsData }] = await Promise.all([
+      supabase
+        .from('players')
+        .select('id, name, jersey_number')
+        .eq('team_season_id', eventData.team_season_id)
+        .order('jersey_number', { ascending: true }),
+      supabase
         .from('player_stats')
         .select('player_id, at_bats, hits, rbi, runs, walks, strikeouts, pitch_count, innings_pitched, strikeouts_pitching, walks_allowed, hits_allowed, earned_runs, batting_order_position')
-        .eq('event_id', statsEventId)
-      const map: Record<string, StatRow> = {}
-      for (const p of players) {
-        const existing = (data ?? [] as unknown as StatRow[]).find((r: StatRow) => r.player_id === p.id)
-        map[p.id] = existing ?? { player_id: p.id, at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0, batting_order_position: null }
+        .eq('event_id', statsEventId),
+    ])
+
+    const eventPlayers = (playersData ?? []) as Player[]
+    setPlayers(eventPlayers)
+
+    const statRows = (statsData ?? []) as unknown as StatRow[]
+    const map: Record<string, StatRow> = {}
+
+    for (const p of eventPlayers) {
+      const existing = statRows.find((r: StatRow) => r.player_id === p.id)
+      map[p.id] = existing ?? {
+        player_id: p.id,
+        at_bats: 0,
+        hits: 0,
+        rbi: 0,
+        runs: 0,
+        walks: 0,
+        strikeouts: 0,
+        pitch_count: 0,
+        innings_pitched: 0,
+        strikeouts_pitching: 0,
+        walks_allowed: 0,
+        hits_allowed: 0,
+        earned_runs: 0,
+        batting_order_position: null,
       }
-      setPlayerStats(map)
     }
-    load()
-  }, [statsEventId, players, password])
+
+    setPlayerStats(map)
+  }
+
+  load()
+}, [statsEventId, password])
 
   const api = async (body: object) => {
     const res = await fetch('/api/admin', {
