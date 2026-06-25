@@ -1360,7 +1360,7 @@ const visibleAdminTabs = isOrgAdmin
         </div>
       </div>
 
-      <div className={`mx-auto px-4 pt-4 space-y-4 ${tab === 'stats' ? 'max-w-5xl' : 'max-w-sm'}`}>
+      <div className={`mx-auto px-4 pt-4 space-y-4 ${tab === 'stats' ? 'max-w-3xl' : 'max-w-sm'}`}>
 
         {/* ── Settings Tab ─────────────────────────────────────────────── */}
         {tab === 'settings' && isOrgAdmin && (
@@ -2521,7 +2521,7 @@ const visibleAdminTabs = isOrgAdmin
         {/* ── Score Tab ──────────────────────────────────────────────────── */}
         {tab === 'score' && (
           <>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div className="mx-auto max-w-sm rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Select Game</p>
               <select value={selectedEventId} onChange={e => {
                 setSelectedEventId(e.target.value)
@@ -2649,29 +2649,30 @@ const visibleAdminTabs = isOrgAdmin
         {/* ── Stats Tab ──────────────────────────────────────────────────── */}
         {tab === 'stats' && (
           <>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div className="mx-auto max-w-sm rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Select Game</p>
               <select value={statsEventId} onChange={e => { setStatsEventId(e.target.value); setStatsMsg(null) }}
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-3 text-sm text-white focus:outline-none focus:slate-400">
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
-                    {formatDate(e.starts_at)} — {e.opponent ? `vs ${e.opponent}` : e.title}
+                    {formatDate(e.starts_at)} {e.opponent ? `vs ${e.opponent}` : e.title}
                   </option>
                 ))}
               </select>
             </div>
 
             {statsEventId && (
-              <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-white/5 p-4 space-y-5">
+              <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 space-y-5">
                 <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Batting</p>
+                  <p className="text-sm uppercase tracking-[0.18em] font-extrabold"
+                    style={{ color: brandColor }}>Batting</p>
                   <div className="overflow-x-auto rounded-xl border border-white/10">
-                    <table className="w-full min-w-[760px] border-collapse text-sm">
+                    <table className="w-full min-w-[620px] border-collapse text-sm table-fixed">
                       <thead className="bg-white/10 text-[10px] uppercase tracking-wide text-slate-500">
                         <tr>
                           {['Player', 'BO', 'AB', 'H', 'R', 'RBI', 'BB', 'K'].map(header => (
-                            <th key={header} className={`px-2 py-2 font-semibold ${header === 'Player' ? 'w-56 text-left' : 'w-20 text-center'}`}>
+                            <th key={header} className={`px-1 py-2 font-semibold ${header === 'Player' ? 'w-36 text-left' : 'w-12 text-center'}`}>
                               {header}
                             </th>
                           ))}
@@ -2682,16 +2683,18 @@ const visibleAdminTabs = isOrgAdmin
                           const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
                           return (
                             <tr key={player.id} className="hover:bg-white/[0.03]">
-                              <td className="px-2 py-2 text-xs font-semibold text-slate-300">
-                                {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
+                              <td className="w-36 px-1 py-2 text-xs font-semibold text-slate-300">
+                                <span className="block truncate">
+                                  {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
+                                </span>
                               </td>
-                              <td className="px-1 py-2">
+                              <td className="px-1 py-2 text-center">
                                 <input type="number" min="1" value={s.batting_order_position ?? ''}
                                   onChange={e => {
                                     const v = e.target.value
                                     setPlayerStats(prev => ({ ...prev, [player.id]: { ...prev[player.id], batting_order_position: v === '' ? null : Number(v) } }))
                                   }}
-                                  className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
+                                  className="w-11 rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-center text-sm text-white [appearance:textfield] focus:outline-none focus:border-slate-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                               </td>
                               {([
                                 ['at_bats', s.at_bats, 'AB'],
@@ -2701,11 +2704,11 @@ const visibleAdminTabs = isOrgAdmin
                                 ['walks', s.walks, 'BB'],
                                 ['strikeouts', s.strikeouts, 'K'],
                               ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
-                                <td key={field} className="px-1 py-2">
+                                <td key={field} className="px-1 py-2 text-center">
                                   <label className="sr-only">{label} for {player.name}</label>
                                   <input type="number" value={val}
                                     onChange={e => updateStat(player.id, field, e.target.value)}
-                                    className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
+                                    className="w-11 rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-center text-sm text-white [appearance:textfield] focus:outline-none focus:border-slate-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                                 </td>
                               ))}
                             </tr>
@@ -2717,13 +2720,14 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Pitching</p>
+                  <p className="text-sm uppercase tracking-[0.18em] font-extrabold"
+                      style={{ color: brandColor }}>Pitching</p>
                   <div className="overflow-x-auto rounded-xl border border-white/10">
-                    <table className="w-full min-w-[680px] border-collapse text-sm">
+                    <table className="w-full min-w-[560px] border-collapse text-sm table-fixed">
                       <thead className="bg-white/10 text-[10px] uppercase tracking-wide text-slate-500">
                         <tr>
                           {['Player', 'PC', 'IP', 'K', 'BB', 'H', 'ER'].map(header => (
-                            <th key={header} className={`px-2 py-2 font-semibold ${header === 'Player' ? 'w-56 text-left' : 'w-20 text-center'}`}>
+                            <th key={header} className={`px-1 py-2 font-semibold ${header === 'Player' ? 'w-36 text-left' : 'w-12 text-center'}`}>
                               {header}
                             </th>
                           ))}
@@ -2734,8 +2738,10 @@ const visibleAdminTabs = isOrgAdmin
                           const s = playerStats[player.id] ?? { at_bats: 0, hits: 0, rbi: 0, runs: 0, walks: 0, strikeouts: 0, pitch_count: 0, innings_pitched: 0, strikeouts_pitching: 0, walks_allowed: 0, hits_allowed: 0, earned_runs: 0 }
                           return (
                             <tr key={player.id} className="hover:bg-white/[0.03]">
-                              <td className="px-2 py-2 text-xs font-semibold text-slate-300">
-                                {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
+                              <td className="w-36 px-1 py-2 text-xs font-semibold text-slate-300">
+                                <span className="block truncate">
+                                  {player.jersey_number !== null ? `#${player.jersey_number} ` : ''}{player.name}
+                                </span>
                               </td>
                               {([
                                 ['pitch_count', s.pitch_count ?? 0, 'PC'],
@@ -2745,11 +2751,11 @@ const visibleAdminTabs = isOrgAdmin
                                 ['hits_allowed', s.hits_allowed ?? 0, 'H'],
                                 ['earned_runs', s.earned_runs ?? 0, 'ER'],
                               ] as [keyof StatRow, number, string][]).map(([field, val, label]) => (
-                                <td key={field} className="px-1 py-2">
+                                <td key={field} className="px-1 py-2 text-center">
                                   <label className="sr-only">{label} for {player.name}</label>
                                   <input type="number" value={val}
                                     onChange={e => updateStat(player.id, field, e.target.value)}
-                                    className="w-full rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-sm text-white text-center focus:outline-none focus:border-slate-400" />
+                                    className="w-11 rounded-lg bg-white/10 border border-white/10 px-1 py-2 text-center text-sm text-white [appearance:textfield] focus:outline-none focus:border-slate-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                                 </td>
                               ))}
                             </tr>
@@ -2760,13 +2766,16 @@ const visibleAdminTabs = isOrgAdmin
                   </div>
                 </div>
 
-                <button onClick={saveStats} disabled={statsSaving}
-                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
-                  style={{ backgroundColor: brandColor }}
+                <div className="flex justify-center">
+                  <button
+                    onClick={saveStats}
+                    disabled={statsSaving}
+                    className="w-48 rounded-xl px-5 py-2 text-sm font-bold text-white transition disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
                   >
-                  {statsSaving ? 'Saving...' : 'Save All Stats'}
-                </button>
-                {statsMsg && <p className="text-sm text-center">{statsMsg}</p>}
+                    {statsSaving ? 'Saving...' : 'Save All Stats'}
+                  </button>
+                </div>
               </div>
             )}
           </>
