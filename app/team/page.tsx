@@ -10,6 +10,7 @@ import { BottomNav } from '@/components/BottomNav'
 import { Skeleton, RowSkeleton } from '@/components/Skeleton'
 import { getDashboardTeamAdminAssignments, type DashboardTeamAdminAssignment } from '@/app/actions/dashboard'
 import { useActiveOrg } from '@/components/org-context'
+import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,14 @@ function TeamPageInner() {
   const { currentTeam } = useCurrentTeam()
   const { org } = useActiveOrg()
   const brandColor = org?.primary_color ?? '#dc2626'
-  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
+  const { seasons, currentSeasonId, loading: seasonsLoading } = useOrgSeasons()
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null)
+  const effectiveSeasonId = selectedSeasonId ?? currentSeasonId
+  const selectedSeason = seasons.find(season => season.id === effectiveSeasonId) ?? null
+  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(
+    currentTeam.id,
+    effectiveSeasonId
+)
   const [teamAdminAssignments, setTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
   const [teamAdminsLoading, setTeamAdminsLoading] = useState(true)
   const [overviewPlayerCount, setOverviewPlayerCount] = useState<number | null>(null)
@@ -173,25 +181,29 @@ function TeamPageInner() {
     loadTeamAdmins()
   }, [currentTeam.id])
 
-  useEffect(() => {
-    const loadPlayerCount = async () => {
-      if (!teamSeasonId) {
-        setOverviewPlayerCount(0)
-        return
-      }
-
-      const supabase = createClient()
-
-      const { count } = await supabase
-        .from('players')
-        .select('id', { count: 'exact', head: true })
-        .eq('team_season_id', teamSeasonId)
-
-      setOverviewPlayerCount(count ?? 0)
+ useEffect(() => {
+  const loadPlayerCount = async () => {
+    if (seasonsLoading || teamSeasonLoading) {
+      return
     }
 
-    loadPlayerCount()
-  }, [teamSeasonId])
+    if (!teamSeasonId) {
+      setOverviewPlayerCount(0)
+      return
+    }
+
+    const supabase = createClient()
+
+    const { count } = await supabase
+      .from('players')
+      .select('id', { count: 'exact', head: true })
+      .eq('team_season_id', teamSeasonId)
+
+    setOverviewPlayerCount(count ?? 0)
+  }
+
+  loadPlayerCount()
+}, [teamSeasonId, teamSeasonLoading, seasonsLoading])
 
   useEffect(() => {
     const loadOverviewEvents = async () => {
@@ -232,14 +244,34 @@ function TeamPageInner() {
         <p className="text-xl tracking-[0.1em] font-bold"
             style={{ color: brandColor }}
             >
-              2026
+              {selectedSeason?.name ?? 'Season'}
             </p>
         <h1 className="text-3xl font-extrabold text-white mt-1">
           {view === 'overview' ? 'Team'
             : view === 'standings' ? 'Standings'
             : view === 'results' ? 'Results'
             : 'Roster'}
-        </h1>
+                </h1>
+
+        {seasons.length > 1 && (
+          <div className="mt-3">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Season
+            </label>
+            <select
+              value={effectiveSeasonId ?? ''}
+              onChange={e => setSelectedSeasonId(e.target.value || null)}
+              className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none"
+            >
+              {seasons.map(season => (
+                <option key={season.id} value={season.id} className="bg-slate-950 text-white">
+                  {season.name}{season.is_current ? ' · Current' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <p className="text-sm text-slate-400 mt-1">{currentTeam.division}</p>
       </div>
 
