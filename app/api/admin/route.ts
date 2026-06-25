@@ -647,10 +647,37 @@ export async function POST(req: NextRequest) {
       const ownershipError = await verifyEventOwnership(eventId)
       if (ownershipError) return NextResponse.json({ error: ownershipError }, { status: 403 })
 
+      const [{ data: eventRow, error: eventError }, { data: playerRow, error: playerError }] = await Promise.all([
+        supabase
+          .from('events')
+          .select('team_season_id')
+          .eq('id', eventId)
+          .single(),
+        supabase
+          .from('players')
+          .select('team_season_id')
+          .eq('id', playerId)
+          .single(),
+      ])
+
+      if (eventError || !eventRow?.team_season_id) {
+        return NextResponse.json({ error: 'Event season not found' }, { status: 400 })
+      }
+
+      if (playerError || !playerRow?.team_season_id) {
+        return NextResponse.json({ error: 'Player season not found' }, { status: 400 })
+      }
+
+      if (playerRow.team_season_id !== eventRow.team_season_id) {
+        return NextResponse.json({ error: 'Player does not belong to this event season' }, { status: 400 })
+      }  
+
       const { error } = await supabase
         .from('player_stats')
         .upsert({
-          player_id: playerId, event_id: eventId,
+          player_id: playerId, 
+          event_id: eventId, 
+          team_season_id: eventRow.team_season_id,
           at_bats: atBats, hits, rbi, runs,
           walks: walks ?? 0, strikeouts,
           pitch_count: pitchCount ?? 0, innings_pitched: inningsPitched ?? 0,
