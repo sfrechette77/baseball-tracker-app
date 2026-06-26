@@ -1192,40 +1192,63 @@ const submitGrantTeamAdmin = async () => {
     setPlayerStats(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: Number(value) } }))
   }
 
- const emptyStatRow = (playerId: string): StatRow => ({
-  player_id: playerId,
-  at_bats: 0,
-  hits: 0,
-  rbi: 0,
-  runs: 0,
-  walks: 0,
-  strikeouts: 0,
-  pitch_count: 0,
-  innings_pitched: 0,
-  strikeouts_pitching: 0,
-  walks_allowed: 0,
-  hits_allowed: 0,
-  earned_runs: 0,
-  batting_order_position: null,
-})
-
-const fillBattingOrder = () => {
-  setPlayerStats(prev => {
-    const next = { ...prev }
-
-    players.forEach((player, index) => {
-      next[player.id] = {
-        ...emptyStatRow(player.id),
-        ...(next[player.id] ?? {}),
-        batting_order_position: index + 1,
-      }
-    })
-
-    return next
+  const emptyStatRow = (playerId: string): StatRow => ({
+    player_id: playerId,
+    at_bats: 0,
+    hits: 0,
+    rbi: 0,
+    runs: 0,
+    walks: 0,
+    strikeouts: 0,
+    pitch_count: 0,
+    innings_pitched: 0,
+    strikeouts_pitching: 0,
+    walks_allowed: 0,
+    hits_allowed: 0,
+    earned_runs: 0,
+    batting_order_position: null,
   })
 
-  setStatsMsg(null)
-}
+  const fillBattingOrder = () => {
+    setPlayerStats(prev => {
+      const next = { ...prev }
+
+      players.forEach((player, index) => {
+        next[player.id] = {
+          ...emptyStatRow(player.id),
+          ...(next[player.id] ?? {}),
+          batting_order_position: index + 1,
+        }
+      })
+
+      return next
+    })
+
+    setStatsMsg(null)
+  }
+
+  const clearPitchingStats = () => {
+    setPlayerStats(prev => {
+      const next = { ...prev }
+
+      players.forEach(player => {
+        next[player.id] = {
+          ...emptyStatRow(player.id),
+          ...(next[player.id] ?? {}),
+          pitch_count: 0,
+          innings_pitched: 0,
+          strikeouts_pitching: 0,
+          walks_allowed: 0,
+          hits_allowed: 0,
+          earned_runs: 0,
+        }
+      })
+
+      return next
+    })
+
+    setStatsMsg(null)
+  }
 
   const updateStanding = (id: string, field: keyof Standing, value: string) => {
     setEditedStandings(prev => ({ ...prev, [id]: { ...prev[id], [field]: Number(value) } }))
@@ -2908,8 +2931,22 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm uppercase tracking-[0.18em] font-extrabold"
-                      style={{ color: brandColor }}>Pitching</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p
+                      className="text-sm uppercase tracking-[0.18em] font-extrabold"
+                      style={{ color: brandColor }}
+                    >
+                      Pitching
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearPitchingStats}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:bg-white/10"
+                      style={{ borderColor: brandColor, color: brandColor }}
+                    >
+                      Clear pitching
+                    </button>
+                  </div>
                   <div className="overflow-x-auto rounded-xl border border-white/10">
                     <table className="w-full min-w-[560px] border-collapse text-sm table-fixed">
                       <thead className="bg-white/10 text-[10px] uppercase tracking-wide text-slate-500">
