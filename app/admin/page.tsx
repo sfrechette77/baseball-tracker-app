@@ -1919,10 +1919,10 @@ const visibleAdminTabs = isOrgAdmin
               <div className="rounded-2xl border border-dashed border-white/10 bg-black/30 p-4">
                 <div className="flex items-center gap-4">
                   <div
-                    className="flex h-12 w-12 items-center justify-center rounded-full"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-black uppercase tracking-wide"
                     style={{ backgroundColor: `${brandColor}20`, color: brandColor }}
                   >
-                    📅
+                    Next
                   </div>
 
                   <div className="flex-1">
@@ -1975,20 +1975,18 @@ const visibleAdminTabs = isOrgAdmin
             <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
               <div className="mb-5 flex items-center gap-3">
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg"
-                  style={{ color: brandColor }}
-                >
-                  ⚡
-                </div>
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: brandColor }}
+                />
                 <h3 className="text-lg font-black text-white">Quick Actions</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Set Status', icon: '📋', nextTab: 'status' as Tab },
-                  { label: 'Enter Score', icon: '🏆', nextTab: 'score' as Tab },
-                  { label: 'Manage Events', icon: '📅', nextTab: 'events' as Tab },
-                  { label: 'Enter Stats', icon: '📊', nextTab: 'stats' as Tab },
+                  { label: 'Set Status', nextTab: 'status' as Tab },
+                  { label: 'Enter Score', nextTab: 'score' as Tab },
+                  { label: 'Manage Events', nextTab: 'events' as Tab },
+                  { label: 'Enter Stats', nextTab: 'stats' as Tab },
                 ].map(action => (
                   <button
                     key={action.label}
@@ -1997,7 +1995,6 @@ const visibleAdminTabs = isOrgAdmin
                     className="flex min-h-[56px] items-center justify-center gap-2 rounded-xl border bg-black/20 px-3 py-2 text-sm font-semibold transition hover:bg-white/5"
                     style={{ borderColor: brandColor, color: brandColor }}
                   >
-                    <span className="text-lg">{action.icon}</span>
                     {action.label}
                   </button>
                 ))}
@@ -2008,18 +2005,16 @@ const visibleAdminTabs = isOrgAdmin
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition hover:bg-white/5"
                 style={{ borderColor: brandColor, color: brandColor }}
               >
-                👥 View Roster
+                View Team Page
               </button>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-black/40 p-5 shadow-lg">
               <div className="mb-5 flex items-center gap-3">
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg"
-                  style={{ color: brandColor }}
-                >
-                  👥
-                </div>
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: brandColor }}
+                />
                 <h3 className="text-lg font-black text-white">Roster Health</h3>
               </div>
 
@@ -2088,10 +2083,10 @@ const visibleAdminTabs = isOrgAdmin
                     teamDashboardPlayers.every(
                       p => p.jersey_number && p.position
                     ) && (
-                      <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
-                        <p className="text-sm text-emerald-300">
-                          ✅ Roster looks healthy
-                        </p>
+                      <div className="flex justify-center">
+                        <div className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center text-sm font-semibold text-emerald-300">
+                          <span>✅ Roster looks healthy</span>
+                        </div>
                       </div>
                     )}
                 </div>
