@@ -2047,7 +2047,7 @@ const visibleAdminTabs = isOrgAdmin
                     <p className="mt-1 text-[11px] font-medium text-slate-400">{stat.label}</p>
                   </div>
                 ))}
-                <div className="mt-4 space-y-2">
+                <div className="col-span-3 mt-4 space-y-2">
                   {teamDashboardPlayers.filter(p => !p.jersey_number).length > 0 && (
                     <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
                       <span className="text-sm text-amber-300">
@@ -2085,7 +2085,7 @@ const visibleAdminTabs = isOrgAdmin
                     ) && (
                       <div className="flex justify-center">
                         <div className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center text-sm font-semibold text-emerald-300">
-                          <span>✅ Roster looks healthy</span>
+                          <span>Roster looks healthy</span>
                         </div>
                       </div>
                     )}
