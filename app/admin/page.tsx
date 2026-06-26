@@ -1897,11 +1897,8 @@ const visibleAdminTabs = isOrgAdmin
               <div className="mb-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Coach Center
-                    </p>
                     <h2 className="mt-1 text-l font-black tracking-tight text-white">
-                      Team Dashboard
+                      Dashboard
                     </h2>
                   </div>
 
@@ -1951,10 +1948,6 @@ const visibleAdminTabs = isOrgAdmin
                       <>
                         <p className="font-black text-white">
                           No upcoming events scheduled
-                        </p>
-
-                        <p className="mt-1 text-sm text-slate-400">
-                          Add a game, practice, or team event to keep families informed.
                         </p>
                       </>
                     )}
