@@ -1,9 +1,10 @@
 # On Deck — Database Schema
 
-**Last updated:** End of Members-UI + signup-fix session
-**Environment:** Production (`fjrtcxfqculymgyfrato`)
-**Status:** **RLS is now ON for all 17 tenant tables.** Multi-tenancy is enforced at the database layer. Chunk 4b complete (`fields.team_id` dropped). Pre-auth routes use a service-role client.
+1. Header block — REPLACE the "Last updated / Status" lines at top
 
+**Last updated:** Stats workflow + team-admin polish session (6-29-26)
+**Environment:** Production (`fjrtcxfqculymgyfrato`)
+**Status:** RLS ON for all 17 tenant tables. Two orgs live in prod (Chicago Elite, Florida Vandals). Org branding, stats workflow polish, team-admin dashboard polish, and org logo policy hardening shipped. Service-key env var standardized to `SUPABASE_SERVICE_ROLE_KEY`.
 ---
 
 ## Overview
@@ -78,21 +79,21 @@ All helpers use `SECURITY DEFINER` to bypass RLS when checking permissions inter
 
 ### organizations
 Top-level tenant. Each org is one customer.
-**`primary_color` now drives the UI accent** at runtime via the `--brand` CSS variable (set in `org-context`, consumed by a red-palette remap in `globals.css`). Elite = `#dc2626`, Florida Vandals = `#F97316`. New orgs must set `primary_color` at creation or the UI falls back to the red default.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | id | uuid | PK, default gen_random_uuid() | |
-| slug | text | NOT NULL, UNIQUE | URL slug (e.g. "chicago-elite") |
-| name | text | NOT NULL | Display name |
-| plan | text | NOT NULL, default 'free' | Subscription tier |
-| primary_color | text | nullable | Hex code |
-| secondary_color | text | nullable | Hex code |
-| logo_url | text | nullable | Points to Supabase Storage |
-| has_league_features | boolean | NOT NULL, default false | Feature flag |
-| created_by | uuid | FK auth.users, ON DELETE SET NULL | Audit |
+| organization_id | uuid | NOT NULL, FK organizations, default Chicago Elite UUID | |
+| name | text | NOT NULL | "Moore" |
+| sport | text | NOT NULL, default 'baseball' | |
+| season_label | text | nullable | ⚠ Listed as dropped in earlier docs but STILL PRESENT in prod (verified 6-11-26). Unused. Candidate for cleanup drop. |
+| division | text | nullable | |
+| arrival_buffer_minutes | integer | NOT NULL, default 45 | |
+| is_opponent | boolean | NOT NULL, default false | TRUE for the 15 league opponent teams (which carry Elite's org_id). FALSE = the org's own teams. Team picker shows only is_opponent=false teams. |
+| owner_user_id | uuid | nullable | Legacy field |
 | created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+
+**Added 6-11-26 era:** `is_opponent` (prod + dev). Separates league opponents from own teams so the DB-driven team picker can filter.
 
 **Indexes:** `idx_organizations_slug` on slug
 
@@ -162,6 +163,8 @@ Links users to orgs with a role + status. One row per (user, org, role) combinat
 - DELETE: `is_org_admin(organization_id)`
 
 **Note on dev vs prod policy differences:** prod has a combined INSERT policy; dev has two separate policies. Functionally equivalent for the cases we care about. Prod's combined policy is slightly more restrictive (requires self-signup to be pending), which is desirable.
+
+**App flow:** Admin → Members includes grant-by-email for existing signed-up users. This creates/reuses an approved `team_admin` membership and upserts selected `team_admins` rows. It does not create auth users or send email.
 
 ---
 
@@ -278,7 +281,6 @@ Permanent team identity.
 | arrival_buffer_minutes | integer | NOT NULL, default 45 | |
 | owner_user_id | uuid | nullable | Legacy field |
 | created_at | timestamptz | NOT NULL, default now() | |
-| is_opponent | boolean | NOT NULL, default false | true = league opponent team (shares org_id but not fielded by the org); excluded from the team picker |
 
 **RLS Policies (ACTIVE):**
 - SELECT: `organization_id IN current_user_org_ids()` — members can read teams in their orgs
@@ -307,9 +309,14 @@ All under RLS now (post-cutover).
 
 **Per-season tables** (players, events, box_scores, player_stats, league_games, standings) link via `team_season_id` to team_seasons. Old `team_id` columns DROPPED in Chunk 3 except on standings (which kept its team_name). `fields.team_id` (a NOT NULL legacy column) was dropped in **Chunk 4b** (dev + prod) — no per-season tenant table now carries a redundant team_id.
 
-**`player_stats.batting_order_position`** (smallint, nullable) — added dev + prod for the batting order feature. Per-game batting slot. App display sorts the Batting table by this NULLS LAST, then jersey_number, then name. Written by `/api/admin` update_player_stats (`battingOrderPosition`).
-
 **Cron / service-key safety:** weather_forecasts and game_status_log writes go through service-key paths (cron `/api/update-weather`, admin `/api/admin`). Service key bypasses RLS entirely. event_imports has NO active writers as of cutover.
+
+**Admin stats save behavior (app/API):**
+- `app/admin/page.tsx` uses desktop Batting/Pitching tables and calls `/api/admin` action `update_player_stats_bulk` once per Save All Stats.
+- `app/api/admin/route.ts` keeps both `update_player_stats` (single row, backward compatibility) and `update_player_stats_bulk` (current UI path).
+- Bulk stats save validates event ownership via `verifyEventOwnership(eventId)`, fetches the event `team_season_id`, verifies every submitted player exists and belongs to that same season, then upserts `player_stats` rows with `event_id`, `player_id`, and `team_season_id`.
+- Client validation catches basic baseball mistakes before API call; RLS/backend validation remains the security boundary.
+
 
 ---
 
@@ -501,6 +508,23 @@ Stores message images for the Chat feature.
 - UPDATE: same scope
 - DELETE: same scope (app layer restricts to authors; chat RLS only allows authors to delete the row itself)
 
+### organization-logos bucket
+Stores org logo images, uploaded via the Admin → Settings tab.
+
+**Configuration:**
+- Name: `organization-logos`
+- Public URLs used (logo_url stores a public URL, not a signed URL)
+- Allowed types in app: PNG, JPG, WebP
+- Path structure: `organizations/{organization_id}/logo-{timestamp}.{ext}`
+
+**RLS Policies on storage.objects (bucket_id = 'organization-logos'):**
+- INSERT: approved org_admins only, scoped to their own org folder:
+  - `bucket_id = 'organization-logos'`
+  - `(storage.foldername(name))[1] = 'organizations'`
+  - `is_org_admin(((storage.foldername(name))[2])::uuid)`
+
+**Flow:** admin picks file → upload to bucket → public URL generated → stored in `organizations.logo_url` on Save Organization Settings.
+
 ---
 
 ## Realtime publication
@@ -543,12 +567,14 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
 - Cutover: `alter table public.<name> enable row level security` for all 17 tenant tables in dev AND prod. Policies were created during Chunk 8; cutover just flipped the master switch.
 - Chunk 4b: `alter table public.fields drop column team_id;` — run against dev AND prod.
-- Batting order: `alter table public.player_stats add column batting_order_position smallint;` — run against dev AND prod.
 - Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
 - Test harness: User C linked to Moore via parent_teams.
-- `teams.is_opponent`: `alter table public.teams add column is_opponent boolean not null default false;` — run dev + prod. Prod: marked the 15 league opponent teams `true` (Moore/Ayeski stay false).
-- Elite `primary_color` corrected: `#0f172a` → `#dc2626` (prod).
-- Florida Vandals prod org created (`4801e4d4-…`) + finalize (org_admin membership, teams Orange/Black, Spring 2026 season, team_seasons).
+- `teams.is_opponent` boolean NOT NULL default false — added dev + prod. Backfilled: 15 league opponent teams set to true.
+- Storage bucket `organization-logos` created (prod). INSERT policy later hardened to approved org_admins uploading only into their own org folder via `is_org_admin`.- Florida Vandals org created in prod (`4801e4d4-bc14-410f-8b00-62b27e6827ef`, slug `florida-vandals`) with teams Orange/Black, Spring 2026 season, team_seasons.
+- Dev org renamed: Northside Knights → Florida Vandals (`6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`).
+- **Membership backfill (production incident fix):** approved `parent` memberships + `parent_teams` (Moore default) created for every membership-less `auth.users` row. Pre-multi-tenant parents had never been backfilled; the DB-driven picker exposed it.
+- Steve's Florida Vandals membership approved via SQL + parent_teams rows inserted for all FV own teams.
+
 
 ---
 
@@ -566,9 +592,7 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 **Rule:** any pre-auth or new-user server route that touches tenant tables must use the service client. After the user is an approved member, use the normal authenticated client so RLS still applies.
 
-**Env var:** `SUPABASE_SERVICE_ROLE_KEY` (prod `service_role` secret) — set in local `.env.local` AND Vercel (Production scope). Missing/mis-scoped → "Missing Supabase service env vars" at runtime.
-
-**⚠ Env var name wart:** the older `/api/admin/route.ts` reads a *different* name — `SUPABASE_SERVICE_ROLE_KEY` — for the same prod service_role key. So both `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` must exist (same value) in `.env.local` AND Vercel. Symptom if one is missing: that route 500s with an empty body ("Missing Supabase env vars" in the dev terminal; "Unexpected end of JSON input" in the browser). Cleanup later: standardize on one name and update both call sites + envs.
+**✅ Env var standardized (6-11-26):** all code now reads `SUPABASE_SERVICE_ROLE_KEY`. `/api/admin/route.ts` was updated from the old `SUPABASE_SERVICE_KEY` name; the old var was removed from `.env.local` and Vercel. One name, one value, everywhere.
 
 ---
 
@@ -578,13 +602,18 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - `org_role` enum (production-only orphan)
 - `organizations` table's old version (Frechette Baseball row)
 - `org_members` table (orphaned scaffolding)
-- `teams.season_label` column
 - `players.team_id`, `events.team_id`, `box_scores.team_id`
 - `league_games.home_team_id`, `league_games.away_team_id`
 - `standings.team_name`
 - `fields.team_id` (NOT NULL legacy column — dropped in Chunk 4b, dev + prod)
 
 ---
+
+## App workflow notes — latest
+
+- Admin → Stats is now the canonical post-game/manual stats entry surface. It supports bulk save, validation, unsaved-change detection, Fill batting order, and Clear pitching.
+- Team-admin dashboard is intentionally limited to operational tabs/actions: Dashboard, Status, Score, Stats, Events.
+- GameChanger-style live scoring is parked. Future stats import should be CSV-based and should wait for a real GameChanger Staff export sample.
 
 ## Outstanding items
 
@@ -593,6 +622,8 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 3. **Decide on `memberships.user_id` FK to `auth.users(id)`** — present in prod, dropped in dev for test harness.
 4. **Decide on `memberships.approved_by` FK** — present in both prod and dev. Causes test friction in dev (fake UUIDs can't be used). Either drop in dev or always omit in dev tests.
 5. ✅ **Tournament box scores bug** — FIXED (app-side, not data/RLS). Opponent box_score row shares Elite's team_season_id and is distinguished by `team_id = null`; the line-score finder was rewritten in `app/event/[id]/page.tsx` to match the "us" row on `team_id` rather than differing team_season_id.
+6. ✅ **organization-logos storage policy** — FIXED (6-22-26). INSERT is now restricted to approved org_admins uploading inside their own org folder via `is_org_admin`.
+7. ✅ **Tighten organization-logos INSERT policy** — DONE. Uploads are scoped to approved org_admins for their own org folder.
 
 ---
 
@@ -605,6 +636,10 @@ Production has data. Several Chunk 3 operations were destructive and required a 
 3. Backfill team_season_id from existing team_id values
 4. Verify backfill is complete
 5. Then drop team_id columns
+6. **Drop `teams.season_label` in prod** — confirmed still present (6-11-26) despite docs saying dropped. Unused.
+7. ✅ **Tighten organization-logos INSERT policy** — DONE (6-22-26). Uploads are scoped to approved org_admins and their own `organizations/{organization_id}/...` folder.
+8. **Backfilled parents** all defaulted to Moore; refine assignments via /admin Members tab if any are actually Ayeski parents or coaches.
+
 
 Production also had:
 - Pre-existing primary keys on all tables (skipped the PK-add step from dev)

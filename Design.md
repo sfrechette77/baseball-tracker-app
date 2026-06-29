@@ -2,34 +2,26 @@
 
 ## Next session starts here
 
-**Multi-tenant is live with a real second tenant.** Florida Vandals exists in prod with its own org_admin login, isolated teams, and orange branding. Per-org theming works.
-
-**Recently completed (this session):**
-- ✅ Team picker is now DB-driven (was hardcoded `teams.ts`). Loads by role: org_admin → org's own teams (`is_opponent=false`); parent/team_admin → assigned teams via `parent_teams`/`team_admins`. Loading gate added; header null-guarded.
-- ✅ `teams.is_opponent` flag (prod + dev) — separates the 15 league opponent teams (all carry Elite's org_id) from own teams (Moore, Ayeski).
-- ✅ Florida Vandals bootstrapped — prod org (first real second tenant) + dev org (renamed from Northside Knights).
-- ✅ Per-org brand color: `--brand` CSS var (set from `organizations.primary_color`) + Tailwind red-palette remap. Elite red, Vandals orange.
-- ✅ Box score fix — 0-AB players with a `batting_order_position` now show (`battingRows` built from `playerStats`, not `playersWithStats`).
-
-**Active items (pick one):**
-1. **layout.tsx branding** — tab title, manifest, icons still hardcoded "Chicago Elite 11U" for every org. Make metadata org-aware for a true per-org PWA.
-2. **teams.ts cleanup** — `PICKABLE_TEAMS`/`DEFAULT_TEAM_ID` are dead code now (only the `PickableTeam` type is still imported).
-3. Admin invite team_admin role (carried over).
-4. Email notifications on approval (carried over).
-5. (debt) Standardize the service-key env var name.
+**Two orgs live in prod.** Florida Vandals is the first real second tenant. Org branding (logo + primary color) is applied across all major surfaces via Admin → Settings. Service-key env var standardized.
 
 **Recently completed:**
-- ✅ **Tournament box score bug** — fixed. Root cause was app-side: for tournaments the opponent box_score row shares Elite's `team_season_id` and is distinguished by `team_id = null`, so the old `themRow` finder (matching on differing team_season_id) returned undefined. Fixed by matching the "us" row on `team_id === event.team_id` and taking the other row as "them".
-- ✅ **Chunk 4b** — dropped `fields.team_id` (the last redundant legacy column) in dev and prod. All other per-season `team_id` columns were already dropped in Chunk 3.
-- ✅ **Admin manage-members UI** — Members tab in /admin.
-- ✅ **Signup RLS fix** — public signup routes broke after the cutover (anonymous/new-user reads of `organizations` blocked by RLS). Fixed via a service-role client.
-- ✅ **Batting order** — `player_stats.batting_order_position` (dev + prod), admin "Bat #" entry, event-page Batting table sorted by it.
+- ✅ Admin → Stats workflow upgraded and smoke tested in production: desktop table UI, bulk Save All Stats endpoint, client-side validation, unsaved-change tracking, Fill batting order, and Clear pitching helper.
+- ✅ Team-admin dashboard polished and smoke tested: cleaner header, no emoji-style quick actions, clearer "View Team Page" action, centered Roster Health status, and simpler dashboard copy.
+- ✅ Team-admin tab visibility verified: team_admin sees Dashboard, Status, Score, Stats, Events; org_admin-only tabs remain hidden from the team-admin tab bar.
+- ✅ Branch cleanup completed after stats/team-admin polish.
+- ✅ Intro email sent to Frankie at Elite Baseball asking for product feedback and a GameChanger stats CSV/box-score export sample.
+- ✅ Org branding rollout — logo + primary_color across Team/Home/Schedule/Stats/Messages/Admin/nav.
+- ✅ Hardcoded red branding audit pass — current/team row highlights use brand color; remaining red is semantic only.
+- ✅ `organization-logos` storage INSERT policy tightened to approved org_admin uploads inside their own org folder.
+- ✅ Existing-parent → team_admin flow verified and grant-by-existing-email shipped.
+- ✅ Admin Settings tab, Admin Overview tab, Florida Vandals second tenant, membership backfill fix, and service-key env var standardization shipped.
 
 **Active items (pick one):**
-
-1. **Admin invite team_admin role.** Currently no UI to add a team_admin (assistant coach) — they'd come in via Chunk H as a parent and need SQL surgery. Build a small invite-by-email flow that skips pending.
-
-2. **Email notifications on approval.** PendingChecker re-check on focus works, but parents would benefit from an email saying "you're approved" instead of refreshing on hope.
+1. **Signup/invite link review** — verify whether Admin already has a polished copy/send signup link flow; if not, build Invite Link v1.
+2. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
+3. **Email notifications on approval** — needs Resend/SMTP; multi-hour.
+4. **Drop `teams.season_label`** (still in prod despite docs saying dropped).
+5. Refine backfilled parents' team assignments / backfill missing profiles.
 
 ---
 
@@ -52,7 +44,12 @@
 - ✅ Tournament box score bug fixed (app-side opponent-row finder)
 - ✅ Chunk 4b — `fields.team_id` dropped (last redundant legacy column)
 - ✅ Admin manage-members UI shipped — Members tab in /admin
+- ✅ Existing-parent team_admin promotion/removal verified in Members tab
+- ✅ organization-logos storage policy tightened to org_admin-only uploads
+- ✅ Hardcoded red branding audit pass completed; current-team/team-row highlights now use brand color
 - ✅ Signup RLS fix — service-role client for pre-auth routes
+- ✅ Admin → Stats workflow polish complete: desktop tables, bulk save, validation, unsaved changes, batting-order fill, clear-pitching helper
+- ✅ Team-admin dashboard polish complete: streamlined dashboard header, clean quick actions, centered roster health state, View Team Page action
 
 ## Key identifiers (DO NOT LOSE)
 
@@ -63,9 +60,10 @@
 - **Steve's membership_id** (org_admin, Chicago Elite): `7cbfaaa5-e502-4f5f-a576-a0dbd668cf98`
 - **Moore team UUID:** `4beb0750-1883-4b56-a386-db280675036c`
 - **Ayeski team UUID:** `0c8cc8d0-2398-41c2-8ba0-036d62ee13a6`
-- **Florida Vandals org UUID (prod):** `4801e4d4-bc14-410f-8b00-62b27e6827ef` (slug `florida-vandals`; admin `frechettegaming22@gmail.com`)
-- **Florida Vandals org UUID (dev):** `6cadb1e5-905d-4dee-9d62-46cb7d4f2b62` (renamed from Northside Knights; still User B's org for cross-tenant tests)
-- **Dev project ref:** `gpsqykddcubponpbwule`
+- **Florida Vandals org UUID (prod):** `4801e4d4-bc14-410f-8b00-62b27e6827ef` (slug `florida-vandals`)
+- **Florida Vandals org UUID (dev, ex-Northside Knights):** `6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`
+- **Affected backfill-test parent (prod):** `549054cf-f128-4df6-a447-c04840614668`
+
 
 ## Feed v1 — SHIPPED
 
@@ -167,17 +165,21 @@ Scope: org_admins can view approved parents and manage their team assignments / 
 - Lists approved **parents only** (org_admins and team_admins excluded).
 - Per member card: name, email, assigned teams with the default marked by ★.
 - **Edit Teams** → inline panel with team checkboxes + default radio (same UX as the approval flow). Replaces all parent_teams rows.
-- **Remove** → confirm step → deletes the membership row (cascades to parent_teams). Parents only.
+- **Make Admin** → promotes an approved parent to `team_admin` for selected teams. The card then shows a yellow Team Admin section with per-team removal controls.
+- **Remove** → confirm step → deletes the parent membership row (cascades to parent_teams). Parents only.
 
 ### Server Actions (app/actions/admin.ts)
-- getApprovedParents — approved parent memberships in the admin's org, joined to profiles (name/email) and parent_teams (teams + default flag).
+- getApprovedParents — approved parent memberships in the admin's org, joined to profiles (name/email), parent_teams (teams + default flag), and existing team_admin team assignments for the same user.
 - updateMemberTeams(membershipId, teamIds, defaultTeamId) — validates org + team ownership, deletes existing parent_teams rows, re-inserts with exactly one default.
-- removeMembership(membershipId) — validates org ownership + parent role, deletes the membership.
-- All three reuse the existing requireOrgAdmin() guard.
+- makeMemberTeamAdmin(parentMembershipId, teamIds) — validates approved parent in same org, creates an approved `team_admin` membership if one does not exist for the user, and upserts `team_admins` rows for selected teams.
+- removeMemberTeamAdmin(parentMembershipId, teamId) — removes one team_admins assignment for that user/team.
+- removeMembership(membershipId) — validates org ownership + parent role, deletes the parent membership.
+- All actions reuse the existing requireOrgAdmin() guard.
 
 ### Decisions
-- Remove = hard delete of the membership row (not a status flip to rejected).
-- Members tab scoped to parents only (team_admins managed elsewhere / future invite flow).
+- Remove = hard delete of the parent membership row (not a status flip to rejected).
+- Existing approved parents can be promoted to team_admin from Members.
+- Brand-new coach invite-by-email is still separate future work; it needs user/profile existence handling and eventually email notification.
 - Modal/inline edit pattern mirrors approval flow for consistency.
 
 ## Signup RLS fix — SHIPPED (production bug)
@@ -197,9 +199,135 @@ The cutover broke public signup. Symptom: /o/chicago-elite/signup returned 404 (
 ### Rule going forward
 Any **pre-auth or new-user server route** that touches tenant tables must use the service client, because RLS will block it (visitor has no membership yet; profiles has no INSERT policy). Reads/writes after the user is an approved member can use the authenticated client as usual.
 
+## Grant Team Admin by Email — SHIPPED
+
+Scope: org_admins can grant team_admin access to an existing signed-up user by email from the Admin → Members tab.
+
+### Behavior
+- Admin enters an email and selects one or more teams.
+- The app normalizes the email with `trim().toLowerCase()`.
+- The user must already have a `profiles` row / signed-up account.
+- If no profile exists, the UI returns: "That user needs to sign up first."
+- The server action creates or reuses an approved `team_admin` membership for the org.
+- Selected teams are upserted into `team_admins`.
+- No email is sent.
+- No Supabase auth user is created.
+- Existing approved parent → Make Admin flow remains available.
+
+### UI
+- Admin → Members includes an "Add Team Admin" panel.
+- Existing Admin tab labels are text-only; emoji icons were removed for a cleaner console.
+
 ## Mute UI — SHIPPED
 
 Scope: per-team chat mute via memberships.muted_chats. Required adding membership_id column to push_subscriptions so push helper can filter by mute state.
+
+## Team picker v2 (DB-driven) — SHIPPED
+
+- `components/team-context.tsx` rewritten: teams loaded from DB, not hardcoded.
+- **Everyone sees all of the org's own teams** (`is_opponent = false`) — cross-team visibility within an org is intentional.
+- Default team: parent's `parent_teams.is_default`, else first team.
+- Loading gate + graceful "no team yet" screen; header null-guarded; header shows the team's own name.
+- `teams.is_opponent` flag (prod + dev) separates the 15 league opponent teams (which carry Elite's org_id) from own teams.
+- `lib/teams.ts`: `PICKABLE_TEAMS` and `DEFAULT_TEAM_ID` deleted (dead code); only the `PickableTeam` type remains.
+
+## Per-org branding — SHIPPED
+
+### Brand color plumbing
+- `--brand` CSS var set from `organizations.primary_color` in org-context (blank/whitespace → fallback red `#dc2626`).
+- `globals.css` remaps Tailwind `--color-red-*` to `--brand` via `color-mix`, so existing `red-*` utilities follow the org color without component edits.
+- Newer surfaces use inline style pattern: `style={{ backgroundColor: brandColor }}` / `color` / `borderColor`.
+- Elite `primary_color` corrected `#0f172a` → `#dc2626`. `generateViewport` = org-aware themeColor.
+- Tested by flipping an org's color red → blue.
+
+### Where branding appears
+Team Overview card + org logo, roster jersey circles, Team page active toggle, bottom-nav active item, Home labels/buttons, Schedule year/filter chips, Stats year/tabs/highlight columns/leader row, Messages tabs/post buttons/chat send + bubbles, push button, Admin tabs/buttons/selected controls, and current-team/team-row highlights in Event detail, Team standings, and Standings now use the org brand color instead of hardcoded red.
+
+### Design rule (IMPORTANT)
+- **Brand color** = active nav, selected tabs, primary buttons, highlights, org identity, selected/current-team rows.
+- **Red** = errors, losses, cancellations, destructive actions, warnings. (Incorrect password, Delete/Remove, Game Off, loss indicators stay red.)
+- Hardcoded red audit status: current-team/team-row highlights now use inline `brandColor` styles. Remaining red audit hits are intentionally semantic, except the unauthenticated admin password-gate button may remain known debt because it appears before normal org/admin context.
+- Hook safety: never call `useActiveOrg()` at module scope. Keep it inside React components/custom hooks and pass `brandColor` into child components when needed. This avoids the invalid-hook-call crash previously seen on Event detail.
+
+### Logo
+- Bucket `organization-logos`, path `organizations/{org_id}/logo-{timestamp}.{ext}`, public URL stored in `organizations.logo_url`.
+- Storage INSERT policy is hardened: only approved org_admins can upload into their own org folder via `is_org_admin((storage.foldername(name))[2]::uuid)`.
+
+## Admin Settings tab — SHIPPED
+
+- New Settings tab in /admin, **org_admin only** (`teamAdminAllowedTabs` unchanged: status, score, stats, events).
+- Contains: Organization Name, read-only Slug, Branding (logo upload + preview, color picker), Access (signup link + Copy button), Season (active season name, read-only).
+- Saves: name, logo_url, primary_color. Slug read-only (changing it would break signup links).
+- UX: visible Logo URL field removed (too technical) — logo_url still saved internally. Advanced hex section removed; color picker with plain-English helper. Access heading: "Share this link with parents, coaches, and players so they can request access."
+
+## Admin Overview tab — SHIPPED
+
+- New first tab, now the default landing in /admin.
+- Cards: Team Overview, Team Record, Roster Count, Team Admins.
+- Team record removed from Schedule page — now lives on Team Overview.
+
+## Admin tab inventory (current)
+
+- org_admin: dashboard/overview, pending, members, status, score, stats, events, league, standings, settings
+- team_admin: dashboard, status, score, stats, events (no Pending, Members, League, Standings, or Settings)
+
+## Admin → Stats workflow — SHIPPED
+
+Scope: make post-game stat entry efficient for team admins on a laptop while preserving mobile usability.
+
+### UI
+- Stats tab uses a wider `max-w-3xl` content wrapper; the Select Game card stays narrow (`max-w-sm`).
+- Batting and Pitching are compact table layouts with horizontal scroll fallback.
+- Batting columns: Player, BO, AB, H, R, RBI, BB, K.
+- Pitching columns: Player, PC, IP, K, BB, H, ER.
+- Numeric inputs are compact, centered, and spinner controls are visually removed via appearance classes.
+- Section headers use `brandColor`; Save All Stats is a centered fixed-width brand-colored button.
+- Fill batting order helper assigns BO 1..N in current player order and marks only batting rows as unsaved.
+- Clear pitching helper zeros pitching fields only and marks only pitching rows as unsaved.
+
+### Data/save behavior
+- `saveStats()` calls `update_player_stats_bulk` once instead of one request per player.
+- Existing single-player `update_player_stats` API action remains for backward compatibility.
+- Bulk save validates event ownership and verifies every submitted player belongs to the same `team_season_id` as the event before upserting.
+- Client-side validation runs before save: no negative values, whole-number checks for normal counting fields, hits cannot exceed at-bats, and innings pitched may be decimal but not negative.
+- Unsaved-change tracking compares `playerStats` to `savedPlayerStats`; batting and pitching highlights are section-specific.
+- After successful save, the saved snapshot is refreshed and highlights/Unsaved changes clear. Failed validation or API errors preserve unsaved state.
+
+## Team Admin dashboard — POLISHED
+
+- Team admins land on a dedicated Dashboard with a next-event card, Quick Actions, and Roster Health.
+- Quick Actions route to Status, Score, Events, and Stats.
+- View Team Page routes to `/team` and intentionally does not imply roster editing.
+- Dashboard visuals use brand color, simple dots/text, and no emoji-style action icons.
+- Roster Health shows Players, Missing #, Missing Pos; the healthy state is centered below the three cards.
+
+## Florida Vandals — first real second tenant — SHIPPED
+
+- Prod org `4801e4d4-bc14-410f-8b00-62b27e6827ef`, slug `florida-vandals`, admin frechettegaming22@gmail.com, colors orange `#F97316`/black.
+- Teams Orange/Black + Spring 2026 season + team_seasons created.
+- Dev org renamed Northside Knights → Florida Vandals (`6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`); cross-tenant test role unchanged.
+- Multi-tenant isolation verified via impersonation.
+- Steve's own FV membership approved via SQL (pending → approved + parent_teams for all FV own teams).
+
+## Production incident — missing parent memberships — FIXED
+
+- **Symptom:** new DB-driven team picker white-screened existing Chicago Elite parents.
+- **Root cause:** the multi-tenant migration never backfilled membership rows for pre-existing parents; the old hardcoded picker masked it.
+- **Fix:** Vercel Instant Rollback → SQL backfill (approved `parent` membership + `parent_teams` Moore-default for every membership-less auth.users) → picker hardened → redeploy. Verified by impersonating a real affected parent.
+- **Lesson:** when replacing hardcoded data paths with DB-driven ones, audit that ALL existing users have the rows the new path depends on.
+- Residual: all backfilled parents defaulted to Moore; some may lack profiles rows (cosmetic).
+
+## "On Deck" product branding decisions
+
+- `generateMetadata`: title + applicationName + appleWebApp.title = "On Deck" (product); description + openGraph stay per-org for share previews.
+- PWA manifest: static `public/manifest.json` named "On Deck" (dynamic per-org manifest reverted; `app/manifest/route.ts` deleted; middleware matcher excludes manifest.json). iOS install name = "On Deck".
+- Desktop-Chrome "No manifest detected" warning persists but manifest serves valid JSON and iOS/Android installs work — ignore for now.
+
+## Env var cleanup — SHIPPED
+
+- All code reads `SUPABASE_SERVICE_ROLE_KEY`. `/api/admin/route.ts` updated from `SUPABASE_SERVICE_KEY`; old name removed from `.env.local` + Vercel.
+- (Delete the old "Env var name wart" bullets wherever they appear in this doc.)
+
 
 ### Schema additions
 - push_subscriptions.membership_id uuid — FK to memberships, ON DELETE CASCADE, nullable initially. Run against both dev and prod.
@@ -249,7 +377,7 @@ The four helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_tea
 - **Prod policy names ≠ dev policy names** for some tables (case + naming convention differences) but the policy expressions matched. Verify expressions, not names.
 
 ### Cron / service-key safety
-Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_ROLE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
+Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
 
 ### Cross-tenant test seed in dev
 Northside Knights is seeded in dev with 1 team + 1 team_season + 4 players + 1 event + 1 league_game. This lets us prove cross-tenant isolation by impersonating User B (NK org_admin) and confirming they see ONLY northside-knights data, never chicago-elite.
@@ -284,27 +412,9 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - No reject UI in v1. To deny a parent, admin deletes the membership row directly via SQL (rare case).
 - No email notification on approval. PendingChecker re-checks on focus so parent's pending screen auto-redirects.
 
-## Team picker (DB-driven) + per-org theming — SHIPPED
-
-### Team picker
-- `team-context.tsx` no longer reads `teams.ts`. On mount it loads the user's approved memberships, then:
-- org_admin → `teams` where `organization_id = org AND is_opponent = false`
-- parent / team_admin → teams via `parent_teams` + `team_admins` (merged, deduped)
-- Default selection: saved localStorage choice → parent's `is_default` → first team.
-- Provider holds a loading spinner until teams resolve, so no team-scoped page mounts without a team. Public `currentTeam` stays non-null (no page-consumer edits); header  guards the logged-out/pending/no-team null.
-
-### is_opponent
-- `teams.is_opponent` (boolean, NOT NULL, default false). `true` = league opponent that shares the org_id but isn't fielded by the org. Excluded from the picker. Prod: 15 opponents flagged true, Moore/Ayeski false.
-
-### Per-org theming
-- `organizations.primary_color` drives the UI accent via a runtime `--brand` CSS variable (set in `org-context`).
-- `globals.css` remaps Tailwind's `--color-red-*` scale to `--brand` via `color-mix`, so all existing `red-*` utilities follow the org color with zero component edits.
-- Elite `primary_color` = `#dc2626`; Vandals = `#F97316`. New orgs must set `primary_color` at creation or they fall back to the red default.
-- Caveat: "danger/delete" reds are org-tinted too (accepted).
-
 ## Admin roles
 
-- Org admin: can do anything in the org — manage all teams, approve parents, change brand/settings, invite other admins.
+- Org admin: can do anything in the org — manage all teams, approve parents, change brand/settings, and grant team_admin access to existing signed-up users by email.
 - Team admin: scoped to specific team(s). Can manage events, post updates, and send notifications for those teams only.
 
 ## Routing
@@ -345,12 +455,15 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Helpers use SECURITY DEFINER so they bypass RLS internally — critical for memberships RLS to be safe.
 - **Pre-auth / new-user server routes use a service-role client** (lib/supabase/service.ts) for any tenant-table access, because RLS blocks visitors with no membership yet (and profiles has no INSERT policy). Authenticated client still used for the user session.
 - Admin Members tab: Remove = hard delete of membership (not status flip); scoped to parents only.
-- Batting order: stored on `player_stats.batting_order_position` (per-game, nullable). Display sort = batting_order_position NULLS LAST → jersey_number → name.
-- **Env var name wart:** `/api/admin/route.ts` reads `SUPABASE_SERVICE_ROLE_KEY`; the signup fix reads `SUPABASE_SERVICE_ROLE_KEY`. Both hold the same prod service_role key. `.env.local` and Vercel must carry BOTH names until standardized. (Cleanup: pick one name, update both call sites + envs.)
-- Team picker is DB-driven and role-scoped; org_admin sees own teams only (`is_opponent=false`), never league opponents.
-- `teams.is_opponent` distinguishes own teams from league opponents sharing the org_id.
-- Brand accent = `organizations.primary_color` via runtime `--brand`; Tailwind red palette remapped to it. New orgs set `primary_color` at creation.
-- One-user-one-org enforced in practice during bootstrap: a new org's admin must use a different Google account than any existing org.
+-  `teams.is_opponent` separates league opponents from own teams; picker filters on it.
+-  Cross-team visibility: every approved member sees all of the org's own teams in the picker.
+-  Brand color via `--brand` CSS var + Tailwind red-* remap; design rule: brand = identity/primary actions, red = errors/destructive/losses.
+-  Org logos: public URLs in `organizations.logo_url`, bucket `organization-logos`, uploaded via Admin Settings.
+-  Slug is read-only in Settings v1 (changing breaks signup links).
+-  Settings tab org_admin only; team_admin tab list unchanged.
+-  Product branding: app title/manifest = "On Deck"; per-org branding lives inside the app (colors, logo, og description).
+-  Service-key env var standardized to `SUPABASE_SERVICE_ROLE_KEY`.
+
 
 ## Parked / explicitly out of scope (for now)
 
@@ -389,7 +502,6 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - ✅ Chunk 4b — dropped `fields.team_id` (dev + prod); all other per-season team_id columns already dropped in Chunk 3
 - ✅ Admin manage-members UI — Members tab in /admin
 - ✅ Signup RLS fix — service-role client for pre-auth routes (lib/supabase/service.ts); `SUPABASE_SERVICE_ROLE_KEY` added to Vercel + .env.local
-- ✅ Batting order — `player_stats.batting_order_position` (dev + prod); admin entry + sorted display
 
 ### Pre-prod cleanup
 Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
@@ -437,12 +549,6 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - **Dev project has no real auth.users** — all dev memberships use the fake test UUIDs, which can't log in. Anything behind requireOrgAdmin() can't be exercised in dev via real login; test those on prod.
 - `.env.local` env-swap workflow: back up prod values (`cp .env.local .env.local.prod.bak`) before pointing local at dev; restore with `cp .env.local.prod.bak .env.local`. Keep local on prod by default.
 
-### Batting order lessons learned
-- **Two different service-key env var names exist.** `/api/admin/route.ts` reads `SUPABASE_SERVICE_ROLE_KEY`; `lib/supabase/service.ts` (signup fix) reads `SUPABASE_SERVICE_ROLE_KEY`. Same value, two names. Stats-saving silently 500'd locally until `SUPABASE_SERVICE_ROLE_KEY` was added to `.env.local` (it had only the `_ROLE_` name). Both names must be present in `.env.local` AND Vercel until standardized.
-- **"Unexpected end of JSON input" on a fetch = the API route threw before returning** (empty body, not valid JSON). The real error is in the **dev terminal**, not the browser console.
-- **Local app points at prod** (per `.env.local`), so a new column must exist in **prod** to test the save locally — adding it only to dev isn't enough when local is pointed at prod.
-- Multi-edit changes: verify each edit actually landed. The display sort failed only because edit #4 (swap `playersWithStats.filter(...)` → `battingRows`) silently didn't apply; grep confirmed it.
-
 ### Cutover lessons learned
 - **Order matters.** Leaf tables first, then dependents, then the foundational table (memberships) last. If memberships breaks, every other policy breaks too.
 - **Read every policy expression before flipping.** Policy names differed between dev and prod for some tables; expressions matched. Trust expressions, not names.
@@ -451,15 +557,6 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - **Pre-existing data bugs surface during validation.** The tournament box score issue was found by carefully testing every page after Batch 3, but the bug pre-dated RLS.
 - **Cron and admin routes use service key.** Verified before flipping RLS on tables those routes write to. Service key bypasses RLS entirely.
 - **Test on prod after every flip.** Even when dev validated cleanly, the prod test caught one issue (tournament box scores) that we then diagnosed and ruled out as RLS-caused.
-
-### Per-org theming + picker lessons learned
-- org_admin "all teams in org" pulled in 15 league opponent teams (all carry Elite's org_id — the documented wart). Fixed with `is_opponent`. Season-scoping did NOT work: opponents have current-season `team_seasons` (for standings).
-- Kept `currentTeam` non-null in the public type to avoid editing every page consumer; gate rendering on a loading state instead, and null-guard only the header.
-- Tailwind v4 `red-*` utilities resolve to `var(--color-red-*)`; override those vars to retint globally — no need to touch the ~220 usages.
-- `color-mix()` fails silently on a blank `--brand` → reds render with no color → invisible UI. `??` doesn't catch an empty string; guard with `.trim()`.
-- Elite's `primary_color` was `#0f172a` (the PWA `themeColor`), unused until `--brand` wired it — which broke the UI. Corrected to `#dc2626`.
-- **Codespaces free tier ran out mid-session → use github.dev** (browser editor, no compute meter). Search panel replaces `grep`; commit+push triggers the Vercel deploy. Same paste-`<`-drop gotcha applies.
-- **New-prod-org bootstrap recipe:** create the `organizations` row (so the slug resolves) → admin signs up their Google account at `/o/{slug}/signup` (creates auth user + pending parent) → SQL: insert approved `org_admin` membership, delete the pending parent, create teams + a current season + team_seasons.
 
 ## RLS test harness (in on-deck-dev only)
 
@@ -490,6 +587,21 @@ reset request.jwt.claims;
 
 For anonymous access: `set role anon;` then `reset role;` when done.
 
+## Branding audit lessons learned
+
+- Do not bulk-replace red classes. Classify each hit first: semantic red stays for errors/destructive/loss/canceled/off/negative/urgent warning; brand color is for identity, selected states, active navigation, current team rows, and primary actions.
+- For current-team row highlights, prefer inline brand-color styles with alpha suffixes, e.g. `${brandColor}1A` for a subtle background and `borderLeftColor: brandColor` for the left accent.
+- When a child component needs brand color, pass `brandColor` as a prop from the component that already has org context. Do not add `useActiveOrg()` to helpers, module scope, maps, or non-component functions.
+
+## GameChanger integration direction
+
+- No stable/public GameChanger API integration is assumed.
+- Do not build full GameChanger-style play-by-play scoring unless the app is intended to become the primary scorekeeping source.
+- Preferred direction is **GameChanger CSV import**: a GameChanger team Staff member exports stats CSV, then Admin → Stats imports and maps it into `player_stats` for a selected game.
+- Build import only after receiving a real CSV sample. GameChanger CSV shape/columns should not be guessed.
+- Possible v1: Select game → Upload CSV → Preview matched/unmatched players → Confirm import → bulk upsert stats.
+- Box-score PDF parsing is parked; CSV is the preferred import path.
+
 ## Future features (parked)
 
 ### Admin manage-members UI — ✅ SHIPPED
@@ -501,8 +613,8 @@ On approval, on team_admin invitation, on game status changes. Requires SMTP pro
 ### DMs
 1:1 conversations between team members. Highest moderation complexity — needs blocking, muting, read receipts. Reuses ~80% of chat plumbing (schema, storage, RLS, push helper).
 
-### Batting order in stats — ✅ SHIPPED
-`player_stats.batting_order_position` (smallint, nullable) added to dev + prod. Admin Stats tab has a "Bat #" input per player (persists via `/api/admin` update_player_stats → `battingOrderPosition`). Event page Batting table sorts by `batting_order_position` (NULLS LAST), then jersey_number, then name. Sort lives in `battingRows` in `app/event/[id]/page.tsx`.
+### Batting order in stats
+player_stats.batting_order_position (integer, nullable). Display by batting_order_position NULLS LAST, jersey_number.
 
 ### Chat features deferred to v2
 - @mentions / notification on mention
