@@ -66,6 +66,15 @@ type RawEventRow = Omit<EventRow, 'fields' | 'arrival_buffer_minutes'> & {
   fields: FieldRow | FieldRow[] | null
 }
 
+type OrganizationLinkRow = {
+  id: string
+  label: string
+  url: string
+  description: string | null
+  is_active: boolean
+  sort_order: number
+}
+
 type WeatherForecastRow = {
   field_id: string
   forecast_time: string
@@ -412,6 +421,7 @@ function PastGameRow({ event }: { event: EventRow }) {
 export default function HomePage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [pastGames, setPastGames] = useState<EventRow[]>([])
+  const [organizationLinks, setOrganizationLinks] = useState<OrganizationLinkRow[]>([])
   const [weatherByEvent, setWeatherByEvent] = useState<WeatherByEvent>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -437,6 +447,19 @@ export default function HomePage() {
       try {
         setError(null)
         const supabase = createClient()
+        if (org?.id) {
+          const { data: linksData, error: linksError } = await supabase
+            .from('organization_links')
+            .select('id, label, url, description, is_active, sort_order')
+            .eq('organization_id', org.id)
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true })
+
+          if (!linksError && linksData) {
+            setOrganizationLinks(linksData as OrganizationLinkRow[])
+          }
+        }
         const nowIso = new Date().toISOString()
         if (teamSeasonNotFound || !teamSeasonId) {
           setEvents([])
@@ -526,7 +549,7 @@ export default function HomePage() {
       }
     }
     loadData()
-    }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound, arrivalBufferMinutes])
+    }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound, arrivalBufferMinutes, org?.id])
 
   const featuredEvent = useMemo(() => events[0] ?? null, [events])
   const otherEvents = useMemo(() => events.slice(1), [events])
@@ -601,6 +624,42 @@ export default function HomePage() {
   />
 )}
 
+        {/* Organization Links */}
+        {organizationLinks.length > 0 && (
+          <section>
+            <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">
+              Organization Links
+            </p>
+
+            <div className="space-y-2">
+              {organizationLinks.map(link => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white">{link.label}</p>
+                      {link.description && (
+                        <p className="mt-1 text-xs text-slate-400">{link.description}</p>
+                      )}
+                    </div>
+
+                    <span
+                      className="shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Open
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Coming Up */}
         {otherEvents.length > 0 && (

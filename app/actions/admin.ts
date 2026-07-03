@@ -20,6 +20,17 @@ export type OrgTeam = {
   name: string
 }
 
+export type OrganizationLink = {
+  id: string
+  organization_id: string
+  label: string
+  url: string
+  description: string | null
+  is_active: boolean
+  is_public: boolean
+  sort_order: number
+}
+
 export type SimpleResult = { ok: true } | { ok: false; error: string }
 
 // ─── Auth guard ────────────────────────────────────────────────────────────
@@ -583,6 +594,113 @@ export async function updateMemberTeams(
   if (insertError) return { ok: false, error: `Failed to assign teams: ${insertError.message}` }
 
   revalidatePath('/admin')
+  return { ok: true }
+}
+
+export async function getOrganizationLinks(): Promise<
+  { ok: true; links: OrganizationLink[] } | { ok: false; error: string }
+> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data, error } = await supabase
+    .from('organization_links')
+    .select('id, organization_id, label, url, description, is_active, is_public, sort_order')
+    .eq('organization_id', guard.membership.organization_id)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) return { ok: false, error: error.message }
+
+  return { ok: true, links: data ?? [] }
+}
+
+export async function saveOrganizationLink(input: {
+  id?: string
+  label: string
+  url: string
+  description?: string | null
+  isActive: boolean
+  isPublic: boolean
+  sortOrder: number
+}): Promise<SimpleResult> {
+  const label = input.label.trim()
+  const url = input.url.trim()
+  const description = input.description?.trim() || null
+
+  if (!label) return { ok: false, error: 'Enter a link label' }
+  if (!url) return { ok: false, error: 'Enter a link URL' }
+
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(url)
+  } catch {
+    return { ok: false, error: 'Enter a valid URL, including https://' }
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    return { ok: false, error: 'Link URL must start with http:// or https://' }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  if (input.id) {
+    const { error } = await supabase
+      .from('organization_links')
+      .update({
+        label,
+        url,
+        description,
+        is_active: input.isActive,
+        is_public: input.isPublic,
+        sort_order: Number.isFinite(input.sortOrder) ? input.sortOrder : 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', input.id)
+      .eq('organization_id', guard.membership.organization_id)
+
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase
+      .from('organization_links')
+      .insert({
+        organization_id: guard.membership.organization_id,
+        label,
+        url,
+        description,
+        is_active: input.isActive,
+        is_public: input.isPublic,
+        sort_order: Number.isFinite(input.sortOrder) ? input.sortOrder : 0,
+      })
+
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+
+  return { ok: true }
+}
+
+export async function deleteOrganizationLink(id: string): Promise<SimpleResult> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { error } = await supabase
+    .from('organization_links')
+    .delete()
+    .eq('id', id)
+    .eq('organization_id', guard.membership.organization_id)
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+
   return { ok: true }
 }
 

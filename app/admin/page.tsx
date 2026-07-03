@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail, startNewSeason } from '@/app/actions/admin'
-import type { PendingMembership, OrgTeam, ApprovedParent } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail, startNewSeason, getOrganizationLinks,  saveOrganizationLink, deleteOrganizationLink, } from '@/app/actions/admin'
+import type { PendingMembership, OrgTeam, ApprovedParent,  OrganizationLink, } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
@@ -67,7 +67,7 @@ type Standing = {
 }
 
 type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
-type SettingsSubTab = 'general' | 'branding' | 'access' | 'season'
+type SettingsSubTab = 'general' | 'branding' | 'access' | 'links' | 'season'
 
 type Field = {
   id: string
@@ -199,6 +199,18 @@ export default function AdminPage() {
   const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
   const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
 
+  const [settingsLinks, setSettingsLinks] = useState<OrganizationLink[]>([])
+  const [settingsLinksLoading, setSettingsLinksLoading] = useState(false)
+  const [settingsLinksMsg, setSettingsLinksMsg] = useState<string | null>(null)
+  const [linkLabel, setLinkLabel] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkDescription, setLinkDescription] = useState('')
+  const [linkIsActive, setLinkIsActive] = useState(true)
+  const [linkIsPublic, setLinkIsPublic] = useState(false)
+  const [linkSortOrder, setLinkSortOrder] = useState('0')
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
+  const [linkSaving, setLinkSaving] = useState(false)
+
   const [newSeasonName, setNewSeasonName] = useState('')
   const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
   const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
@@ -267,6 +279,86 @@ export default function AdminPage() {
       setSettingsMsg('❌ Could not copy signup link')
     }
   }
+
+    const resetLinkForm = () => {
+      setEditingLinkId(null)
+      setLinkLabel('')
+      setLinkUrl('')
+      setLinkDescription('')
+      setLinkIsActive(true)
+      setLinkIsPublic(false)
+      setLinkSortOrder('0')
+    }
+
+    const loadOrganizationLinks = async () => {
+      if (!isOrgAdmin) return
+
+      setSettingsLinksLoading(true)
+      setSettingsLinksMsg(null)
+
+      const result = await getOrganizationLinks()
+
+      if (result.ok) {
+        setSettingsLinks(result.links)
+      } else {
+        setSettingsLinksMsg(`❌ ${result.error}`)
+      }
+
+      setSettingsLinksLoading(false)
+    }
+
+    const editOrganizationLink = (link: OrganizationLink) => {
+      setEditingLinkId(link.id)
+      setLinkLabel(link.label)
+      setLinkUrl(link.url)
+      setLinkDescription(link.description ?? '')
+      setLinkIsActive(link.is_active)
+      setLinkIsPublic(link.is_public)
+      setLinkSortOrder(String(link.sort_order ?? 0))
+    }
+
+    const submitOrganizationLink = async () => {
+      if (!isOrgAdmin) return
+
+      setLinkSaving(true)
+      setSettingsLinksMsg(null)
+
+      const result = await saveOrganizationLink({
+        id: editingLinkId ?? undefined,
+        label: linkLabel,
+        url: linkUrl,
+        description: linkDescription,
+        isActive: linkIsActive,
+        isPublic: linkIsPublic,
+        sortOrder: Number.parseInt(linkSortOrder || '0', 10),
+      })
+
+      if (result.ok) {
+        setSettingsLinksMsg(editingLinkId ? 'Link updated.' : 'Link added.')
+        resetLinkForm()
+        await loadOrganizationLinks()
+      } else {
+        setSettingsLinksMsg(`❌ ${result.error}`)
+      }
+
+      setLinkSaving(false)
+    }
+
+    const removeOrganizationLink = async (id: string) => {
+      if (!isOrgAdmin) return
+      if (!confirm('Delete this organization link?')) return
+
+      setSettingsLinksMsg(null)
+
+      const result = await deleteOrganizationLink(id)
+
+      if (result.ok) {
+        setSettingsLinksMsg('Link deleted.')
+        await loadOrganizationLinks()
+      } else {
+        setSettingsLinksMsg(`❌ ${result.error}`)
+      }
+    }
 
   const submitSeasonRollover = async () => {
   if (!newSeasonName.trim()) {
@@ -384,7 +476,11 @@ export default function AdminPage() {
     loadCurrentSeason()
   }, [org, isOrgAdmin])
 
-    
+    useEffect(() => {
+      if (!isOrgAdmin || settingsSubTab !== 'links') return
+      loadOrganizationLinks()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOrgAdmin, settingsSubTab])
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -1581,6 +1677,7 @@ const visibleAdminTabs = isOrgAdmin
                   ['general', 'General'],
                   ['branding', 'Branding'],
                   ['access', 'Access'],
+                  ['links', 'Links'],
                   ['season', 'Season'],
                 ] as const).map(([subTab, label]) => {
                   const isActive = settingsSubTab === subTab
@@ -1755,6 +1852,165 @@ const visibleAdminTabs = isOrgAdmin
 
                   {settingsMsg && (
                     <p className="text-sm text-center text-slate-300">{settingsMsg}</p>
+                  )}
+                </div>
+              )}
+
+              {settingsSubTab === 'links' && (
+                <div role="tabpanel" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Organization Links</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add useful parent-facing links such as tryout registration, training sessions, your website, or team store.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Label</label>
+                      <input
+                        type="text"
+                        value={linkLabel}
+                        onChange={e => setLinkLabel(e.target.value)}
+                        placeholder="Book a Training Session"
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">URL</label>
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={e => setLinkUrl(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Description</label>
+                      <textarea
+                        value={linkDescription}
+                        onChange={e => setLinkDescription(e.target.value)}
+                        placeholder="Optional short description"
+                        rows={2}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={linkIsActive}
+                          onChange={e => setLinkIsActive(e.target.checked)}
+                        />
+                        Active
+                      </label>
+
+                      <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={linkIsPublic}
+                          onChange={e => setLinkIsPublic(e.target.checked)}
+                        />
+                        Public
+                      </label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Sort Order</label>
+                      <input
+                        type="number"
+                        value={linkSortOrder}
+                        onChange={e => setLinkSortOrder(e.target.value)}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={submitOrganizationLink}
+                        disabled={linkSaving || !linkLabel.trim() || !linkUrl.trim()}
+                        className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {linkSaving ? 'Saving...' : editingLinkId ? 'Update Link' : 'Add Link'}
+                      </button>
+
+                      {editingLinkId && (
+                        <button
+                          type="button"
+                          onClick={resetLinkForm}
+                          className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {settingsLinksLoading && (
+                      <p className="text-sm text-slate-400">Loading links...</p>
+                    )}
+
+                    {!settingsLinksLoading && settingsLinks.length === 0 && (
+                      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                        <p className="text-sm text-slate-400">No organization links yet.</p>
+                      </div>
+                    )}
+
+                    {!settingsLinksLoading && settingsLinks.map(link => (
+                      <div
+                        key={link.id}
+                        className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white">{link.label}</p>
+                            <p className="truncate text-xs text-slate-400">{link.url}</p>
+                            {link.description && (
+                              <p className="mt-1 text-xs text-slate-500">{link.description}</p>
+                            )}
+                            <div className="mt-2 flex gap-2">
+                              <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-300">
+                                {link.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                              {link.is_public && (
+                                <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-300">
+                                  Public
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editOrganizationLink(link)}
+                              className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => removeOrganizationLink(link.id)}
+                              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {settingsLinksMsg && (
+                    <p className="text-sm text-center text-slate-300">{settingsLinksMsg}</p>
                   )}
                 </div>
               )}
