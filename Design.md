@@ -301,6 +301,14 @@ Scope: make post-game stat entry efficient for team admins on a laptop while pre
 - Dashboard visuals use brand color, simple dots/text, and no emoji-style action icons.
 - Roster Health shows Players, Missing #, Missing Pos; the healthy state is centered below the three cards.
 
+## Org Resource Links v1 — SHIPPED
+
+- Admin → Settings → Links lets org_admins add/edit/delete external resource links.
+- Active links appear on the Home page for approved org members.
+- Intended uses: tryout registration, training booking, team store, org website, facility info.
+- Links are external; On Deck does not process registration, booking, waivers, or payments.
+- This keeps On Deck positioned as the baseball/team hub while linking out to existing systems like StatStak/Baseline.
+
 ## Florida Vandals — first real second tenant — SHIPPED
 
 - Prod org `4801e4d4-bc14-410f-8b00-62b27e6827ef`, slug `florida-vandals`, admin frechettegaming22@gmail.com, colors orange `#F97316`/black.

@@ -525,6 +525,16 @@ Stores org logo images, uploaded via the Admin → Settings tab.
 
 **Flow:** admin picks file → upload to bucket → public URL generated → stored in `organizations.logo_url` on Save Organization Settings.
 
+**Organization_Links
+- organization_id
+- label
+- url
+- description
+- is_active
+- is_public
+- sort_order
+- RLS: approved org members can select; org_admins can insert/update/delete
+
 ---
 
 ## Realtime publication
