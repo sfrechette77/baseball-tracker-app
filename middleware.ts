@@ -9,8 +9,13 @@ const PUBLIC_ROUTES = ['/login', '/auth/callback', '/signup']
 // Add to PUBLIC_ROUTES array above
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) return true
+
+  // Public organization landing page: /o/<slug>
+  if (/^\/o\/[^/]+\/?$/.test(pathname)) return true
+
   // Org-scoped signup pages: /o/<slug>/signup and /o/<slug>/signup/complete
   if (/^\/o\/[^/]+\/signup(\/|$)/.test(pathname)) return true
+
   return false
 }
 
