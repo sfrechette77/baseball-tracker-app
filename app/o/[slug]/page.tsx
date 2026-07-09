@@ -19,7 +19,7 @@ export default async function OrganizationPage({ params }: Props) {
 
   const { data: org, error: orgError } = await supabase
     .from('organizations')
-    .select('id, name, slug, logo_url, primary_color')
+    .select('id, name, slug, logo_url, primary_color, public_description')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -65,8 +65,8 @@ export default async function OrganizationPage({ params }: Props) {
           <h1 className="mt-2 text-3xl font-extrabold">{org.name}</h1>
 
           <p className="mt-3 text-sm text-slate-400">
-            Team schedules, updates, scores, stats, and organization resources
-            in one place.
+            {org.public_description ||
+              'Team schedules, updates, scores, stats, and organization resources in one place.'}
           </p>
         </header>
 
