@@ -8,6 +8,7 @@ export type Org = {
   secondary_color: string | null
   logo_url: string | null
   has_league_features: boolean
+  public_description: string | null
 }
 
 export type MembershipRole = 'org_admin' | 'team_admin' | 'parent'

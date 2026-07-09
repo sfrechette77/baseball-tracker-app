@@ -15,6 +15,8 @@ export async function PATCH(req: Request) {
   const logoUrl = body.logoUrl as string | null | undefined
   const primaryColor = body.primaryColor as string | undefined
 
+  const publicDescription = body.publicDescription as string | null | undefined
+
   if (!organizationId) {
     return NextResponse.json(
       { error: 'Missing organization ID.' },
@@ -70,10 +72,11 @@ export async function PATCH(req: Request) {
       name: name.trim(),
       logo_url: logoUrl || null,
       primary_color: primaryColor,
+      public_description: publicDescription?.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', organizationId)
-    .select('id, name, slug, logo_url, primary_color')
+    .select('id, name, slug, logo_url, primary_color, public_description')
     .single()
 
   if (updateError) {

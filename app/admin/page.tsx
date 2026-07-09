@@ -180,6 +180,7 @@ export default function AdminPage() {
   const isTeamAdmin = membership?.role === 'team_admin'
 
   const { org } = useActiveOrg()
+  const [settingsPublicDescription, setSettingsPublicDescription] = useState('')
   const brandColor = org?.primary_color || '#dc2626'
 
   const signupLink =
@@ -225,6 +226,7 @@ export default function AdminPage() {
     setSettingsName(org.name ?? '')
     setSettingsLogoUrl(org.logo_url ?? '')
     setSettingsPrimaryColor(org.primary_color ?? '#dc2626')
+    setSettingsPublicDescription(org.public_description ?? '')
   }, [org])
 
   const saveOrgSettings = async () => {
@@ -244,6 +246,7 @@ export default function AdminPage() {
           name: settingsName.trim(),
           logoUrl: settingsLogoUrl.trim() || null,
           primaryColor: settingsPrimaryColor.trim() || '#dc2626',
+          publicDescription: settingsPublicDescription,
         }),
       })
 
@@ -1712,6 +1715,20 @@ const visibleAdminTabs = isOrgAdmin
                       onChange={e => setSettingsName(e.target.value)}
                       className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400">Public Welcome Message</label>
+                    <textarea
+                      value={settingsPublicDescription}
+                      onChange={e => setSettingsPublicDescription(e.target.value)}
+                      rows={3}
+                      placeholder="Tell families what they can find here."
+                      className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                    />
+                    <p className="text-[11px] text-slate-500">
+                      This appears on the public organization page.
+                    </p>
                   </div>
 
                   <div className="space-y-2">
