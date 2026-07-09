@@ -15,13 +15,12 @@
 - ✅ `organization-logos` storage INSERT policy tightened to approved org_admin uploads inside their own org folder.
 - ✅ Existing-parent → team_admin flow verified and grant-by-existing-email shipped.
 - ✅ Admin Settings tab, Admin Overview tab, Florida Vandals second tenant, membership backfill fix, and service-key env var standardization shipped.
+- ✅ Public organization hub shipped: `/o/{slug}` shows org branding, public resource links, signup access, sign-in access, and an admin-editable welcome message.
 
 **Active items (pick one):**
-1. **Signup/invite link review** — verify whether Admin already has a polished copy/send signup link flow; if not, build Invite Link v1.
-2. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
-3. **Email notifications on approval** — needs Resend/SMTP; multi-hour.
-4. **Drop `teams.season_label`** (still in prod despite docs saying dropped).
-5. Refine backfilled parents' team assignments / backfill missing profiles.
+1. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
+2. **Email notifications on approval** — needs Resend/SMTP; multi-hour.
+3. Refine backfilled parents' team assignments / backfill missing profiles.
 
 ---
 
@@ -253,6 +252,39 @@ Team Overview card + org logo, roster jersey circles, Team page active toggle, b
 - Bucket `organization-logos`, path `organizations/{org_id}/logo-{timestamp}.{ext}`, public URL stored in `organizations.logo_url`.
 - Storage INSERT policy is hardened: only approved org_admins can upload into their own org folder via `is_org_admin((storage.foldername(name))[2]::uuid)`.
 
+## Public Organization Hub — SHIPPED
+
+Scope: public, shareable organization landing page for prospective families and existing members.
+
+### Route
+- `/o/{slug}` is publicly accessible without authentication.
+- Middleware and `AppShell` both whitelist the exact org-root route.
+- Unknown slugs return the app’s 404 page.
+
+### Content
+- Organization logo
+- Organization name
+- Organization primary brand color
+- Admin-editable public welcome message
+- Active public organization links
+- “Request App Access” button linking to `/o/{slug}/signup`
+- “Already approved? Sign in” link to `/login`
+
+### Public welcome message
+- Stored in `organizations.public_description`.
+- Editable in Admin → Settings → General.
+- If blank, the public page shows a generic fallback message.
+
+### Public links
+- Uses `organization_links`.
+- Only rows with `is_active = true` and `is_public = true` appear on the public hub.
+- Intended uses: tryout registration, training-session booking, organization website, team store, and facility information.
+- Links open externally; On Deck does not process booking, registration, waivers, or payments.
+
+### Product positioning
+- On Deck is the branded baseball information and team-operations hub.
+- Existing external systems such as StatStak/Baseline can continue handling registration, payment, and booking workflows.
+
 ## Admin Settings tab — SHIPPED
 
 - New Settings tab in /admin, **org_admin only** (`teamAdminAllowedTabs` unchanged: status, score, stats, events).
@@ -300,14 +332,6 @@ Scope: make post-game stat entry efficient for team admins on a laptop while pre
 - View Team Page routes to `/team` and intentionally does not imply roster editing.
 - Dashboard visuals use brand color, simple dots/text, and no emoji-style action icons.
 - Roster Health shows Players, Missing #, Missing Pos; the healthy state is centered below the three cards.
-
-## Org Resource Links v1 — SHIPPED
-
-- Admin → Settings → Links lets org_admins add/edit/delete external resource links.
-- Active links appear on the Home page for approved org members.
-- Intended uses: tryout registration, training booking, team store, org website, facility info.
-- Links are external; On Deck does not process registration, booking, waivers, or payments.
-- This keeps On Deck positioned as the baseball/team hub while linking out to existing systems like StatStak/Baseline.
 
 ## Florida Vandals — first real second tenant — SHIPPED
 
@@ -427,7 +451,7 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 
 ## Routing
 
-- Path-based: org-scoped pre-auth pages under /o/{slug}/... (currently just signup; full /o/{slug}/[everything else] routing deferred)
+- Path-based: org-scoped pre-auth pages under /o/{slug}/
 - Non-org pages at root: /login, /account, etc.
 - Middleware enforces: not-public route → must be logged in. Org-scoped post-auth middleware deferred.
 
@@ -609,6 +633,7 @@ For anonymous access: `set role anon;` then `reset role;` when done.
 - Build import only after receiving a real CSV sample. GameChanger CSV shape/columns should not be guessed.
 - Possible v1: Select game → Upload CSV → Preview matched/unmatched players → Confirm import → bulk upsert stats.
 - Box-score PDF parsing is parked; CSV is the preferred import path.
+- GameChanger CSV import discovery — wait for a real Staff export sample before building.
 
 ## Future features (parked)
 

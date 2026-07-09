@@ -1,10 +1,9 @@
 # On Deck — Database Schema
 
-1. Header block — REPLACE the "Last updated / Status" lines at top
-
-**Last updated:** Stats workflow + team-admin polish session (6-29-26)
+**Last updated:** Public organization hub + resource links + welcome message session
 **Environment:** Production (`fjrtcxfqculymgyfrato`)
-**Status:** RLS ON for all 17 tenant tables. Two orgs live in prod (Chicago Elite, Florida Vandals). Org branding, stats workflow polish, team-admin dashboard polish, and org logo policy hardening shipped. Service-key env var standardized to `SUPABASE_SERVICE_ROLE_KEY`.
+**Status:** RLS ON for all tenant tables. Public organization hubs, org resource links, signup/access flow, stats workflow, team-admin dashboard, and org branding are shipped.
+
 ---
 
 ## Overview
@@ -78,30 +77,66 @@ All helpers use `SECURITY DEFINER` to bypass RLS when checking permissions inter
 ## Tables — Control Plane
 
 ### organizations
-Top-level tenant. Each org is one customer.
+Top-level tenant. Each organization is one customer.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| id | uuid | PK, default gen_random_uuid() | Organization identifier |
+| slug | text | NOT NULL, UNIQUE | Public route identifier used by `/o/{slug}` and signup links |
+| name | text | NOT NULL | Organization display name |
+| primary_color | text | nullable | Main brand color used across the app |
+| secondary_color | text | nullable | Secondary organization color |
+| logo_url | text | nullable | Public URL for the organization logo |
+| public_description | text | nullable | Public welcome message shown on `/o/{slug}` |
+| has_league_features | boolean | NOT NULL, default false | Enables league-management features for the organization |
+| created_at | timestamptz | NOT NULL, default now() | |
+| updated_at | timestamptz | NOT NULL, default now() | |
+
+**Indexes:**
+- `idx_organizations_slug` on slug
+
+**RLS Policies (ACTIVE):**
+- SELECT: `id IN current_user_org_ids()` — approved members can read their organization.
+- INSERT: `auth.uid() IS NOT NULL` — authenticated users can create an organization.
+- UPDATE: `is_org_admin(id)` — org_admins only.
+- DELETE: `is_org_admin(id)` — org_admins only.
+
+**Public access behavior:**
+- Public routes such as `/o/{slug}` and `/o/{slug}/signup` use the server-only service-role client for organization lookup because anonymous visitors do not have memberships and therefore cannot pass the normal organization SELECT policy.
+- `public_description` is editable in Admin → Settings → General.
+- If `public_description` is blank, the public organization hub displays a generic fallback message.
+
+### organization_links
+Organization-managed external resource links shown inside the authenticated app and optionally on the public organization hub.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | id | uuid | PK, default gen_random_uuid() | |
-| organization_id | uuid | NOT NULL, FK organizations, default Chicago Elite UUID | |
-| name | text | NOT NULL | "Moore" |
-| sport | text | NOT NULL, default 'baseball' | |
-| season_label | text | nullable | ⚠ Listed as dropped in earlier docs but STILL PRESENT in prod (verified 6-11-26). Unused. Candidate for cleanup drop. |
-| division | text | nullable | |
-| arrival_buffer_minutes | integer | NOT NULL, default 45 | |
-| is_opponent | boolean | NOT NULL, default false | TRUE for the 15 league opponent teams (which carry Elite's org_id). FALSE = the org's own teams. Team picker shows only is_opponent=false teams. |
-| owner_user_id | uuid | nullable | Legacy field |
+| organization_id | uuid | NOT NULL, FK organizations, ON DELETE CASCADE | Tenant scope |
+| label | text | NOT NULL | Link title shown to users |
+| url | text | NOT NULL | External http/https URL |
+| description | text | nullable | Optional supporting copy |
+| is_active | boolean | NOT NULL, default true | Controls visibility in authenticated app |
+| is_public | boolean | NOT NULL, default false | Controls visibility on `/o/{slug}` |
+| sort_order | integer | NOT NULL, default 0 | Lower values display first |
 | created_at | timestamptz | NOT NULL, default now() | |
+| updated_at | timestamptz | NOT NULL, default now() | |
 
-**Added 6-11-26 era:** `is_opponent` (prod + dev). Separates league opponents from own teams so the DB-driven team picker can filter.
-
-**Indexes:** `idx_organizations_slug` on slug
+**Indexes:**
+- `idx_organization_links_org` on organization_id
+- `idx_organization_links_org_active_sort` on (organization_id, is_active, sort_order)
 
 **RLS Policies (ACTIVE):**
-- SELECT: `id IN current_user_org_ids()` — members can read their orgs
-- INSERT: `auth.uid() IS NOT NULL` — any authenticated user can create
-- UPDATE: `is_org_admin(id)` — org_admins only
-- DELETE: `is_org_admin(id)` — org_admins only
+- SELECT: approved members of the organization can read organization links.
+- INSERT: org_admins only for their own organization.
+- UPDATE: org_admins only for their own organization.
+- DELETE: org_admins only for their own organization.
+
+**App behavior:**
+- Admin → Settings → Links supports add, edit, delete, active/public toggles, descriptions, and sort order.
+- Authenticated Home shows active links.
+- Public `/o/{slug}` shows only active public links.
+- URLs are validated as http/https before save.
 
 ---
 
@@ -269,23 +304,34 @@ Links parent memberships to teams.
 All tables in this section have `organization_id` NOT NULL with default Chicago Elite UUID (`75c11f73-5394-4ffc-bf39-9c708418e07b` in prod), FK organizations, ON DELETE CASCADE, indexed via `idx_<tablename>_org`.
 
 ### teams
-Permanent team identity.
+Permanent team identity within an organization. Seasonal participation is represented separately through `team_seasons`.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
-| id | uuid | PK | |
-| organization_id | uuid | NOT NULL, FK organizations | |
-| name | text | NOT NULL | "Moore" |
-| sport | text | NOT NULL, default 'baseball' | |
-| division | text | nullable | |
-| arrival_buffer_minutes | integer | NOT NULL, default 45 | |
+| id | uuid | PK, default gen_random_uuid() | Team identifier |
+| organization_id | uuid | NOT NULL, FK organizations, ON DELETE CASCADE | Tenant scope |
+| name | text | NOT NULL | Team display name, such as "Moore" |
+| sport | text | NOT NULL, default 'baseball' | Sport type |
+| division | text | nullable | Division or age grouping |
+| arrival_buffer_minutes | integer | NOT NULL, default 45 | Default arrival time before events |
+| is_opponent | boolean | NOT NULL, default false | TRUE for league opponent records; FALSE for the organization’s own teams |
 | owner_user_id | uuid | nullable | Legacy field |
 | created_at | timestamptz | NOT NULL, default now() | |
 
-**RLS Policies (ACTIVE):**
-- SELECT: `organization_id IN current_user_org_ids()` — members can read teams in their orgs
-- INSERT/UPDATE/DELETE: `is_org_admin(organization_id)`
+**Indexes:**
+- `idx_teams_org` on organization_id
 
+**RLS Policies (ACTIVE):**
+- SELECT: `organization_id IN current_user_org_ids()` — approved members can read teams in their organization.
+- INSERT: `is_org_admin(organization_id)` — org_admins only.
+- UPDATE: `is_org_admin(organization_id)` — org_admins only.
+- DELETE: `is_org_admin(organization_id)` — org_admins only.
+
+**App behavior:**
+- The team picker shows only rows where `is_opponent = false`.
+- League opponent rows may share the organization’s `organization_id`, but are excluded from normal team selection.
+- Team-level seasonal data is linked through `team_seasons`; `teams` stores the permanent team identity.
+- `team_admins` and `parent_teams` link to permanent `teams.id`, not `team_seasons.id`.
 ---
 
 ### players, events, fields, league_games, standings, box_scores, player_stats, game_status_log, event_imports, weather_forecasts
@@ -525,16 +571,6 @@ Stores org logo images, uploaded via the Admin → Settings tab.
 
 **Flow:** admin picks file → upload to bucket → public URL generated → stored in `organizations.logo_url` on Save Organization Settings.
 
-**Organization_Links
-- organization_id
-- label
-- url
-- description
-- is_active
-- is_public
-- sort_order
-- RLS: approved org members can select; org_admins can insert/update/delete
-
 ---
 
 ## Realtime publication
@@ -575,7 +611,6 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 **Other migrations run ad-hoc and not saved to repo:**
 - Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
-- Cutover: `alter table public.<name> enable row level security` for all 17 tenant tables in dev AND prod. Policies were created during Chunk 8; cutover just flipped the master switch.
 - Chunk 4b: `alter table public.fields drop column team_id;` — run against dev AND prod.
 - Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
 - Test harness: User C linked to Moore via parent_teams.
@@ -646,9 +681,8 @@ Production has data. Several Chunk 3 operations were destructive and required a 
 3. Backfill team_season_id from existing team_id values
 4. Verify backfill is complete
 5. Then drop team_id columns
-6. **Drop `teams.season_label` in prod** — confirmed still present (6-11-26) despite docs saying dropped. Unused.
-7. ✅ **Tighten organization-logos INSERT policy** — DONE (6-22-26). Uploads are scoped to approved org_admins and their own `organizations/{organization_id}/...` folder.
-8. **Backfilled parents** all defaulted to Moore; refine assignments via /admin Members tab if any are actually Ayeski parents or coaches.
+6. ✅ **Tighten organization-logos INSERT policy** — DONE (6-22-26). Uploads are scoped to approved org_admins and their own `organizations/{organization_id}/...` folder.
+7. **Backfilled parents** all defaulted to Moore; refine assignments via /admin Members tab if any are actually Ayeski parents or coaches.
 
 
 Production also had:
