@@ -49,6 +49,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
         primary_color,
         secondary_color,
         logo_url,
+        public_description,
         has_league_features
       )
     `)
@@ -74,6 +75,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
       primary_color: orgRow.primary_color,
       secondary_color: orgRow.secondary_color,
       logo_url: orgRow.logo_url,
+      public_description: orgRow.public_description,
       has_league_features: orgRow.has_league_features,
     },
     membership: {
