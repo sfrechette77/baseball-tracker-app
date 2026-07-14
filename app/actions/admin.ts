@@ -616,6 +616,107 @@ export async function getOrganizationLinks(): Promise<
   return { ok: true, links: data ?? [] }
 }
 
+export type OrganizationLaunchReadiness = {
+  logoConfigured: boolean
+  brandColorConfigured: boolean
+  currentSeasonExists: boolean
+  teamExists: boolean
+  orgAdminExists: boolean
+  signupLinkAvailable: boolean
+  publicDescriptionConfigured: boolean
+  publicLinkExists: boolean
+}
+
+export async function getOrganizationLaunchReadiness(): Promise<
+  | { ok: true; readiness: OrganizationLaunchReadiness }
+  | { ok: false; error: string }
+> {
+  const ctx = await requireOrgAdmin()
+
+  if (!ctx.ok) {
+    return { ok: false, error: ctx.error }
+  }
+
+  const supabase = await createClient()
+  const organizationId = ctx.membership.organization_id
+
+  const [
+    organizationResult,
+    seasonResult,
+    teamResult,
+    adminResult,
+    publicLinkResult,
+  ] = await Promise.all([
+    supabase
+      .from('organizations')
+      .select('slug, logo_url, primary_color, public_description')
+      .eq('id', organizationId)
+      .single(),
+
+    supabase
+      .from('seasons')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('is_current', true)
+      .limit(1),
+
+    supabase
+      .from('teams')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('is_opponent', false)
+      .limit(1),
+
+    supabase
+      .from('memberships')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('role', 'org_admin')
+      .eq('status', 'approved')
+      .limit(1),
+
+    supabase
+      .from('organization_links')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .eq('is_public', true)
+      .limit(1),
+  ])
+
+  const firstError =
+    organizationResult.error ||
+    seasonResult.error ||
+    teamResult.error ||
+    adminResult.error ||
+    publicLinkResult.error
+
+  if (firstError) {
+    return {
+      ok: false,
+      error: firstError.message,
+    }
+  }
+
+  const organization = organizationResult.data
+
+  return {
+    ok: true,
+    readiness: {
+      logoConfigured: Boolean(organization.logo_url?.trim()),
+      brandColorConfigured: Boolean(organization.primary_color?.trim()),
+      currentSeasonExists: Boolean(seasonResult.data?.length),
+      teamExists: Boolean(teamResult.data?.length),
+      orgAdminExists: Boolean(adminResult.data?.length),
+      signupLinkAvailable: Boolean(organization.slug?.trim()),
+      publicDescriptionConfigured: Boolean(
+        organization.public_description?.trim()
+      ),
+      publicLinkExists: Boolean(publicLinkResult.data?.length),
+    },
+  }
+}
+
 export async function saveOrganizationLink(input: {
   id?: string
   label: string

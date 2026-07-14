@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail, startNewSeason, getOrganizationLinks,  saveOrganizationLink, deleteOrganizationLink, } from '@/app/actions/admin'
+import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail, startNewSeason, getOrganizationLinks,  saveOrganizationLink, deleteOrganizationLink, getOrganizationLaunchReadiness, type OrganizationLaunchReadiness,} from '@/app/actions/admin'
 import type { PendingMembership, OrgTeam, ApprovedParent,  OrganizationLink, } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
@@ -200,6 +200,12 @@ export default function AdminPage() {
   const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
   const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
 
+  const [launchReadiness, setLaunchReadiness] =
+  useState<OrganizationLaunchReadiness | null>(null)
+
+  const [launchReadinessLoading, setLaunchReadinessLoading] = useState(false)
+  const [launchReadinessMsg, setLaunchReadinessMsg] = useState<string | null>(null)
+
   const [settingsLinks, setSettingsLinks] = useState<OrganizationLink[]>([])
   const [settingsLinksLoading, setSettingsLinksLoading] = useState(false)
   const [settingsLinksMsg, setSettingsLinksMsg] = useState<string | null>(null)
@@ -257,6 +263,7 @@ export default function AdminPage() {
       }
 
       setSettingsMsg('Organization settings saved.')
+      await loadLaunchReadiness()
     } catch (err) {
       setSettingsMsg(
         err instanceof Error
@@ -340,6 +347,7 @@ export default function AdminPage() {
         setSettingsLinksMsg(editingLinkId ? 'Link updated.' : 'Link added.')
         resetLinkForm()
         await loadOrganizationLinks()
+        await loadLaunchReadiness()
       } else {
         setSettingsLinksMsg(`❌ ${result.error}`)
       }
@@ -358,10 +366,49 @@ export default function AdminPage() {
       if (result.ok) {
         setSettingsLinksMsg('Link deleted.')
         await loadOrganizationLinks()
+        await loadLaunchReadiness()
       } else {
         setSettingsLinksMsg(`❌ ${result.error}`)
       }
     }
+
+  const loadLaunchReadiness = async () => {
+    setLaunchReadinessLoading(true)
+    setLaunchReadinessMsg(null)
+
+    const result = await getOrganizationLaunchReadiness()
+
+    if (result.ok) {
+      setLaunchReadiness(result.readiness)
+    } else {
+      setLaunchReadinessMsg(`❌ ${result.error}`)
+    }
+
+    setLaunchReadinessLoading(false)
+  }
+
+  const launchReadinessItems = launchReadiness
+    ? [
+        { label: 'Organization logo', complete: launchReadiness.logoConfigured },
+        { label: 'Brand color', complete: launchReadiness.brandColorConfigured },
+        { label: 'Current season', complete: launchReadiness.currentSeasonExists },
+        { label: 'At least one team', complete: launchReadiness.teamExists },
+        { label: 'Approved org admin', complete: launchReadiness.orgAdminExists },
+        { label: 'Signup link', complete: launchReadiness.signupLinkAvailable },
+        {
+          label: 'Public welcome message',
+          complete: launchReadiness.publicDescriptionConfigured,
+        },
+        {
+          label: 'Public resource link',
+          complete: launchReadiness.publicLinkExists,
+        },
+      ]
+    : []
+
+  const completedLaunchItems = launchReadinessItems.filter(
+    item => item.complete
+  ).length
 
   const submitSeasonRollover = async () => {
   if (!newSeasonName.trim()) {
@@ -484,6 +531,13 @@ export default function AdminPage() {
       loadOrganizationLinks()
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOrgAdmin, settingsSubTab])
+
+    useEffect(() => {
+      if (!isOrgAdmin) return
+
+      loadLaunchReadiness()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOrgAdmin])  
 
   // Events
   const [events, setEvents] = useState<EventRow[]>([])
@@ -1707,6 +1761,52 @@ const visibleAdminTabs = isOrgAdmin
 
               {settingsSubTab === 'general' && (
                 <div role="tabpanel" className="space-y-4">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Launch Readiness</h3>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Core setup items for launching this organization.
+                      </p>
+                    </div>
+
+                    {!launchReadinessLoading && launchReadiness && (
+                      <span className="shrink-0 text-xs font-semibold text-slate-300">
+                        {completedLaunchItems}/{launchReadinessItems.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {launchReadinessLoading && (
+                    <p className="mt-4 text-sm text-slate-400">Checking setup…</p>
+                  )}
+
+                  {!launchReadinessLoading && launchReadiness && (
+                    <div className="mt-4 space-y-2">
+                      {launchReadinessItems.map(item => (
+                        <div
+                          key={item.label}
+                          className="flex items-center justify-between rounded-lg bg-slate-900/70 px-3 py-2"
+                        >
+                          <span className="text-sm text-slate-200">{item.label}</span>
+                          <span
+                            className={
+                              item.complete
+                                ? 'text-xs font-semibold text-emerald-400'
+                                : 'text-xs font-semibold text-amber-400'
+                            }
+                          >
+                            {item.complete ? 'Complete' : 'Needs setup'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {launchReadinessMsg && (
+                    <p className="mt-4 text-sm text-slate-300">{launchReadinessMsg}</p>
+                  )}
+                </div>
                   <div className="space-y-2">
                     <label className="text-xs text-slate-400">Organization Name</label>
                     <input
