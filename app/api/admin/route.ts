@@ -650,7 +650,7 @@ export async function POST(req: NextRequest) {
       const [{ data: eventRow, error: eventError }, { data: playerRow, error: playerError }] = await Promise.all([
         supabase
           .from('events')
-          .select('team_season_id')
+          .select('team_season_id, organization_id')
           .eq('id', eventId)
           .single(),
         supabase
@@ -676,13 +676,22 @@ export async function POST(req: NextRequest) {
         .from('player_stats')
         .upsert({
           player_id: playerId, 
-          event_id: eventId, 
+          event_id: eventId,
+          organization_id: eventRow.organization_id, 
           team_season_id: eventRow.team_season_id,
-          at_bats: atBats, hits, rbi, runs,
-          walks: walks ?? 0, strikeouts,
-          pitch_count: pitchCount ?? 0, innings_pitched: inningsPitched ?? 0,
-          strikeouts_pitching: strikeoutsPitching ?? 0, walks_allowed: walksAllowed ?? 0,
-          hits_allowed: hitsAllowed ?? 0, earned_runs: earnedRuns ?? 0, batting_order_position: battingOrderPosition ?? null,
+          at_bats: atBats,
+          hits,
+          rbi,
+          runs,
+          walks: walks ?? 0,
+          strikeouts,
+          pitch_count: pitchCount ?? 0,
+          innings_pitched: inningsPitched ?? 0,
+          strikeouts_pitching: strikeoutsPitching ?? 0,
+          walks_allowed: walksAllowed ?? 0,
+          hits_allowed: hitsAllowed ?? 0,
+          earned_runs: earnedRuns ?? 0,
+          batting_order_position: battingOrderPosition ?? null,
         }, { onConflict: 'player_id,event_id' })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
@@ -699,7 +708,7 @@ export async function POST(req: NextRequest) {
 
       const { data: eventRow, error: eventError } = await supabase
         .from('events')
-        .select('team_season_id')
+        .select('team_season_id, organization_id')
         .eq('id', eventId)
         .single()
 
@@ -739,6 +748,7 @@ export async function POST(req: NextRequest) {
       const rows = stats.map((stat: any) => ({
         event_id: eventId,
         player_id: stat.playerId,
+        organization_id: eventRow.organization_id,
         team_season_id: eventRow.team_season_id,
         batting_order_position: stat.batting_order_position ?? null,
         at_bats: stat.at_bats,
