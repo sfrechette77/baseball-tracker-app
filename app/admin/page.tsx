@@ -9,6 +9,15 @@ import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAss
 import { DashboardTab } from '@/components/admin/DashboardTab'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 import { useActiveOrg } from '@/components/org-context'
+import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
+import { useTeamSeason } from '@/lib/org/useTeamSeason'
+
+import {
+  createAthleteRosterAssignment,
+  assignExistingAthleteToTeamSeason,
+  getAssignableAthletes,
+  type AssignableAthlete,
+} from '@/app/actions/roster'
 
 
 function createClient() {
@@ -36,6 +45,14 @@ type Player = {
   id: string
   name: string
   jersey_number: string | null
+}
+
+type ManagedRosterPlayer = {
+  id: string
+  athlete_id: string | null
+  name: string
+  jersey_number: string | null
+  position: string | null
 }
 
 type StatRow = {
@@ -66,7 +83,7 @@ type Standing = {
   runs_against: number
 }
 
-type Tab = 'dashboard' | 'pending' | 'members' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
+type Tab = 'dashboard' | 'pending' | 'members' | 'roster' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
 type SettingsSubTab = 'general' | 'branding' | 'access' | 'links' | 'season'
 
 type Field = {
@@ -175,6 +192,21 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general')
   const { currentTeam } = useCurrentTeam()
+  const {
+  seasons: rosterSeasons,
+  currentSeasonId,
+  loading: rosterSeasonsLoading,
+} = useOrgSeasons()
+
+  const {
+    teamSeasonId: rosterTeamSeasonId,
+    loading: rosterTeamSeasonLoading,
+    notFound: rosterTeamSeasonNotFound,
+  } = useTeamSeason(currentTeam.id, currentSeasonId)
+
+  const currentRosterSeason =
+    rosterSeasons.find(season => season.id === currentSeasonId) ?? null
+
   const { membership, loading: orgLoading } = useActiveOrg()
   const isOrgAdmin = membership?.role === 'org_admin'
   const isTeamAdmin = membership?.role === 'team_admin'
@@ -457,6 +489,24 @@ export default function AdminPage() {
   setSeasonRolloverMsg('✅ New season started. Current-season pages now point to the new season.')
 }
 
+  const [managedRosterPlayers, setManagedRosterPlayers] =
+    useState<ManagedRosterPlayer[]>([])
+
+  const [assignableAthletes, setAssignableAthletes] =
+    useState<AssignableAthlete[]>([])
+
+  const [rosterLoading, setRosterLoading] = useState(false)
+  const [rosterSaving, setRosterSaving] = useState(false)
+  const [rosterMsg, setRosterMsg] = useState<string | null>(null)
+
+  const [newAthleteName, setNewAthleteName] = useState('')
+  const [newAthleteJersey, setNewAthleteJersey] = useState('')
+  const [newAthletePosition, setNewAthletePosition] = useState('')
+
+  const [existingAthleteId, setExistingAthleteId] = useState('')
+  const [existingAthleteJersey, setExistingAthleteJersey] = useState('')
+  const [existingAthletePosition, setExistingAthletePosition] = useState('')
+
   const uploadOrgLogo = async (file: File) => {
     if (!org || !isOrgAdmin) return
 
@@ -662,6 +712,13 @@ export default function AdminPage() {
     setEvents((eventsForScore ?? []) as EventRow[])
     setAllEvents((allEventsData ?? []) as EventListRow[])
   }
+
+  useEffect(() => {
+  if (tab !== 'roster' || !rosterTeamSeasonId) return
+
+  loadManagedRoster()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [tab, rosterTeamSeasonId])
 
   useEffect(() => {
     if (!password) return
@@ -1655,8 +1712,132 @@ const deleteLeagueGame = async () => {
     return !counts || counts.family_count === 0
   })
 
+  const loadManagedRoster = async () => {
+    if (!rosterTeamSeasonId) {
+      setManagedRosterPlayers([])
+      setAssignableAthletes([])
+      return
+    }
+
+    setRosterLoading(true)
+    setRosterMsg(null)
+
+    try {
+      const supabase = createClient()
+
+      const [rosterResult, assignableResult] = await Promise.all([
+        supabase
+          .from('players')
+          .select('id, athlete_id, name, jersey_number, position')
+          .eq('team_season_id', rosterTeamSeasonId)
+          .order('name', { ascending: true }),
+
+        getAssignableAthletes(rosterTeamSeasonId),
+      ])
+
+      if (rosterResult.error) {
+        throw new Error(rosterResult.error.message)
+      }
+
+      if (!assignableResult.ok) {
+        throw new Error(assignableResult.error)
+      }
+
+      setManagedRosterPlayers(
+        (rosterResult.data ?? []) as ManagedRosterPlayer[]
+      )
+      setAssignableAthletes(assignableResult.athletes)
+    } catch (err) {
+      setManagedRosterPlayers([])
+      setAssignableAthletes([])
+      setRosterMsg(
+        `Error: ${
+          err instanceof Error ? err.message : 'Failed to load roster.'
+        }`
+      )
+    } finally {
+      setRosterLoading(false)
+    }
+  }
+
+  const submitNewAthlete = async () => {
+  if (!rosterTeamSeasonId || rosterSaving) return
+
+  const displayName = newAthleteName.trim()
+
+  if (!displayName) {
+    setRosterMsg('Error: Enter the player name.')
+    return
+  }
+
+  setRosterSaving(true)
+  setRosterMsg(null)
+
+  const result = await createAthleteRosterAssignment({
+    teamSeasonId: rosterTeamSeasonId,
+    displayName,
+    jerseyNumber: newAthleteJersey,
+    position: newAthletePosition,
+  })
+
+  if (result.ok) {
+    setNewAthleteName('')
+    setNewAthleteJersey('')
+    setNewAthletePosition('')
+    setRosterMsg('Player added to the current-season roster.')
+    await loadManagedRoster()
+  } else {
+    setRosterMsg(`Error: ${result.error}`)
+  }
+
+  setRosterSaving(false)
+}
+
+const selectExistingAthlete = (athleteId: string) => {
+  setExistingAthleteId(athleteId)
+
+  const selected = assignableAthletes.find(
+    athlete => athlete.id === athleteId
+  )
+
+  setExistingAthleteJersey(selected?.previousJerseyNumber ?? '')
+  setExistingAthletePosition(selected?.previousPosition ?? '')
+}
+
+const submitExistingAthlete = async () => {
+  if (!rosterTeamSeasonId || rosterSaving) return
+
+  if (!existingAthleteId) {
+    setRosterMsg('Error: Select an existing athlete.')
+    return
+  }
+
+  setRosterSaving(true)
+  setRosterMsg(null)
+
+  const result = await assignExistingAthleteToTeamSeason({
+    athleteId: existingAthleteId,
+    teamSeasonId: rosterTeamSeasonId,
+    jerseyNumber: existingAthleteJersey,
+    position: existingAthletePosition,
+  })
+
+  if (result.ok) {
+    setExistingAthleteId('')
+    setExistingAthleteJersey('')
+    setExistingAthletePosition('')
+    setRosterMsg('Existing athlete added to the current-season roster.')
+    await loadManagedRoster()
+  } else {
+    setRosterMsg(`Error: ${result.error}`)
+  }
+
+  setRosterSaving(false)
+}
+
   const allAdminTabs = [
   { key: 'dashboard', label: 'Dashboard' },
+  { key: 'roster', label: 'Roster' },
   { key: 'pending', label: 'Pending' },
   { key: 'members', label: 'Members' },
   { key: 'status', label: 'Status' },
@@ -1668,7 +1849,7 @@ const deleteLeagueGame = async () => {
   { key: 'settings', label: 'Settings' },
 ] as const
 
-const teamAdminAllowedTabs: Tab[] = ['dashboard', 'status', 'score', 'stats', 'events']
+const teamAdminAllowedTabs: Tab[] = ['dashboard', 'roster', 'status', 'score', 'stats', 'events']
 
 const visibleAdminTabs = isOrgAdmin
   ? allAdminTabs
@@ -1706,7 +1887,15 @@ const visibleAdminTabs = isOrgAdmin
         </div>
       </div>
 
-      <div className={`mx-auto px-4 pt-4 space-y-4 ${tab === 'stats' ? 'max-w-3xl' : 'max-w-sm'}`}>
+      <div
+        className={`mx-auto px-4 pt-4 space-y-4 ${
+          tab === 'stats'
+            ? 'max-w-3xl'
+            : tab === 'roster'
+              ? 'max-w-xl'
+              : 'max-w-sm'
+        }`}
+      >
 
         {/* ── Settings Tab ─────────────────────────────────────────────── */}
         {tab === 'settings' && isOrgAdmin && (
@@ -2350,6 +2539,7 @@ const visibleAdminTabs = isOrgAdmin
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Set Status', nextTab: 'status' as Tab },
+                  { label: 'Manage Roster', nextTab: 'roster' as Tab },
                   { label: 'Enter Score', nextTab: 'score' as Tab },
                   { label: 'Manage Events', nextTab: 'events' as Tab },
                   { label: 'Enter Stats', nextTab: 'stats' as Tab },
@@ -2422,7 +2612,7 @@ const visibleAdminTabs = isOrgAdmin
 
                       <button
                         type="button"
-                        onClick={() => window.location.href = '/team'}
+                        onClick={() => setTab('roster')}
                         className="text-xs font-bold text-amber-300"
                       >
                         Fix →
@@ -2438,7 +2628,7 @@ const visibleAdminTabs = isOrgAdmin
 
                       <button
                         type="button"
-                        onClick={() => window.location.href = '/team'}
+                        onClick={() => setTab('roster')}
                         className="text-xs font-bold text-amber-300"
                       >
                         Fix →
@@ -2458,6 +2648,278 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Roster Tab ─────────────────────────────────────────────────── */}
+        {tab === 'roster' && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+                style={{ color: brandColor }}
+              >
+                Roster Management
+              </p>
+
+              <h2 className="mt-1 text-lg font-extrabold text-white">
+                {currentTeam.label}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-400">
+                {currentRosterSeason?.name ?? 'Current season'}
+              </p>
+            </div>
+
+            {(rosterSeasonsLoading || rosterTeamSeasonLoading) && (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <p className="text-sm text-slate-400">Loading roster…</p>
+              </div>
+            )}
+
+            {!rosterSeasonsLoading &&
+              !rosterTeamSeasonLoading &&
+              (rosterTeamSeasonNotFound || !rosterTeamSeasonId) && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+                  <p className="font-bold text-amber-300">
+                    Team is not configured for the current season.
+                  </p>
+                  <p className="mt-1 text-sm text-amber-200/70">
+                    An organization admin must create the team-season before this
+                    roster can be managed.
+                  </p>
+                </div>
+              )}
+
+            {!rosterSeasonsLoading &&
+              !rosterTeamSeasonLoading &&
+              rosterTeamSeasonId && (
+                <>
+                  {rosterMsg && (
+                    <div
+                      className={
+                        rosterMsg.startsWith('Error:')
+                          ? 'rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300'
+                          : 'rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300'
+                      }
+                    >
+                      {rosterMsg}
+                    </div>
+                  )}
+
+                  {/* Current roster */}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-extrabold text-white">Current Roster</h3>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {currentRosterSeason?.name ?? 'Current season'}
+                        </p>
+                      </div>
+
+                      <span className="text-sm font-bold text-slate-300">
+                        {managedRosterPlayers.length}{' '}
+                        {managedRosterPlayers.length === 1 ? 'player' : 'players'}
+                      </span>
+                    </div>
+
+                    {rosterLoading ? (
+                      <p className="mt-4 text-sm text-slate-400">Loading roster…</p>
+                    ) : managedRosterPlayers.length === 0 ? (
+                      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4 text-center">
+                        <p className="text-sm text-slate-400">
+                          No players are assigned to this season yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-2">
+                        {managedRosterPlayers.map(player => (
+                          <div
+                            key={player.id}
+                            className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+                          >
+                            <div
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-white"
+                              style={{ backgroundColor: brandColor }}
+                            >
+                              {player.jersey_number || '—'}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold text-white">
+                                {player.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                {player.position || 'No position entered'}
+                              </p>
+                            </div>
+
+                            {!player.athlete_id && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                                Identity missing
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* New athlete */}
+                    <form
+                      onSubmit={event => {
+                        event.preventDefault()
+                        void submitNewAthlete()
+                      }}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                    >
+                      <h3 className="font-extrabold text-white">Add New Athlete</h3>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Creates a permanent athlete and adds them to this season.
+                      </p>
+
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-400">
+                            Player name
+                          </label>
+                          <input
+                            type="text"
+                            value={newAthleteName}
+                            onChange={event => setNewAthleteName(event.target.value)}
+                            placeholder="First and last name"
+                            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-400">
+                            Jersey number
+                          </label>
+                          <input
+                            type="text"
+                            value={newAthleteJersey}
+                            onChange={event => setNewAthleteJersey(event.target.value)}
+                            placeholder="Optional"
+                            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-400">
+                            Position
+                          </label>
+                          <input
+                            type="text"
+                            value={newAthletePosition}
+                            onChange={event => setNewAthletePosition(event.target.value)}
+                            placeholder="Optional"
+                            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={rosterSaving}
+                          className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          {rosterSaving ? 'Saving…' : 'Add New Athlete'}
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Existing athlete */}
+                    <form
+                      onSubmit={event => {
+                        event.preventDefault()
+                        void submitExistingAthlete()
+                      }}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-5"
+                    >
+                      <h3 className="font-extrabold text-white">Add Existing Athlete</h3>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Adds a returning athlete without creating a duplicate identity.
+                      </p>
+
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-400">
+                            Athlete
+                          </label>
+                          <select
+                            value={existingAthleteId}
+                            onChange={event => selectExistingAthlete(event.target.value)}
+                            disabled={assignableAthletes.length === 0}
+                            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none disabled:opacity-50"
+                          >
+                            <option value="" className="bg-slate-950">
+                              {assignableAthletes.length === 0
+                                ? 'No eligible athletes'
+                                : 'Select an athlete'}
+                            </option>
+
+                            {assignableAthletes.map(athlete => (
+                              <option
+                                key={athlete.id}
+                                value={athlete.id}
+                                className="bg-slate-950"
+                              >
+                                {athlete.displayName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-400">
+                            Jersey number
+                          </label>
+                          <input
+                            type="text"
+                            value={existingAthleteJersey}
+                            onChange={event =>
+                              setExistingAthleteJersey(event.target.value)
+                            }
+                            placeholder="Optional"
+                            disabled={!existingAthleteId}
+                            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400 disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-slate-400">
+                            Position
+                          </label>
+                          <input
+                            type="text"
+                            value={existingAthletePosition}
+                            onChange={event =>
+                              setExistingAthletePosition(event.target.value)
+                            }
+                            placeholder="Optional"
+                            disabled={!existingAthleteId}
+                            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400 disabled:opacity-50"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={rosterSaving || !existingAthleteId}
+                          className="w-full rounded-xl border py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
+                          style={{
+                            borderColor: brandColor,
+                            color: brandColor,
+                          }}
+                        >
+                          {rosterSaving ? 'Saving…' : 'Add Existing Athlete'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </>
+              )}
           </div>
         )}
 
