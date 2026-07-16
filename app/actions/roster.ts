@@ -22,6 +22,17 @@ export type RosterWriteResult =
       error: string
     }
 
+export type RosterStatusWriteResult =
+  | {
+      ok: true
+      playerId: string
+      rosterStatus: 'active' | 'inactive'
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type AssignableAthletesResult =
   | {
       ok: true
@@ -105,6 +116,51 @@ async function requireRosterAccess(
       teamId: teamSeason.team_id,
       isOrgAdmin: Boolean(isOrgAdmin),
     },
+  }
+}
+
+async function requirePlayerRosterAccess(
+  playerId: string
+): Promise<
+  | {
+      ok: true
+      teamSeasonId: string
+    }
+  | {
+      ok: false
+      error: string
+    }
+> {
+  const normalizedPlayerId = playerId.trim()
+
+  if (!normalizedPlayerId) {
+    return { ok: false, error: 'Missing roster assignment' }
+  }
+
+  const supabase = await createClient()
+
+  const { data: player, error: playerError } = await supabase
+    .from('players')
+    .select('team_season_id')
+    .eq('id', normalizedPlayerId)
+    .single()
+
+  if (playerError || !player?.team_season_id) {
+    return {
+      ok: false,
+      error: playerError?.message || 'Roster assignment not found',
+    }
+  }
+
+  const access = await requireRosterAccess(player.team_season_id)
+
+  if (!access.ok) {
+    return access
+  }
+
+  return {
+    ok: true,
+    teamSeasonId: player.team_season_id,
   }
 }
 
@@ -334,4 +390,97 @@ export async function getAssignableAthletes(
     })
 
   return { ok: true, athletes }
+}
+
+export async function removePlayerFromRoster(input: {
+  playerId: string
+  reason?: string
+}): Promise<RosterStatusWriteResult> {
+  const playerId = input.playerId.trim()
+  const reason = input.reason?.trim() || null
+
+  const access = await requirePlayerRosterAccess(playerId)
+
+  if (!access.ok) {
+    return access
+  }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc(
+    'remove_player_from_roster',
+    {
+      p_player_id: playerId,
+      p_reason: reason,
+    }
+  )
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  const updated = Array.isArray(data) ? data[0] : data
+
+  if (
+    !updated?.result_player_id ||
+    updated.result_roster_status !== 'inactive'
+  ) {
+    return {
+      ok: false,
+      error: 'Updated roster assignment was not returned',
+    }
+  }
+
+  refreshRosterPaths()
+
+  return {
+    ok: true,
+    playerId: updated.result_player_id,
+    rosterStatus: 'inactive',
+  }
+}
+
+export async function restorePlayerToRoster(
+  playerId: string
+): Promise<RosterStatusWriteResult> {
+  const normalizedPlayerId = playerId.trim()
+
+  const access = await requirePlayerRosterAccess(normalizedPlayerId)
+
+  if (!access.ok) {
+    return access
+  }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc(
+    'restore_player_to_roster',
+    {
+      p_player_id: normalizedPlayerId,
+    }
+  )
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  const updated = Array.isArray(data) ? data[0] : data
+
+  if (
+    !updated?.result_player_id ||
+    updated.result_roster_status !== 'active'
+  ) {
+    return {
+      ok: false,
+      error: 'Restored roster assignment was not returned',
+    }
+  }
+
+  refreshRosterPaths()
+
+  return {
+    ok: true,
+    playerId: updated.result_player_id,
+    rosterStatus: 'active',
+  }
 }
