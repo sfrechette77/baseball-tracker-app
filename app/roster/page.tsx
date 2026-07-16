@@ -55,10 +55,12 @@ export default function RosterPage() {
           return
         }
         const supabase = createClient()
-        const { data } = await supabase
-          .from('players')
-          .select('id, name, jersey_number, position')
-          .eq('team_season_id', teamSeasonId)
+       const { data, error } = await supabase
+        .from('players')
+        .select('id, name, jersey_number, position')
+        .eq('team_season_id', teamSeasonId)
+        .eq('roster_status', 'active')
+        .order('name', { ascending: true })
         setPlayers((data ?? []) as Player[])
       } catch (err) {
         console.error(err)

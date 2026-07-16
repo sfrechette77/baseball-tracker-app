@@ -16,6 +16,8 @@ import {
   createAthleteRosterAssignment,
   assignExistingAthleteToTeamSeason,
   getAssignableAthletes,
+  removePlayerFromRoster,
+  restorePlayerToRoster,
   type AssignableAthlete,
 } from '@/app/actions/roster'
 
@@ -53,6 +55,9 @@ type ManagedRosterPlayer = {
   name: string
   jersey_number: string | null
   position: string | null
+  roster_status: 'active' | 'inactive'
+  removed_at: string | null
+  removed_reason: string | null
 }
 
 type StatRow = {
@@ -206,6 +211,9 @@ export default function AdminPage() {
 
   const currentRosterSeason =
     rosterSeasons.find(season => season.id === currentSeasonId) ?? null
+
+  const [rosterStatusSavingId, setRosterStatusSavingId] =
+    useState<string | null>(null)
 
   const { membership, loading: orgLoading } = useActiveOrg()
   const isOrgAdmin = membership?.role === 'org_admin'
@@ -1728,7 +1736,7 @@ const deleteLeagueGame = async () => {
       const [rosterResult, assignableResult] = await Promise.all([
         supabase
           .from('players')
-          .select('id, athlete_id, name, jersey_number, position')
+          .select('id, athlete_id, name, jersey_number, position,  roster_status, removed_at, removed_reason')
           .eq('team_season_id', rosterTeamSeasonId)
           .order('name', { ascending: true }),
 
@@ -1834,6 +1842,59 @@ const submitExistingAthlete = async () => {
 
   setRosterSaving(false)
 }
+
+  const removeManagedPlayer = async (player: ManagedRosterPlayer) => {
+    if (rosterStatusSavingId) return
+
+    const confirmed = window.confirm(
+      `Remove ${player.name} from this season's active roster?\n\n` +
+        'Their athlete identity, statistics, and season history will be preserved.'
+    )
+
+    if (!confirmed) return
+
+    setRosterStatusSavingId(player.id)
+    setRosterMsg(null)
+
+    const result = await removePlayerFromRoster({
+      playerId: player.id,
+    })
+
+    if (result.ok) {
+      setRosterMsg(`${player.name} was removed from the active roster.`)
+      await loadManagedRoster()
+    } else {
+      setRosterMsg(`Error: ${result.error}`)
+    }
+
+    setRosterStatusSavingId(null)
+  }
+
+  const restoreManagedPlayer = async (player: ManagedRosterPlayer) => {
+    if (rosterStatusSavingId) return
+
+    setRosterStatusSavingId(player.id)
+    setRosterMsg(null)
+
+    const result = await restorePlayerToRoster(player.id)
+
+    if (result.ok) {
+      setRosterMsg(`${player.name} was restored to the active roster.`)
+      await loadManagedRoster()
+    } else {
+      setRosterMsg(`Error: ${result.error}`)
+    }
+
+    setRosterStatusSavingId(null)
+  }
+
+  const activeRosterPlayers = managedRosterPlayers.filter(
+    player => player.roster_status === 'active'
+  )
+
+  const inactiveRosterPlayers = managedRosterPlayers.filter(
+    player => player.roster_status === 'inactive'
+  )
 
   const allAdminTabs = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -2718,14 +2779,14 @@ const visibleAdminTabs = isOrgAdmin
                       </div>
 
                       <span className="text-sm font-bold text-slate-300">
-                        {managedRosterPlayers.length}{' '}
-                        {managedRosterPlayers.length === 1 ? 'player' : 'players'}
+                        {activeRosterPlayers.length}{' '}
+                        {activeRosterPlayers.length === 1 ? 'player' : 'players'}
                       </span>
                     </div>
 
                     {rosterLoading ? (
                       <p className="mt-4 text-sm text-slate-400">Loading roster…</p>
-                    ) : managedRosterPlayers.length === 0 ? (
+                    ) : activeRosterPlayers.length === 0 ? (
                       <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4 text-center">
                         <p className="text-sm text-slate-400">
                           No players are assigned to this season yet.
@@ -2733,7 +2794,7 @@ const visibleAdminTabs = isOrgAdmin
                       </div>
                     ) : (
                       <div className="mt-4 space-y-2">
-                        {managedRosterPlayers.map(player => (
+                        {activeRosterPlayers.map(player => (
                           <div
                             key={player.id}
                             className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
@@ -2759,11 +2820,82 @@ const visibleAdminTabs = isOrgAdmin
                                 Identity missing
                               </span>
                             )}
+
+                          <button
+                            type="button"
+                            onClick={() => void removeManagedPlayer(player)}
+                            disabled={rosterStatusSavingId !== null}
+                            className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {rosterStatusSavingId === player.id ? 'Removing…' : 'Remove'}
+                          </button>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
+
+                  {inactiveRosterPlayers.length > 0 && (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="font-extrabold text-white">Inactive Players</h3>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Removed from this season&apos;s active roster. History and statistics
+                            are preserved.
+                          </p>
+                        </div>
+
+                        <span className="text-sm font-bold text-slate-300">
+                          {inactiveRosterPlayers.length}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        {inactiveRosterPlayers.map(player => (
+                          <div
+                            key={player.id}
+                            className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+                          >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-extrabold text-slate-400">
+                              {player.jersey_number || '—'}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold text-slate-300">
+                                {player.name}
+                              </p>
+
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {player.position || 'No position entered'}
+                              </p>
+
+                              {player.removed_reason && (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Reason: {player.removed_reason}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => void restoreManagedPlayer(player)}
+                              disabled={rosterStatusSavingId !== null}
+                              className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                              style={{
+                                borderColor: brandColor,
+                                color: brandColor,
+                              }}
+                            >
+                              {rosterStatusSavingId === player.id
+                                ? 'Restoring…'
+                                : 'Restore'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid gap-4 md:grid-cols-2">
                     {/* New athlete */}

@@ -198,6 +198,7 @@ function TeamPageInner() {
       .from('players')
       .select('id', { count: 'exact', head: true })
       .eq('team_season_id', teamSeasonId)
+      .eq('roster_status', 'active')
 
     setOverviewPlayerCount(count ?? 0)
   }
@@ -776,10 +777,17 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
           return
         }
         const supabase = createClient()
-        const { data } = await supabase
-          .from('players')
-          .select('id, name, jersey_number, position')
-          .eq('team_season_id', teamSeasonId)
+       const { data, error } = await supabase
+        .from('players')
+        .select('id, name, jersey_number, position')
+        .eq('team_season_id', teamSeasonId)
+        .eq('roster_status', 'active')
+
+      if (error) {
+        console.error('Failed to load active roster:', error)
+        setPlayers([])
+        return
+      }
         setPlayers((data ?? []) as Player[])
       } catch (err) {
         console.error(err)
