@@ -732,11 +732,34 @@ export default function AdminPage() {
     if (!password) return
     const load = async () => {
       const supabase = createClient()
-      const [{ data: playersData }, { data: standingsData }, { data: fieldsData }] = await Promise.all([
-        supabase.from('players').select('id, name, jersey_number').eq('team_id', currentTeam.id).order('jersey_number', { ascending: true }),
-        supabase.from('standings').select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against'),
-        supabase.from('fields').select('id, name').order('name', { ascending: true }),
+      const [
+        { data: playersData },
+        { data: standingsData },
+        { data: fieldsData }
+      ] = await Promise.all([
+        rosterTeamSeasonId
+          ? supabase
+              .from('players')
+              .select('id, name, jersey_number')
+              .eq('team_season_id', rosterTeamSeasonId)
+              .eq('roster_status', 'active')
+              .order('jersey_number', { ascending: true })
+          : Promise.resolve({
+              data: [] as Player[],
+              error: null,
+            }),
+
+        supabase
+        .from('standings')
+        .select(
+          'id, team_name, games_played, wins, losses, ties, runs_for, runs_against'
+        ),
+        supabase
+          .from('fields')
+          .select('id, name')
+          .order('name', { ascending: true }),
       ])
+
       setPlayers((playersData ?? []) as Player[])
       const s = (standingsData ?? []) as Standing[]
       setStandings(s)
@@ -748,7 +771,7 @@ export default function AdminPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password, currentTeam?.id])
+  }, [password, currentTeam?.id, rosterTeamSeasonId])
   
     useEffect(() => {
     if (!password || tab !== 'dashboard') return
@@ -855,11 +878,17 @@ export default function AdminPage() {
       .order('starts_at', { ascending: true })
       .limit(1)
 
-    const { data: playersData, error: playersError } = await supabase
-      .from('players')
-      .select('id, name, jersey_number, position')
-      .eq('team_id', currentTeam.id)
-      .order('name', { ascending: true })
+    const { data: playersData, error: playersError } = rosterTeamSeasonId
+      ? await supabase
+          .from('players')
+          .select('id, name, jersey_number, position')
+          .eq('team_season_id', rosterTeamSeasonId)
+          .eq('roster_status', 'active')
+          .order('name', { ascending: true })
+      : {
+          data: [],
+          error: null,
+        }
 
     if (eventsError || playersError) {
       setTeamDashboardMsg(
