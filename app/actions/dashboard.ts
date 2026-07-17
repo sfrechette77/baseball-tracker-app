@@ -64,50 +64,135 @@ export async function getDashboardPlayerCount(): Promise<
   if (!guard.ok) return { ok: false, error: guard.error }
 
   const { count, error } = await supabase
-    .from('players')
-    .select('id', { count: 'exact', head: true })
-    .eq('organization_id', guard.membership.organization_id)
-
-  if (error) return { ok: false, error: error.message }
+  .from('athletes')
+  .select('id', { count: 'exact', head: true })
+  .eq('organization_id', guard.membership.organization_id)
+  .is('archived_at', null)
 
   return { ok: true, playerCount: count ?? 0 }
 }
 
 export async function getDashboardTeamHealthCounts(): Promise<
-  { ok: true; counts: DashboardTeamHealthCounts[] } | { ok: false; error: string }
+  { ok: true; counts: DashboardTeamHealthCounts[] } |
+  { ok: false; error: string }
 > {
   const supabase = await createClient()
   const guard = await requireOrgAdmin()
-  if (!guard.ok) return { ok: false, error: guard.error }
 
-  const { data: teams, error: teamsError } = await supabase
-    .from('teams')
-    .select('id')
-    .eq('organization_id', guard.membership.organization_id)
+  if (!guard.ok) {
+    return { ok: false, error: guard.error }
+  }
 
-  if (teamsError) return { ok: false, error: teamsError.message }
+  const organizationId = guard.membership.organization_id
 
-  const teamIds = (teams ?? []).map(t => t.id)
-  if (teamIds.length === 0) return { ok: true, counts: [] }
-
-  const [{ data: players, error: playersError }, { data: parentTeams, error: parentTeamsError }] = await Promise.all([
+  const [
+    { data: teams, error: teamsError },
+    { data: currentSeason, error: currentSeasonError },
+  ] = await Promise.all([
     supabase
-      .from('players')
-      .select('id, team_id')
-      .in('team_id', teamIds),
+      .from('teams')
+      .select('id')
+      .eq('organization_id', organizationId),
+
     supabase
-      .from('parent_teams')
-      .select('membership_id, team_id, memberships!inner(status, role, organization_id)')
-      .in('team_id', teamIds)
-      .eq('memberships.organization_id', guard.membership.organization_id)
-      .eq('memberships.role', 'parent')
-      .eq('memberships.status', 'approved'),
+      .from('seasons')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('is_current', true)
+      .limit(1)
+      .maybeSingle(),
   ])
 
-  if (playersError) return { ok: false, error: playersError.message }
-  if (parentTeamsError) return { ok: false, error: parentTeamsError.message }
+  if (teamsError) {
+    return { ok: false, error: teamsError.message }
+  }
 
-  const countsByTeamId: Record<string, DashboardTeamHealthCounts> = {}
+  if (currentSeasonError) {
+    return { ok: false, error: currentSeasonError.message }
+  }
+
+  const teamIds = (teams ?? []).map(
+  (team: { id: string }) => team.id
+)
+
+  if (teamIds.length === 0) {
+    return { ok: true, counts: [] }
+  }
+
+  const { data: parentTeams, error: parentTeamsError } = await supabase
+    .from('parent_teams')
+    .select(
+      'membership_id, team_id, memberships!inner(status, role, organization_id)'
+    )
+    .in('team_id', teamIds)
+    .eq('memberships.organization_id', organizationId)
+    .eq('memberships.role', 'parent')
+    .eq('memberships.status', 'approved')
+
+  if (parentTeamsError) {
+    return { ok: false, error: parentTeamsError.message }
+  }
+
+  let activePlayers: Array<{
+    id: string
+    team_id: string
+  }> = []
+
+  if (currentSeason?.id) {
+    const { data: teamSeasons, error: teamSeasonsError } = await supabase
+      .from('team_seasons')
+      .select('id, team_id')
+      .eq('organization_id', organizationId)
+      .eq('season_id', currentSeason.id)
+      .in('team_id', teamIds)
+
+    if (teamSeasonsError) {
+      return { ok: false, error: teamSeasonsError.message }
+    }
+
+    const teamSeasonIds = (teamSeasons ?? []).map(
+      (teamSeason: { id: string; team_id: string }) => teamSeason.id
+    )
+
+    if (teamSeasonIds.length > 0) {
+      const { data: playerRows, error: playersError } = await supabase
+        .from('players')
+        .select('id, team_season_id')
+        .in('team_season_id', teamSeasonIds)
+        .eq('roster_status', 'active')
+
+      if (playersError) {
+        return { ok: false, error: playersError.message }
+      }
+
+      const teamIdByTeamSeasonId = new Map<string, string>(
+        (teamSeasons ?? []).map(
+          (teamSeason: { id: string; team_id: string }) => [
+            teamSeason.id,
+            teamSeason.team_id,
+          ]
+        )
+      )
+
+      activePlayers = (playerRows ?? []).flatMap(player => {
+        const teamId = teamIdByTeamSeasonId.get(player.team_season_id)
+
+        return teamId
+          ? [
+              {
+                id: player.id,
+                team_id: teamId,
+              },
+            ]
+          : []
+      })
+    }
+  }
+
+  const countsByTeamId: Record<
+    string,
+    DashboardTeamHealthCounts
+  > = {}
 
   for (const teamId of teamIds) {
     countsByTeamId[teamId] = {
@@ -117,17 +202,26 @@ export async function getDashboardTeamHealthCounts(): Promise<
     }
   }
 
-  for (const player of players ?? []) {
-    if (!countsByTeamId[player.team_id]) continue
-    countsByTeamId[player.team_id].player_count += 1
+  for (const player of activePlayers) {
+    const counts = countsByTeamId[player.team_id]
+
+    if (!counts) continue
+
+    counts.player_count += 1
   }
 
   for (const parentTeam of parentTeams ?? []) {
-    if (!countsByTeamId[parentTeam.team_id]) continue
-    countsByTeamId[parentTeam.team_id].family_count += 1
+    const counts = countsByTeamId[parentTeam.team_id]
+
+    if (!counts) continue
+
+    counts.family_count += 1
   }
 
-  return { ok: true, counts: Object.values(countsByTeamId) }
+  return {
+    ok: true,
+    counts: Object.values(countsByTeamId),
+  }
 }
 
 export async function getDashboardThisWeek(): Promise<
