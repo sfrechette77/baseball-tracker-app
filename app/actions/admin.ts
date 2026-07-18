@@ -209,13 +209,36 @@ export async function approveMembership(
 
 // ─── Types (Members) ───────────────────────────────────────────────────────
 
+export type GuardianAthleteAssignment = {
+  id: string
+  display_name: string
+  status: string
+  relationship: string | null
+  is_primary: boolean
+}
+
+export type OrganizationAthleteOption = {
+  id: string
+  display_name: string
+  status: string
+}
+
 export type ApprovedParent = {
-  id: string           // membership id
+  id: string
   user_id: string
+  role: 'parent' | 'team_admin'
   full_name: string | null
   email: string | null
-  teams: { id: string; name: string; is_default: boolean }[]
-  team_admin_teams: { id: string; name: string }[]
+  teams: {
+    id: string
+    name: string
+    is_default: boolean
+  }[]
+  team_admin_teams: {
+    id: string
+    name: string
+  }[]
+  athletes: GuardianAthleteAssignment[]
   created_at: string
 }
 
@@ -256,6 +279,40 @@ export async function getApprovedParents(): Promise<
     .eq('status', 'approved')
     .in('user_id', userIds),
 ])
+
+const parentMembershipIds = memberships
+  .filter(membership => membership.role === 'parent')
+  .map(membership => membership.id)
+
+const {
+  data: guardianAthleteRows,
+  error: guardianAthletesError,
+} = parentMembershipIds.length > 0
+  ? await supabase
+      .from('guardian_athletes')
+      .select(`
+        membership_id,
+        athlete_id,
+        relationship,
+        is_primary,
+        athletes!inner (
+          id,
+          display_name,
+          status
+        )
+      `)
+      .in('membership_id', parentMembershipIds)
+  : {
+      data: [],
+      error: null,
+    }
+
+if (guardianAthletesError) {
+  return {
+    ok: false,
+    error: guardianAthletesError.message,
+  }
+}
 
   const profileById: Record<string, { full_name: string | null; email: string | null }> = {}
   for (const p of profiles ?? []) {
@@ -307,13 +364,48 @@ export async function getApprovedParents(): Promise<
     }
   }
 
+  const athletesByMembership: Record<
+    string,
+    GuardianAthleteAssignment[]
+  > = {}
+
+  for (const row of guardianAthleteRows ?? []) {
+    const athlete = row.athletes as unknown as {
+      id: string
+      display_name: string
+      status: string
+    }
+
+    if (!athlete || athlete.status === 'archived') continue
+
+    if (!athletesByMembership[row.membership_id]) {
+      athletesByMembership[row.membership_id] = []
+    }
+
+    athletesByMembership[row.membership_id].push({
+      id: athlete.id,
+      display_name: athlete.display_name,
+      status: athlete.status,
+      relationship: row.relationship,
+      is_primary: row.is_primary,
+    })
+  }
+
+  for (const assignments of Object.values(athletesByMembership)) {
+    assignments.sort((a, b) =>
+      a.display_name.localeCompare(b.display_name)
+    )
+  }
+
   const members: ApprovedParent[] = memberships.map(m => ({
     id: m.id,
     user_id: m.user_id,
+    role: m.role as 'parent' | 'team_admin',
     full_name: profileById[m.user_id]?.full_name ?? null,
     email: profileById[m.user_id]?.email ?? null,
     teams: teamsByMembership[m.id] ?? [],
     team_admin_teams: teamAdminTeamsByUserId[m.user_id] ?? [],
+    athletes: athletesByMembership[m.id] ?? [],
     created_at: m.created_at,
   }))
 

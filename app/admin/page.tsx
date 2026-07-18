@@ -3303,7 +3303,18 @@ const visibleAdminTabs = isOrgAdmin
                   return (
                     <div key={m.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div>
-                        <p className="text-sm font-bold text-white">{m.full_name || m.email || '(no name)'}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-white">
+                              {m.full_name || m.email || '(no name)'}
+                            </p>
+                            <p className="truncate text-xs text-slate-400">{m.email}</p>
+                          </div>
+
+                          <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                            {m.role === 'parent' ? 'Parent' : 'Team Admin'}
+                          </span>
+                        </div>
                         <p className="text-xs text-slate-400">{m.email}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           {m.teams.length === 0
