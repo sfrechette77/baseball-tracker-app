@@ -33,6 +33,20 @@ export type RosterStatusWriteResult =
       error: string
     }
 
+export type RosterEditResult =
+  | {
+      ok: true
+      playerId: string
+      athleteId: string
+      displayName: string
+      jerseyNumber: string | null
+      position: string | null
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type AssignableAthletesResult =
   | {
       ok: true
@@ -390,6 +404,72 @@ export async function getAssignableAthletes(
     })
 
   return { ok: true, athletes }
+}
+
+export async function updateRosterAssignment(input: {
+  playerId: string
+  displayName: string
+  jerseyNumber?: string
+  position?: string
+}): Promise<RosterEditResult> {
+  const playerId = input.playerId.trim()
+  const displayName = input.displayName.trim()
+  const jerseyNumber = input.jerseyNumber?.trim() || null
+  const position = input.position?.trim() || null
+
+  if (!playerId) {
+    return { ok: false, error: 'Missing roster assignment' }
+  }
+
+  if (!displayName) {
+    return { ok: false, error: 'Player name is required' }
+  }
+
+  const access = await requirePlayerRosterAccess(playerId)
+
+  if (!access.ok) {
+    return access
+  }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc(
+    'update_roster_assignment',
+    {
+      p_player_id: playerId,
+      p_display_name: displayName,
+      p_jersey_number: jerseyNumber,
+      p_position: position,
+    }
+  )
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  const updated = Array.isArray(data) ? data[0] : data
+
+  if (
+    !updated?.result_player_id ||
+    !updated?.result_athlete_id ||
+    !updated?.result_display_name
+  ) {
+    return {
+      ok: false,
+      error: 'Updated roster assignment was not returned',
+    }
+  }
+
+  refreshRosterPaths()
+
+  return {
+    ok: true,
+    playerId: updated.result_player_id,
+    athleteId: updated.result_athlete_id,
+    displayName: updated.result_display_name,
+    jerseyNumber: updated.result_jersey_number ?? null,
+    position: updated.result_position ?? null,
+  }
 }
 
 export async function removePlayerFromRoster(input: {
