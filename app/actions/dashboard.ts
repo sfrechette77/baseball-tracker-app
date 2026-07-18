@@ -67,7 +67,6 @@ export async function getDashboardPlayerCount(): Promise<
   .from('athletes')
   .select('id', { count: 'exact', head: true })
   .eq('organization_id', guard.membership.organization_id)
-  .is('archived_at', null)
 
   return { ok: true, playerCount: count ?? 0 }
 }
