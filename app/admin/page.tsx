@@ -3,8 +3,30 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useCurrentTeam } from '@/components/team-context'
-import { getPendingMemberships, getOrgTeams, approveMembership, getApprovedParents, updateMemberTeams, removeMembership, makeMemberTeamAdmin, removeMemberTeamAdmin, grantTeamAdminByEmail, startNewSeason, getOrganizationLinks,  saveOrganizationLink, deleteOrganizationLink, getOrganizationLaunchReadiness, type OrganizationLaunchReadiness,} from '@/app/actions/admin'
-import type { PendingMembership, OrgTeam, ApprovedParent,  OrganizationLink, } from '@/app/actions/admin'
+import {
+  getPendingMemberships,
+  getOrgTeams,
+  approveMembership,
+  getApprovedParents,
+  updateMemberTeams,
+  removeMembership,
+  makeMemberTeamAdmin,
+  removeMemberTeamAdmin,
+  grantTeamAdminByEmail,
+  startNewSeason,
+  getOrganizationLinks,
+  saveOrganizationLink,
+  deleteOrganizationLink,
+  getOrganizationLaunchReadiness,
+  getOrganizationAthletes,
+  updateGuardianAthleteAssignments,
+  type PendingMembership,
+  type OrgTeam,
+  type ApprovedParent,
+  type OrganizationLink,
+  type OrganizationLaunchReadiness,
+  type OrganizationAthleteOption,
+} from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
@@ -688,6 +710,21 @@ export default function AdminPage() {
   const [grantAdminTeamIds, setGrantAdminTeamIds] = useState<Set<string>>(new Set())
   const [grantAdminSaving, setGrantAdminSaving] = useState(false)
 
+  const [organizationAthletes, setOrganizationAthletes] =
+    useState<OrganizationAthleteOption[]>([])
+
+  const [editingAthletesMemberId, setEditingAthletesMemberId] =
+    useState<string | null>(null)
+
+  const [memberAthleteIds, setMemberAthleteIds] =
+    useState<Set<string>>(new Set())
+
+  const [memberPrimaryAthleteId, setMemberPrimaryAthleteId] =
+    useState('')
+
+  const [memberAthletesSaving, setMemberAthletesSaving] =
+    useState(false)
+
   // Events tab
   const [allEvents, setAllEvents] = useState<EventListRow[]>([])
   const [fields, setFields] = useState<Field[]>([])
@@ -926,14 +963,109 @@ export default function AdminPage() {
 
   const reloadMembers = async () => {
     setMembersLoading(true)
-    const [membersResult, teamsResult] = await Promise.all([
+
+    const [
+      membersResult,
+      teamsResult,
+      athletesResult,
+    ] = await Promise.all([
       getApprovedParents(),
       getOrgTeams(),
+      getOrganizationAthletes(),
     ])
-    if (membersResult.ok) setMembersList(membersResult.members)
-    else setMembersMsg(`❌ ${membersResult.error}`)
-    if (teamsResult.ok) setOrgTeams(teamsResult.teams)
+
+    if (membersResult.ok) {
+      setMembersList(membersResult.members)
+    } else {
+      setMembersMsg(`Error: ${membersResult.error}`)
+    }
+
+    if (teamsResult.ok) {
+      setOrgTeams(teamsResult.teams)
+    } else {
+      setMembersMsg(`Error: ${teamsResult.error}`)
+    }
+
+    if (athletesResult.ok) {
+      setOrganizationAthletes(athletesResult.athletes)
+    } else {
+      setMembersMsg(`Error: ${athletesResult.error}`)
+    }
+
     setMembersLoading(false)
+  }
+
+  const startEditingMemberAthletes = (member: ApprovedParent) => {
+    setEditingAthletesMemberId(member.id)
+
+    setMemberAthleteIds(
+      new Set(member.athletes.map(athlete => athlete.id))
+    )
+
+    setMemberPrimaryAthleteId(
+      member.athletes.find(athlete => athlete.is_primary)?.id ?? ''
+    )
+
+    setEditingMemberId(null)
+    setRemovingMemberId(null)
+    setPromotingMemberId(null)
+    setMembersMsg(null)
+  }
+
+  const toggleMemberAthlete = (athleteId: string) => {
+    setMemberAthleteIds(previous => {
+      const next = new Set(previous)
+
+      if (next.has(athleteId)) {
+        next.delete(athleteId)
+
+        if (memberPrimaryAthleteId === athleteId) {
+          setMemberPrimaryAthleteId('')
+        }
+      } else {
+        next.add(athleteId)
+      }
+
+      return next
+    })
+  }
+
+  const cancelEditingMemberAthletes = () => {
+    setEditingAthletesMemberId(null)
+    setMemberAthleteIds(new Set())
+    setMemberPrimaryAthleteId('')
+    setMembersMsg(null)
+  }
+
+  const saveMemberAthletes = async () => {
+    if (!editingAthletesMemberId || memberAthletesSaving) return
+
+    setMemberAthletesSaving(true)
+    setMembersMsg(null)
+
+    const result = await updateGuardianAthleteAssignments({
+      membershipId: editingAthletesMemberId,
+      athleteIds: Array.from(memberAthleteIds),
+      primaryAthleteId: memberPrimaryAthleteId || null,
+    })
+
+    if (result.ok) {
+      setMembersMsg(
+        `${result.assignedCount} athlete${
+          result.assignedCount === 1 ? '' : 's'
+        } assigned.`
+      )
+
+      setEditingAthletesMemberId(null)
+      setMemberAthleteIds(new Set())
+      setMemberPrimaryAthleteId('')
+
+      await reloadMembers()
+    } else {
+      setMembersMsg(`Error: ${result.error}`)
+    }
+
+    setMemberAthletesSaving(false)
   }
 
   // Load approved parents when Members tab is active

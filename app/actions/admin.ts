@@ -412,6 +412,127 @@ if (guardianAthletesError) {
   return { ok: true, members }
 }
 
+export async function getOrganizationAthletes(): Promise<
+  | {
+      ok: true
+      athletes: OrganizationAthleteOption[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+
+  if (!guard.ok) {
+    return { ok: false, error: guard.error }
+  }
+
+  const { data, error } = await supabase
+    .from('athletes')
+    .select('id, display_name, status')
+    .eq('organization_id', guard.membership.organization_id)
+    .neq('status', 'archived')
+    .order('display_name', { ascending: true })
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  return {
+    ok: true,
+    athletes: (data ?? []) as OrganizationAthleteOption[],
+  }
+}
+
+export async function updateGuardianAthleteAssignments(input: {
+  membershipId: string
+  athleteIds: string[]
+  primaryAthleteId?: string | null
+}): Promise<
+  | {
+      ok: true
+      assignedCount: number
+    }
+  | {
+      ok: false
+      error: string
+    }
+> {
+  const membershipId = input.membershipId.trim()
+
+  const athleteIds = Array.from(
+    new Set(
+      input.athleteIds
+        .map(athleteId => athleteId.trim())
+        .filter(Boolean)
+    )
+  )
+
+  const primaryAthleteId =
+    input.primaryAthleteId?.trim() || null
+
+  if (!membershipId) {
+    return {
+      ok: false,
+      error: 'Missing parent membership',
+    }
+  }
+
+  if (
+    primaryAthleteId &&
+    !athleteIds.includes(primaryAthleteId)
+  ) {
+    return {
+      ok: false,
+      error: 'Primary athlete must be selected',
+    }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+
+  if (!guard.ok) {
+    return { ok: false, error: guard.error }
+  }
+
+  const { data, error } = await supabase.rpc(
+    'replace_guardian_athletes',
+    {
+      p_membership_id: membershipId,
+      p_athlete_ids: athleteIds,
+      p_primary_athlete_id: primaryAthleteId,
+    }
+  )
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message,
+    }
+  }
+
+  const result = Array.isArray(data) ? data[0] : data
+
+  if (
+    !result?.result_membership_id ||
+    typeof result.result_assigned_count !== 'number'
+  ) {
+    return {
+      ok: false,
+      error: 'Updated athlete assignments were not returned',
+    }
+  }
+
+  revalidatePath('/admin')
+
+  return {
+    ok: true,
+    assignedCount: result.result_assigned_count,
+  }
+}
+
 export async function makeMemberTeamAdmin(
   parentMembershipId: string,
   teamIds: string[]
