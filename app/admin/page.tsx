@@ -3431,6 +3431,7 @@ const visibleAdminTabs = isOrgAdmin
               <div className="space-y-2">
                 {membersList.map(m => {
                   const isEditing = editingMemberId === m.id
+                  const isEditingAthletes = editingAthletesMemberId === m.id
                   const isRemoving = removingMemberId === m.id
                   return (
                     <div key={m.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
@@ -3447,12 +3448,30 @@ const visibleAdminTabs = isOrgAdmin
                             {m.role === 'parent' ? 'Parent' : 'Team Admin'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400">{m.email}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           {m.teams.length === 0
                             ? 'No teams assigned'
                             : m.teams.map(t => t.is_default ? `${t.name} ★` : t.name).join(', ')}
                         </p>
+                        {m.role === 'parent' && (
+                          <div className="mt-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              Athletes
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-300">
+                              {m.athletes.length === 0
+                                ? 'No athletes linked'
+                                : m.athletes
+                                    .map(athlete =>
+                                      athlete.is_primary
+                                        ? `${athlete.display_name} ★`
+                                        : athlete.display_name
+                                    )
+                                    .join(', ')}
+                            </p>
+                          </div>
+                        )}
                         {m.team_admin_teams.length > 0 && (
                           <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
                             <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
@@ -3476,20 +3495,43 @@ const visibleAdminTabs = isOrgAdmin
                         )}
                       </div>
 
-                      {!isEditing && !isRemoving && (
-                        <div className="grid grid-cols-3 gap-2">
+                      {!isEditing && !isEditingAthletes && !isRemoving && (
+                        <div
+                          className={
+                            m.role === 'parent'
+                              ? 'grid grid-cols-2 gap-2'
+                              : 'grid grid-cols-3 gap-2'
+                          }
+                        >
                           <button
+                            type="button"
                             onClick={() => {
+                              setEditingAthletesMemberId(null)
                               setEditingMemberId(m.id)
                               setMemberTeamIds(new Set(m.teams.map(t => t.id)))
-                              setMemberDefaultTeamId(m.teams.find(t => t.is_default)?.id ?? m.teams[0]?.id ?? '')
+                              setMemberDefaultTeamId(
+                                m.teams.find(t => t.is_default)?.id ??
+                                  m.teams[0]?.id ??
+                                  ''
+                              )
                               setMembersMsg(null)
                             }}
-                            className="flex-1 rounded-xl bg-white/10 border border-white/10 py-2 text-xs font-bold text-white transition"
+                            className="rounded-xl border border-white/10 py-2 text-xs font-bold text-white transition hover:opacity-90"
                             style={{ backgroundColor: brandColor }}
                           >
                             Edit Teams
                           </button>
+
+                          {m.role === 'parent' && (
+                            <button
+                              type="button"
+                              onClick={() => startEditingMemberAthletes(m)}
+                              className="rounded-xl border border-white/10 py-2 text-xs font-bold text-white transition"
+                              style={{ backgroundColor: brandColor }}
+                            >
+                              Athletes
+                            </button>
+                          )}
 
                           <button
                             onClick={() => startPromoteMember(m)}
@@ -3505,6 +3547,110 @@ const visibleAdminTabs = isOrgAdmin
                           >
                             Remove
                           </button>
+                        </div>
+                      )}
+
+                      {isEditingAthletes && m.role === 'parent' && (
+                        <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                          <div>
+                            <p
+                              className="text-[10px] font-semibold uppercase tracking-wide"
+                              style={{ color: settingsPrimaryColor }}
+                            >
+                              Assign athletes
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-400">
+                              Select the athletes connected to this parent. The primary designation
+                              does not change team access.
+                            </p>
+                          </div>
+
+                          {organizationAthletes.length === 0 ? (
+                            <p className="text-xs text-amber-400">
+                              No organization athletes are available.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {organizationAthletes.map(athlete => {
+                                const checked = memberAthleteIds.has(athlete.id)
+                                const isPrimary =
+                                  memberPrimaryAthleteId === athlete.id
+
+                                return (
+                                  <div
+                                    key={athlete.id}
+                                    className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
+                                  >
+                                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleMemberAthlete(athlete.id)}
+                                        disabled={memberAthletesSaving}
+                                        className="h-4 w-4"
+                                      />
+
+                                      <span className="truncate text-sm text-white">
+                                        {athlete.display_name}
+                                      </span>
+                                    </label>
+
+                                    {checked && (
+                                      <label className="flex cursor-pointer items-center gap-1 text-xs">
+                                        <input
+                                          type="radio"
+                                          name={`primary-athlete-${m.id}`}
+                                          checked={isPrimary}
+                                          onChange={() =>
+                                            setMemberPrimaryAthleteId(athlete.id)
+                                          }
+                                          disabled={memberAthletesSaving}
+                                          className="h-3 w-3"
+                                        />
+
+                                        <span
+                                          className={
+                                            isPrimary
+                                              ? 'font-semibold'
+                                              : 'text-slate-500'
+                                          }
+                                          style={
+                                            isPrimary
+                                              ? { color: settingsPrimaryColor }
+                                              : undefined
+                                          }
+                                        >
+                                          Primary
+                                        </span>
+                                      </label>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => void saveMemberAthletes()}
+                              disabled={memberAthletesSaving}
+                              className="flex-1 rounded-xl py-2 text-sm font-bold text-white transition disabled:opacity-50"
+                              style={{ backgroundColor: settingsPrimaryColor }}
+                            >
+                              {memberAthletesSaving ? 'Saving…' : 'Save Athletes'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={cancelEditingMemberAthletes}
+                              disabled={memberAthletesSaving}
+                              className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/20 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       )}
 
