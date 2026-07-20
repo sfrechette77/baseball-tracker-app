@@ -1,8 +1,8 @@
 # On Deck — Database Schema
 
-**Last updated:** Athlete identity + guardian-athlete management
+**Last updated:** Parent athlete roster experience
 **Environment:** Production (`fjrtcxfqculymgyfrato`)
-**Status:** RLS ON for all tenant tables, including durable athlete identities and guardian-athlete relationships. Parent athlete assignment is shipped in Admin → Members.
+**Status:** RLS ON for all tenant tables. Durable athlete identity, guardian-athlete administration, and the parent-facing Team → Roster experience are shipped.
 
 ---
 
@@ -818,7 +818,13 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - GameChanger-style live scoring is parked. Future stats import should be CSV-based and should wait for a real GameChanger Staff export sample.
 - Admin → Members supports linking an approved parent membership to multiple durable athletes and selecting an optional primary athlete.
 - Guardian-athlete relationships do not modify `parent_teams`; team access and default-team behavior remain independent.
-- The parent-facing athlete experience is not yet shipped. The current feature is the durable schema and org-admin management workflow.
+- Team → Roster loads the signed-in user’s approved parent membership and permitted `guardian_athletes` relationships.
+- Seasonal players are matched to durable athletes through nullable `players.athlete_id`.
+- Linked athletes appear in a My Athletes section and are highlighted in the full roster.
+- The optional primary athlete is identified separately.
+- Multiple linked athletes are supported.
+- Parents without linked athletes on the current seasonal roster see the normal roster with no additional empty state.
+- The parent-facing feature is read-only and does not modify `parent_teams` or any team-access permission.
 
 ## Outstanding items
 
@@ -829,9 +835,8 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 5. ✅ **Tournament box scores bug** — FIXED (app-side, not data/RLS). Opponent box_score row shares Elite's team_season_id and is distinguished by `team_id = null`; the line-score finder was rewritten in `app/event/[id]/page.tsx` to match the "us" row on `team_id` rather than differing team_season_id.
 6. ✅ **organization-logos storage policy** — FIXED (6-22-26). INSERT is now restricted to approved org_admins uploading inside their own org folder via `is_org_admin`.
 7. ✅ **Tighten organization-logos INSERT policy** — DONE. Uploads are scoped to approved org_admins for their own org folder.
-8. **Parent athlete experience** — guardian relationships are stored and manageable, but the parent-facing Team-page experience still needs to be built.
-9. **Relationship labels** — the schema supports `guardian_athletes.relationship`, and the replacement RPC preserves it, but the current Members UI does not edit relationship labels.
-10. **Primary athlete database enforcement** — the RPC maintains zero or one primary athlete for normal app writes, but the database does not currently have a partial unique constraint enforcing one primary row per membership.
+8. **Relationship labels** — the schema supports `guardian_athletes.relationship`, and the replacement RPC preserves it, but the current Members UI does not edit relationship labels.
+9. **Primary athlete database enforcement** — the RPC maintains zero or one primary athlete for normal app writes, but the database does not currently have a partial unique constraint enforcing one primary row per membership.
 ---
 
 ## Notes for production migration (historical)
