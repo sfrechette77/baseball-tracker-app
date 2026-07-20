@@ -1,8 +1,8 @@
 # On Deck — Database Schema
 
-**Last updated:** Parent athlete roster experience
+**Last updated:** Admin roster assignment editing
 **Environment:** Production (`fjrtcxfqculymgyfrato`)
-**Status:** RLS ON for all tenant tables. Durable athlete identity, guardian-athlete administration, and the parent-facing Team → Roster experience are shipped.
+**Status:** RLS ON for all tenant tables. Durable athlete identity, guardian-athlete administration, the parent-facing Team → Roster experience, and role-aware Admin → Roster editing are shipped.
 
 ---
 
@@ -111,6 +111,40 @@ All helpers use `SECURITY DEFINER` to bypass RLS when checking permissions inter
 - Relationships omitted from the replacement set are deleted.
 - Passing an empty athlete array clears all athlete relationships for the parent.
 - The RPC does not read or modify `parent_teams`; team access remains unchanged.
+
+### update_roster_assignment(
+`p_player_id uuid, p_display_name text, p_jersey_number text default null, p_position text default null`
+)
+
+**Returns:**
+
+| Column | Type | Notes |
+|---|---|---|
+| result_player_id | uuid | Updated seasonal roster assignment |
+| result_athlete_id | uuid | Durable athlete identity |
+| result_display_name | text | Final durable display name |
+| result_jersey_number | text | Final seasonal jersey number |
+| result_position | text | Final seasonal position |
+
+**Security:**
+- `SECURITY DEFINER`
+- `search_path` locked to `public, auth`
+- Requires an authenticated user.
+- Requires `can_admin_team_season` for the selected player’s team season.
+- Execute privilege is revoked from `public`.
+- Execute privilege is granted to `authenticated`.
+- Team-admin durable-name changes are rejected inside the RPC, even if the UI or server action is bypassed.
+
+**Behavior:**
+- Only active roster assignments may be edited.
+- Org admins may change the durable athlete display name.
+- Durable name changes update `athletes.display_name`.
+- Durable name changes synchronize every linked `players.name` row for the same athlete and organization.
+- Team admins may not change the durable athlete name.
+- Jersey number and position apply only to the selected seasonal roster assignment.
+- Blank jersey number or position values are normalized to null.
+- A legacy player row without `athlete_id` is repaired by creating and linking a durable athlete.
+- The RPC does not change roster status, removal metadata, team access, or statistics.
 
 ---
 
@@ -765,6 +799,9 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - `lib/db/migrations/athlete-identity-v1.sql` — creates durable `athletes`, creates `guardian_athletes`, adds nullable `players.athlete_id`, performs the conservative identity backfill, adds indexes/triggers, and enables RLS. **Already applied. Do not rerun against the current production database.**
 - `lib/db/migrations/guardian-athlete-management-v1.sql` — creates the org-admin-only `replace_guardian_athletes` RPC used by Admin → Members. **Already applied. Do not rerun against the current production database.**
 - `lib/db/migrations/chat-v1.sql` — Chat v1 schema, RLS, Realtime publication, Storage policies. **Already RUN against dev AND prod.**
+- `lib/db/migrations/roster-status-v1.sql` — adds active/inactive roster status, removal metadata, and the remove/restore roster RPCs. **Already applied to development and production.**
+- `lib/db/migrations/admin-roster-rpcs-v1.sql` — creates the durable-athlete roster creation and returning-athlete assignment RPCs used by Admin → Roster. **Already applied to development and production.**
+- `lib/db/migrations/edit-roster-assignment-v1.sql` — creates the role-aware `update_roster_assignment` RPC used by inline Admin → Roster editing. **Already applied to development and production.**
 
 **Other migrations run ad-hoc and not saved to repo:**
 - Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
@@ -825,6 +862,13 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - Multiple linked athletes are supported.
 - Parents without linked athletes on the current seasonal roster see the normal roster with no additional empty state.
 - The parent-facing feature is read-only and does not modify `parent_teams` or any team-access permission.
+- Admin → Roster supports inline editing of active roster assignments.
+- Org admins can edit durable athlete names plus seasonal jersey number and position.
+- Team admins can edit seasonal jersey number and position but cannot change durable athlete names.
+- Durable name changes synchronize linked seasonal player rows without changing their IDs or historical statistics.
+- Jersey number and position remain specific to the selected seasonal assignment.
+- Legacy active player rows missing `athlete_id` can be repaired through the edit workflow.
+- Inactive roster assignments cannot be edited.
 
 ## Outstanding items
 
