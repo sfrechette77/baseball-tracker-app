@@ -18,6 +18,7 @@
 - ✅ Public organization hub shipped: `/o/{slug}` shows org branding, public resource links, signup access, sign-in access, and an admin-editable welcome message.
 - ✅ Durable athlete identity and guardian-athlete management shipped: org admins can link approved parent memberships to one or more organization athletes, mark an optional primary athlete, and clear or replace assignments without changing team access.
 - ✅ Parent athlete roster experience shipped: parents see linked athletes in a dedicated My Athletes section, linked roster rows are highlighted, multiple siblings are supported, and the optional primary athlete is identified without changing team access.
+- ✅ Admin roster assignment editing shipped: org admins can edit durable athlete names plus seasonal jersey number and position, while team admins can edit seasonal fields only.
 
 **Active items (pick one):**
 1. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
@@ -47,6 +48,7 @@
 - ✅ Admin manage-members UI shipped — Members tab in /admin
 - ✅ Guardian-athlete management shipped — Members tab supports athlete assignment and optional primary-athlete designation for parent memberships
 - ✅ Parent athlete experience shipped — Team → Roster shows linked athletes, primary designation, sibling support, and linked-player highlighting
+- ✅ Admin roster assignment editing shipped — inline Edit/Save/Cancel controls, role-aware name protection, seasonal-field editing, and active-roster enforcement
 - ✅ Existing-parent team_admin promotion/removal verified in Members tab
 - ✅ organization-logos storage policy tightened to org_admin-only uploads
 - ✅ Hardcoded red branding audit pass completed; current-team/team-row highlights now use brand color
@@ -163,36 +165,6 @@ Scope: org-scoped self-registration for parents, admin approval queue with team 
 
 Scope: org_admins can manage approved members, parent team access, team-admin assignments, and parent-to-athlete relationships from the Admin → Members tab.
 
-## Parent Athlete Experience — SHIPPED
-
-Scope: give parents a personalized roster experience using existing guardian-athlete relationships without changing team access or permissions.
-
-### Team → Roster
-- Parents with linked athletes on the current seasonal roster see a **My Athletes** section above the full roster.
-- Each linked athlete card shows the seasonal player name, jersey number, and position.
-- The optional primary athlete receives a **Primary** badge.
-- Multiple linked athletes are supported for siblings and multi-player households.
-- Linked athletes are highlighted in the full roster.
-- Non-primary linked athletes receive a **My Athlete** badge.
-- Parents with no linked athletes on the current roster see the normal roster with no extra section.
-- Users without an approved parent membership see the normal roster experience.
-
-### Data behavior
-- The roster query includes nullable `players.athlete_id`.
-- The signed-in user’s approved parent membership is loaded for the active organization.
-- Guardian relationships are read from `guardian_athletes`.
-- Seasonal roster rows are matched to durable athletes through `players.athlete_id`.
-- Archived athletes are excluded from the parent-facing relationship list.
-- Guardian relationships outside the selected team season do not appear in the current roster’s My Athletes section.
-
-### Access-control behavior
-- The feature is read-only.
-- It does not insert, update, or delete `parent_teams`.
-- It does not grant access to additional teams.
-- It does not filter or restrict the organization’s existing roster visibility.
-- RLS limits guardian relationship reads to the user’s own parent membership or an org_admin.
-- Users who also hold an org_admin or team_admin role can still receive the parent experience when they also have an approved parent membership.
-
 ### UI
 - `/admin` includes a **Members** tab for approved parent and team-admin memberships.
 - Each member card shows the member name, email, role badge, team access, default team, and team-admin assignments.
@@ -240,6 +212,69 @@ Scope: give parents a personalized roster experience using existing guardian-ath
 - Remove remains a hard delete of the parent membership rather than a status change.
 - Existing approved parents can still be promoted to team_admin.
 - Brand-new coach invitation by email remains a separate workflow.
+
+## Parent Athlete Experience — SHIPPED
+
+Scope: give parents a personalized roster experience using existing guardian-athlete relationships without changing team access or permissions.
+
+### Team → Roster
+- Parents with linked athletes on the current seasonal roster see a **My Athletes** section above the full roster.
+- Each linked athlete card shows the seasonal player name, jersey number, and position.
+- The optional primary athlete receives a **Primary** badge.
+- Multiple linked athletes are supported for siblings and multi-player households.
+- Linked athletes are highlighted in the full roster.
+- Non-primary linked athletes receive a **My Athlete** badge.
+- Parents with no linked athletes on the current roster see the normal roster with no extra section.
+- Users without an approved parent membership see the normal roster experience.
+
+### Data behavior
+- The roster query includes nullable `players.athlete_id`.
+- The signed-in user’s approved parent membership is loaded for the active organization.
+- Guardian relationships are read from `guardian_athletes`.
+- Seasonal roster rows are matched to durable athletes through `players.athlete_id`.
+- Archived athletes are excluded from the parent-facing relationship list.
+- Guardian relationships outside the selected team season do not appear in the current roster’s My Athletes section.
+
+### Access-control behavior
+- The feature is read-only.
+- It does not insert, update, or delete `parent_teams`.
+- It does not grant access to additional teams.
+- It does not filter or restrict the organization’s existing roster visibility.
+- RLS limits guardian relationship reads to the user’s own parent membership or an org_admin.
+- Users who also hold an org_admin or team_admin role can still receive the parent experience when they also have an approved parent membership.
+
+## Admin Roster Assignment Editing — SHIPPED
+
+Scope: allow authorized admins to correct current-season roster information while preserving durable athlete identity, historical statistics, and role boundaries.
+
+### Admin → Roster UI
+- Active roster rows include an **Edit** action.
+- Editing occurs inline with Player name, Jersey number, and Position fields.
+- Save and Cancel controls replace the normal row actions while editing.
+- Edit and Save use the organization brand color.
+- Remove remains a semantic red destructive action.
+- Remove and Restore behavior remains unchanged.
+- Inactive roster assignments do not expose editing controls.
+
+### Role behavior
+- Org admins can edit the durable athlete name, seasonal jersey number, and seasonal position.
+- Team admins can edit seasonal jersey number and position.
+- The name field is disabled for team admins.
+- The server action and database RPC independently reject team-admin attempts to change a durable athlete name.
+- Both org admins and assigned team admins must pass `can_admin_team_season`.
+
+### Identity and season behavior
+- Athlete names are durable organization-level identity data.
+- An org-admin name change updates `athletes.display_name`.
+- The durable name is synchronized to every linked seasonal `players.name` row for the same organization.
+- Jersey number and position are updated only on the selected seasonal `players` row.
+- Historical statistics continue referencing the existing seasonal `players.id`.
+- Editing does not change `roster_status`, removal history, team assignment, or statistics.
+
+### Legacy compatibility
+- An active legacy roster row without `players.athlete_id` can be repaired during editing.
+- The RPC creates a durable athlete identity and links the selected roster row before completing the update.
+- Inactive assignments are rejected by both the server action and RPC.
 
 ## Signup RLS fix — SHIPPED (production bug)
 
