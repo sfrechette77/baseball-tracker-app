@@ -17,6 +17,7 @@
 - ✅ Admin Settings tab, Admin Overview tab, Florida Vandals second tenant, membership backfill fix, and service-key env var standardization shipped.
 - ✅ Public organization hub shipped: `/o/{slug}` shows org branding, public resource links, signup access, sign-in access, and an admin-editable welcome message.
 - ✅ Durable athlete identity and guardian-athlete management shipped: org admins can link approved parent memberships to one or more organization athletes, mark an optional primary athlete, and clear or replace assignments without changing team access.
+- ✅ Parent athlete roster experience shipped: parents see linked athletes in a dedicated My Athletes section, linked roster rows are highlighted, multiple siblings are supported, and the optional primary athlete is identified without changing team access.
 
 **Active items (pick one):**
 1. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
@@ -45,6 +46,7 @@
 - ✅ Chunk 4b — `fields.team_id` dropped (last redundant legacy column)
 - ✅ Admin manage-members UI shipped — Members tab in /admin
 - ✅ Guardian-athlete management shipped — Members tab supports athlete assignment and optional primary-athlete designation for parent memberships
+- ✅ Parent athlete experience shipped — Team → Roster shows linked athletes, primary designation, sibling support, and linked-player highlighting
 - ✅ Existing-parent team_admin promotion/removal verified in Members tab
 - ✅ organization-logos storage policy tightened to org_admin-only uploads
 - ✅ Hardcoded red branding audit pass completed; current-team/team-row highlights now use brand color
@@ -160,6 +162,36 @@ Scope: org-scoped self-registration for parents, admin approval queue with team 
 ## Admin Members + Guardian-Athlete Management — SHIPPED
 
 Scope: org_admins can manage approved members, parent team access, team-admin assignments, and parent-to-athlete relationships from the Admin → Members tab.
+
+## Parent Athlete Experience — SHIPPED
+
+Scope: give parents a personalized roster experience using existing guardian-athlete relationships without changing team access or permissions.
+
+### Team → Roster
+- Parents with linked athletes on the current seasonal roster see a **My Athletes** section above the full roster.
+- Each linked athlete card shows the seasonal player name, jersey number, and position.
+- The optional primary athlete receives a **Primary** badge.
+- Multiple linked athletes are supported for siblings and multi-player households.
+- Linked athletes are highlighted in the full roster.
+- Non-primary linked athletes receive a **My Athlete** badge.
+- Parents with no linked athletes on the current roster see the normal roster with no extra section.
+- Users without an approved parent membership see the normal roster experience.
+
+### Data behavior
+- The roster query includes nullable `players.athlete_id`.
+- The signed-in user’s approved parent membership is loaded for the active organization.
+- Guardian relationships are read from `guardian_athletes`.
+- Seasonal roster rows are matched to durable athletes through `players.athlete_id`.
+- Archived athletes are excluded from the parent-facing relationship list.
+- Guardian relationships outside the selected team season do not appear in the current roster’s My Athletes section.
+
+### Access-control behavior
+- The feature is read-only.
+- It does not insert, update, or delete `parent_teams`.
+- It does not grant access to additional teams.
+- It does not filter or restrict the organization’s existing roster visibility.
+- RLS limits guardian relationship reads to the user’s own parent membership or an org_admin.
+- Users who also hold an org_admin or team_admin role can still receive the parent experience when they also have an approved parent membership.
 
 ### UI
 - `/admin` includes a **Members** tab for approved parent and team-admin memberships.
@@ -667,20 +699,6 @@ For anonymous access: `set role anon;` then `reset role;` when done.
 - Possible v1: Select game → Upload CSV → Preview matched/unmatched players → Confirm import → bulk upsert stats.
 - Box-score PDF parsing is parked; CSV is the preferred import path.
 - GameChanger CSV import discovery — wait for a real Staff export sample before building.
-
-## Future features (parked)
-
-### Parent athlete experience
-
-The guardian-athlete data and admin assignment workflow are shipped. The next product layer is a parent-facing experience that uses those relationships without changing permissions.
-
-Possible v1:
-- Show a parent’s linked athletes on the Team page.
-- Highlight linked athletes within the current roster.
-- Mark the optional primary athlete.
-- Support multiple siblings.
-- Show no athlete-specific section when no relationship exists.
-- Keep all team access controlled through `parent_teams`.
 
 ### Email notifications
 On approval, on team_admin invitation, on game status changes. Requires SMTP provider (Resend recommended). Multi-hour rabbit hole — defer until needed.
