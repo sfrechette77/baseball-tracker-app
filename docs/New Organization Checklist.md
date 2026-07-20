@@ -23,3 +23,12 @@ Confirm Stats helpers: Fill batting order and Clear pitching
 Confirm Roster Health display on team-admin dashboard
 For GameChanger import planning, request a real CSV export from a team Staff account before building importer
 Confirm public org hub, public welcome message and public resource links
+Confirm Admin → Members shows the correct Parent or Team Admin role badge
+Assign one or more athletes to an approved parent
+Mark an optional primary athlete, save, reopen the Athletes panel, and confirm assignments persist
+Confirm assigning or clearing athletes does not change the parent’s team assignments or default team
+Sign in with an approved parent membership and confirm Team → Roster shows the My Athletes section
+Confirm linked athletes are highlighted in the full roster
+Confirm the primary athlete receives the Primary badge
+Confirm multiple linked siblings appear correctly
+Clear all athlete assignments and confirm My Athletes disappears while team access remains unchanged
