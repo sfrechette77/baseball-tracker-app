@@ -7,7 +7,7 @@
 **Recently completed:**
 - ✅ Admin → Stats workflow upgraded and smoke tested in production: desktop table UI, bulk Save All Stats endpoint, client-side validation, unsaved-change tracking, Fill batting order, and Clear pitching helper.
 - ✅ Team-admin dashboard polished and smoke tested: cleaner header, no emoji-style quick actions, clearer "View Team Page" action, centered Roster Health status, and simpler dashboard copy.
-- ✅ Team-admin tab visibility verified: team_admin sees Dashboard, Status, Score, Stats, Events; org_admin-only tabs remain hidden from the team-admin tab bar.
+- ✅ Team-admin tab visibility verified: team_admin sees Dashboard, Roster, Status, Score, Stats, Events; org_admin-only tabs remain hidden from the team-admin tab bar.
 - ✅ Branch cleanup completed after stats/team-admin polish.
 - ✅ Intro email sent to Frankie at Elite Baseball asking for product feedback and a GameChanger stats CSV/box-score export sample.
 - ✅ Org branding rollout — logo + primary_color across Team/Home/Schedule/Stats/Messages/Admin/nav.
@@ -382,7 +382,7 @@ Scope: public, shareable organization landing page for prospective families and 
 
 ## Admin Settings tab — SHIPPED
 
-- New Settings tab in /admin, **org_admin only** (`teamAdminAllowedTabs` unchanged: status, score, stats, events).
+- Settings remains org_admin-only. Team-admin tabs are Dashboard, Roster, Status, Score, Stats, and Events.
 - Contains: Organization Name, read-only Slug, Branding (logo upload + preview, color picker), Access (signup link + Copy button), Season (active season name, read-only).
 - Saves: name, logo_url, primary_color. Slug read-only (changing it would break signup links).
 - UX: visible Logo URL field removed (too technical) — logo_url still saved internally. Advanced hex section removed; color picker with plain-English helper. Access heading: "Share this link with parents, coaches, and players so they can request access."
@@ -395,8 +395,8 @@ Scope: public, shareable organization landing page for prospective families and 
 
 ## Admin tab inventory (current)
 
-- org_admin: dashboard/overview, pending, members, status, score, stats, events, league, standings, settings
-- team_admin: dashboard, status, score, stats, events (no Pending, Members, League, Standings, or Settings)
+- org_admin: dashboard/overview, roster, pending, members, status, score, stats, events, league, standings, settings
+- team_admin: dashboard, roster, status, score, stats, events (no Pending, Members, League, Standings, or Settings)
 
 ## Admin → Stats workflow — SHIPPED
 
@@ -423,7 +423,7 @@ Scope: make post-game stat entry efficient for team admins on a laptop while pre
 ## Team Admin dashboard — POLISHED
 
 - Team admins land on a dedicated Dashboard with a next-event card, Quick Actions, and Roster Health.
-- Quick Actions route to Status, Score, Events, and Stats.
+- Quick Actions route to Roster, Status, Score, Events, and Stats.
 - View Team Page routes to `/team` and intentionally does not imply roster editing.
 - Dashboard visuals use brand color, simple dots/text, and no emoji-style action icons.
 - Roster Health shows Players, Missing #, Missing Pos; the healthy state is centered below the three cards.
