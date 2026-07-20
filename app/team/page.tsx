@@ -30,6 +30,13 @@ type Player = {
   name: string
   jersey_number: string | null
   position: string | null
+  athlete_id: string | null
+}
+
+type GuardianAthleteLink = {
+  athlete_id: string
+  display_name: string
+  is_primary: boolean
 }
 
 type LeagueGameRow = {
@@ -762,7 +769,11 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
   const { org } = useActiveOrg()
   const brandColor = org?.primary_color ?? '#dc2626'
   
+  const organizationId = org?.id ?? null
+
   const [players, setPlayers] = useState<Player[]>([])
+  const [guardianAthletes, setGuardianAthletes] =
+    useState<GuardianAthleteLink[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -770,33 +781,182 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
       setLoading(true)
       return
     }
+
+    let cancelled = false
+
     const load = async () => {
+      setLoading(true)
+
       try {
         if (!teamSeasonId) {
-          setPlayers([])
+          if (!cancelled) {
+            setPlayers([])
+            setGuardianAthletes([])
+          }
           return
         }
-        const supabase = createClient()
-       const { data, error } = await supabase
-        .from('players')
-        .select('id, name, jersey_number, position')
-        .eq('team_season_id', teamSeasonId)
-        .eq('roster_status', 'active')
 
-      if (error) {
-        console.error('Failed to load active roster:', error)
-        setPlayers([])
-        return
-      }
-        setPlayers((data ?? []) as Player[])
-      } catch (err) {
-        console.error(err)
+        const supabase = createClient()
+
+        const { data: rosterRows, error: rosterError } =
+          await supabase
+            .from('players')
+            .select(
+              'id, name, jersey_number, position, athlete_id'
+            )
+            .eq('team_season_id', teamSeasonId)
+            .eq('roster_status', 'active')
+
+        if (rosterError) {
+          console.error(
+            'Failed to load active roster:',
+            rosterError
+          )
+
+          if (!cancelled) {
+            setPlayers([])
+            setGuardianAthletes([])
+          }
+
+          return
+        }
+
+        if (!cancelled) {
+          setPlayers((rosterRows ?? []) as Player[])
+        }
+
+        if (!organizationId) {
+          if (!cancelled) setGuardianAthletes([])
+          return
+        }
+
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          if (userError) {
+            console.error(
+              'Failed to load current user:',
+              userError
+            )
+          }
+
+          if (!cancelled) setGuardianAthletes([])
+          return
+        }
+
+        const {
+          data: parentMembershipRows,
+          error: membershipError,
+        } = await supabase
+          .from('memberships')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('organization_id', organizationId)
+          .eq('role', 'parent')
+          .eq('status', 'approved')
+
+        if (membershipError) {
+          console.error(
+            'Failed to load parent membership:',
+            membershipError
+          )
+
+          if (!cancelled) setGuardianAthletes([])
+          return
+        }
+
+        const parentMembershipIds = (
+          parentMembershipRows ?? []
+        ).map(membership => membership.id)
+
+        if (parentMembershipIds.length === 0) {
+          if (!cancelled) setGuardianAthletes([])
+          return
+        }
+
+        const {
+          data: guardianRows,
+          error: guardianError,
+        } = await supabase
+          .from('guardian_athletes')
+          .select(`
+            athlete_id,
+            is_primary,
+            athletes!inner (
+              display_name,
+              status
+            )
+          `)
+          .in('membership_id', parentMembershipIds)
+
+        if (guardianError) {
+          console.error(
+            'Failed to load guardian athletes:',
+            guardianError
+          )
+
+          if (!cancelled) setGuardianAthletes([])
+          return
+        }
+
+        const links: GuardianAthleteLink[] = []
+
+        for (const row of guardianRows ?? []) {
+          const athlete = row.athletes as unknown as {
+            display_name: string
+            status: string
+          }
+
+          if (!athlete || athlete.status === 'archived') {
+            continue
+          }
+
+          links.push({
+            athlete_id: row.athlete_id,
+            display_name: athlete.display_name,
+            is_primary: row.is_primary,
+          })
+        }
+
+        links.sort((a, b) => {
+          if (a.is_primary !== b.is_primary) {
+            return a.is_primary ? -1 : 1
+          }
+
+          return a.display_name.localeCompare(b.display_name)
+        })
+
+        if (!cancelled) {
+          setGuardianAthletes(links)
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load roster and guardian athletes:',
+          error
+        )
+
+        if (!cancelled) {
+          setPlayers([])
+          setGuardianAthletes([])
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    load()
-  }, [teamSeasonId, teamSeasonLoading])
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    teamSeasonId,
+    teamSeasonLoading,
+    organizationId,
+  ])
 
   const sortedPlayers = useMemo(() => {
     return [...players].sort((a, b) => {
@@ -805,6 +965,23 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
       return numA - numB
     })
   }, [players])
+
+  const guardianByAthleteId = useMemo(() => {
+    return new Map(
+      guardianAthletes.map(athlete => [
+        athlete.athlete_id,
+        athlete,
+      ])
+    )
+  }, [guardianAthletes])
+
+  const linkedRosterPlayers = useMemo(() => {
+    return sortedPlayers.filter(
+      player =>
+        player.athlete_id &&
+        guardianByAthleteId.has(player.athlete_id)
+    )
+  }, [sortedPlayers, guardianByAthleteId])
 
   if (loading) {
     return (
@@ -831,24 +1008,144 @@ function RosterView({ teamSeasonId, teamSeasonLoading }: { teamSeasonId: string 
   }
 
   return (
-    <div className="space-y-2">
-      {sortedPlayers.map((player) => (
-        <Link key={player.id} href={`/player/${player.id}`}>
-          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full font-bold text-white"
-                  style={{ backgroundColor: brandColor }}
+    <div className="space-y-4">
+      {linkedRosterPlayers.length > 0 && (
+        <section
+          className="rounded-2xl border bg-white/5 p-4"
+          style={{ borderColor: `${brandColor}66` }}
+        >
+          <p
+            className="text-[10px] font-semibold uppercase tracking-[0.25em]"
+            style={{ color: brandColor }}
+          >
+            My Athletes
+          </p>
+
+          <div className="mt-3 space-y-2">
+            {linkedRosterPlayers.map(player => {
+              const linkedAthlete =
+                player.athlete_id
+                  ? guardianByAthleteId.get(player.athlete_id)
+                  : undefined
+
+              return (
+                <Link
+                  key={player.id}
+                  href={`/player/${player.id}`}
+                  className="block"
                 >
-              {player.jersey_number ?? '?'}
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-white">{player.name}</p>
-              {player.position && (
-                <p className="text-xs text-slate-400">{player.position}</p>
-              )}
-            </div>
+                  <div className="flex items-center gap-3 rounded-xl bg-black/20 px-3 py-2 transition hover:bg-white/10">
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      {player.jersey_number ?? '?'}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-white">
+                        {player.name}
+                      </p>
+
+                      {player.position && (
+                        <p className="text-xs text-slate-400">
+                          {player.position}
+                        </p>
+                      )}
+                    </div>
+
+                    {linkedAthlete?.is_primary && (
+                      <span
+                        className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{
+                          borderColor: `${brandColor}66`,
+                          color: brandColor,
+                        }}
+                      >
+                        Primary
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
           </div>
-        </Link>
-      ))}
+        </section>
+      )}
+
+      <section>
+        {linkedRosterPlayers.length > 0 && (
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+            Full Roster
+          </p>
+        )}
+
+        <div className="space-y-2">
+          {sortedPlayers.map(player => {
+            const linkedAthlete =
+              player.athlete_id
+                ? guardianByAthleteId.get(player.athlete_id)
+                : undefined
+
+            const isLinkedAthlete = Boolean(linkedAthlete)
+
+            return (
+              <Link
+                key={player.id}
+                href={`/player/${player.id}`}
+                className="block"
+              >
+                <div
+                  className="flex items-center gap-3 rounded-2xl border bg-white/5 p-3 transition hover:bg-white/10"
+                  style={
+                    isLinkedAthlete
+                      ? {
+                          borderColor: `${brandColor}99`,
+                          backgroundColor: `${brandColor}14`,
+                        }
+                      : {
+                          borderColor: 'rgba(255, 255, 255, 0.1)',
+                        }
+                  }
+                >
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {player.jersey_number ?? '?'}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-white">
+                      {player.name}
+                    </p>
+
+                    {player.position && (
+                      <p className="text-xs text-slate-400">
+                        {player.position}
+                      </p>
+                    )}
+                  </div>
+
+                  {linkedAthlete && (
+                    <span
+                      className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide"
+                      style={{
+                        borderColor: `${brandColor}66`,
+                        color: brandColor,
+                      }}
+                    >
+                      {linkedAthlete.is_primary
+                        ? 'Primary'
+                        : 'My Athlete'}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
     </div>
   )
 }
