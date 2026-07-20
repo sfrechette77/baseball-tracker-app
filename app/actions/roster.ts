@@ -139,6 +139,9 @@ async function requirePlayerRosterAccess(
   | {
       ok: true
       teamSeasonId: string
+      displayName: string
+      rosterStatus: 'active' | 'inactive'
+      isOrgAdmin: boolean
     }
   | {
       ok: false
@@ -155,7 +158,7 @@ async function requirePlayerRosterAccess(
 
   const { data: player, error: playerError } = await supabase
     .from('players')
-    .select('team_season_id')
+    .select('team_season_id, name, roster_status')
     .eq('id', normalizedPlayerId)
     .single()
 
@@ -172,9 +175,19 @@ async function requirePlayerRosterAccess(
     return access
   }
 
+  if (player.roster_status !== 'active') {
+    return {
+      ok: false,
+      error: 'Only active roster assignments can be edited',
+    }
+  }
+
   return {
     ok: true,
     teamSeasonId: player.team_season_id,
+    displayName: player.name,
+    rosterStatus: player.roster_status,
+    isOrgAdmin: access.context.isOrgAdmin,
   }
 }
 
@@ -429,6 +442,16 @@ export async function updateRosterAssignment(input: {
 
   if (!access.ok) {
     return access
+  }
+
+  if (
+    !access.isOrgAdmin &&
+    displayName !== access.displayName.trim()
+  ) {
+    return {
+      ok: false,
+      error: 'Only organization admins can change athlete names',
+    }
   }
 
   const supabase = await createClient()

@@ -1,5 +1,17 @@
 begin;
 
+-- Shared updated_at trigger used by athlete identity tables.
+create or replace function public.set_row_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $function$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$function$;
+
 -- ─── Permanent athlete identities ───────────────────────────────────────────
 
 create table if not exists public.athletes (
@@ -35,6 +47,22 @@ create index if not exists idx_athletes_organization_name
     organization_id,
     lower(trim(display_name))
   );
+
+-- Required by the tenant-safe composite guardian membership foreign key.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.memberships'::regclass
+      and conname = 'memberships_id_organization_unique'
+  ) then
+    alter table public.memberships
+      add constraint memberships_id_organization_unique
+      unique (id, organization_id);
+  end if;
+end
+$$;
 
 
 -- ─── Guardian-to-athlete relationships ──────────────────────────────────────
