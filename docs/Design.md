@@ -16,6 +16,7 @@
 - ✅ Existing-parent → team_admin flow verified and grant-by-existing-email shipped.
 - ✅ Admin Settings tab, Admin Overview tab, Florida Vandals second tenant, membership backfill fix, and service-key env var standardization shipped.
 - ✅ Public organization hub shipped: `/o/{slug}` shows org branding, public resource links, signup access, sign-in access, and an admin-editable welcome message.
+- ✅ Durable athlete identity and guardian-athlete management shipped: org admins can link approved parent memberships to one or more organization athletes, mark an optional primary athlete, and clear or replace assignments without changing team access.
 
 **Active items (pick one):**
 1. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
@@ -43,6 +44,7 @@
 - ✅ Tournament box score bug fixed (app-side opponent-row finder)
 - ✅ Chunk 4b — `fields.team_id` dropped (last redundant legacy column)
 - ✅ Admin manage-members UI shipped — Members tab in /admin
+- ✅ Guardian-athlete management shipped — Members tab supports athlete assignment and optional primary-athlete designation for parent memberships
 - ✅ Existing-parent team_admin promotion/removal verified in Members tab
 - ✅ organization-logos storage policy tightened to org_admin-only uploads
 - ✅ Hardcoded red branding audit pass completed; current-team/team-row highlights now use brand color
@@ -155,31 +157,57 @@ Scope: org-scoped self-registration for parents, admin approval queue with team 
 - approveMembership validates target membership belongs to admin's org, validates all team IDs belong to admin's org, flips status to approved, creates parent_teams rows, marks one as default
 - UI: per-row Approve button → modal with team checkboxes (defaulting to all checked) + "default team" radio.
 
-## Admin Manage-Members UI — SHIPPED
+## Admin Members + Guardian-Athlete Management — SHIPPED
 
-Scope: org_admins can view approved parents and manage their team assignments / remove them, all in-app (previously SQL-only).
+Scope: org_admins can manage approved members, parent team access, team-admin assignments, and parent-to-athlete relationships from the Admin → Members tab.
 
 ### UI
-- /admin **Members** tab (8th tab, next to Pending). Tabs grid widened to accommodate.
-- Lists approved **parents only** (org_admins and team_admins excluded).
-- Per member card: name, email, assigned teams with the default marked by ★.
-- **Edit Teams** → inline panel with team checkboxes + default radio (same UX as the approval flow). Replaces all parent_teams rows.
-- **Make Admin** → promotes an approved parent to `team_admin` for selected teams. The card then shows a yellow Team Admin section with per-team removal controls.
-- **Remove** → confirm step → deletes the parent membership row (cascades to parent_teams). Parents only.
+- `/admin` includes a **Members** tab for approved parent and team-admin memberships.
+- Each member card shows the member name, email, role badge, team access, default team, and team-admin assignments.
+- **Edit Teams** → inline panel with team checkboxes and a default-team radio. This replaces the parent membership's `parent_teams` rows.
+- **Athletes** → available only for `parent` memberships. The admin can select one or more organization athletes and optionally designate one as primary.
+- Current athlete assignments appear on the parent card; the primary athlete is marked with ★.
+- Saving with no selected athletes clears all guardian-athlete relationships for that parent.
+- **Make Admin** → grants team-admin access for selected teams.
+- Existing team-admin assignments appear in a separate section with per-team removal controls.
+- **Remove** → confirmation step for removing a parent membership.
 
-### Server Actions (app/actions/admin.ts)
-- getApprovedParents — approved parent memberships in the admin's org, joined to profiles (name/email), parent_teams (teams + default flag), and existing team_admin team assignments for the same user.
-- updateMemberTeams(membershipId, teamIds, defaultTeamId) — validates org + team ownership, deletes existing parent_teams rows, re-inserts with exactly one default.
-- makeMemberTeamAdmin(parentMembershipId, teamIds) — validates approved parent in same org, creates an approved `team_admin` membership if one does not exist for the user, and upserts `team_admins` rows for selected teams.
-- removeMemberTeamAdmin(parentMembershipId, teamId) — removes one team_admins assignment for that user/team.
-- removeMembership(membershipId) — validates org ownership + parent role, deletes the parent membership.
-- All actions reuse the existing requireOrgAdmin() guard.
+### Server Actions (`app/actions/admin.ts`)
+- `getApprovedParents` — loads approved member records, profile information, parent team access, team-admin assignments, and guardian-athlete assignments.
+- `getOrganizationAthletes` — returns non-archived organization athletes available for guardian assignment.
+- `updateMemberTeams(membershipId, teamIds, defaultTeamId)` — validates organization and team ownership, replaces `parent_teams`, and preserves exactly one default team.
+- `updateGuardianAthleteAssignments(input)` — validates the selected athletes and optional primary athlete, then calls `replace_guardian_athletes`.
+- `makeMemberTeamAdmin(parentMembershipId, teamIds)` — creates or reuses an approved `team_admin` membership and upserts its team assignments.
+- `removeMemberTeamAdmin(parentMembershipId, teamId)` — removes one team-admin assignment.
+- `removeMembership(membershipId)` — validates organization ownership and removes the parent membership.
+- All management actions require an approved org_admin membership.
+
+### Guardian-athlete data model
+- `athletes` stores durable organization-level athlete identity.
+- `players` stores seasonal roster assignments and links back to the durable athlete through nullable `players.athlete_id`.
+- `guardian_athletes` links an approved parent membership to one or more durable athletes.
+- A guardian-athlete relationship may be marked primary.
+- A parent may be linked to multiple athletes, supporting siblings and multi-player households.
+- Athlete relationships do not grant access to teams or team content.
+
+### Access-control separation
+- `parent_teams` remains the authority for parent team access and default-team selection.
+- `guardian_athletes` records family relationships only.
+- Assigning an athlete does not add or remove any `parent_teams` rows.
+- Clearing athlete assignments does not remove team access.
+- Team-admin-only memberships do not receive guardian-athlete assignment controls.
 
 ### Decisions
-- Remove = hard delete of the parent membership row (not a status flip to rejected).
-- Existing approved parents can be promoted to team_admin from Members.
-- Brand-new coach invite-by-email is still separate future work; it needs user/profile existence handling and eventually email notification.
-- Modal/inline edit pattern mirrors approval flow for consistency.
+- Durable athlete identity is separate from seasonal roster participation.
+- Historical statistics continue to reference seasonal `players.id`.
+- Removing a seasonal player assignment does not delete the durable athlete.
+- Primary athlete is optional.
+- Relationship labels are preserved when assignments are replaced.
+- Archived athletes cannot be newly assigned.
+- Guardian-athlete management is org-admin-only.
+- Remove remains a hard delete of the parent membership rather than a status change.
+- Existing approved parents can still be promoted to team_admin.
+- Brand-new coach invitation by email remains a separate workflow.
 
 ## Signup RLS fix — SHIPPED (production bug)
 
@@ -473,6 +501,10 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Routing: path-based (/o/{slug}/...). Subdomain routing deferred to post-revenue.
 - Per-season tables link to team_seasons. Permanent team_id dropped post-cutover (Chunk 4b).
 - team_admins and parent_teams link to teams (permanent), not team_seasons
+- `athletes` stores permanent athlete identity; `players` stores seasonal roster assignments.
+- Seasonal `players` rows link to durable athletes through nullable `players.athlete_id`.
+- `guardian_athletes` links parent memberships to durable athletes and supports an optional primary athlete.
+- `parent_teams` controls team access; guardian-athlete relationships never grant or remove access.
 - Membership modeling: one row per role
 - Enum named `membership_role`
 - Feature flags as boolean columns initially
@@ -502,7 +534,6 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Stripe billing and subscription management — Phase 4
 - Marketing site, free-to-paid conversion — Phase 5
 - Multi-org users (one person in multiple orgs) — rejected
-- Per-player parent linking — rejected
 - Subdomain routing and custom domains — deferred
 - Migration from Pattern C to anything more complex — defer until needed
 - Cross-org league play / shared opponent rosters — deferred
@@ -524,16 +555,18 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Fix pattern: set column default FIRST, then backfill, then NOT NULL.
 
 ### Migration progress (all complete)
-- Chunk 0–8: schema migration to multi-tenant
-- Chunks A–G: app pages migrated to team_season_id
-- Team page rebuild: Standings + Results + Roster sub-views, MSBL Rules to /team/rules
-- Feed v1: schema + actions + UI + push + skeleton loaders
-- Chat v1: schema + actions + UI + realtime + push + mute + realtime reactions
-- Chunk H: signup + admin approval flow
+- ✅Chunk 0–8: schema migration to multi-tenant
+- ✅Chunks A–G: app pages migrated to team_season_id
+- ✅Team page rebuild: Standings + Results + Roster sub-views, MSBL Rules to /team/rules
+- ✅Feed v1: schema + actions + UI + push + skeleton loaders
+- ✅Chat v1: schema + actions + UI + realtime + push + mute + realtime reactions
+- ✅Chunk H: signup + admin approval flow
 - **Cutover: RLS enabled on all 17 tenant tables in prod**
 - ✅ Chunk 4b — dropped `fields.team_id` (dev + prod); all other per-season team_id columns already dropped in Chunk 3
 - ✅ Admin manage-members UI — Members tab in /admin
 - ✅ Signup RLS fix — service-role client for pre-auth routes (lib/supabase/service.ts); `SUPABASE_SERVICE_ROLE_KEY` added to Vercel + .env.local
+- ✅ Athlete identity v1 — durable `athletes` records, nullable `players.athlete_id`, season-safe roster add/edit/remove/restore behavior
+- ✅ Guardian-athlete management v1 — `guardian_athletes`, replacement RPC, admin data layer, and Members-tab assignment UI
 
 ### Pre-prod cleanup
 Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
@@ -637,8 +670,17 @@ For anonymous access: `set role anon;` then `reset role;` when done.
 
 ## Future features (parked)
 
-### Admin manage-members UI — ✅ SHIPPED
-See "Admin Manage-Members UI — SHIPPED" above. Members tab in /admin: lists approved parents, edit team assignments + default, remove (hard delete). Actions: getApprovedParents, updateMemberTeams, removeMembership.
+### Parent athlete experience
+
+The guardian-athlete data and admin assignment workflow are shipped. The next product layer is a parent-facing experience that uses those relationships without changing permissions.
+
+Possible v1:
+- Show a parent’s linked athletes on the Team page.
+- Highlight linked athletes within the current roster.
+- Mark the optional primary athlete.
+- Support multiple siblings.
+- Show no athlete-specific section when no relationship exists.
+- Keep all team access controlled through `parent_teams`.
 
 ### Email notifications
 On approval, on team_admin invitation, on game status changes. Requires SMTP provider (Resend recommended). Multi-hour rabbit hole — defer until needed.

@@ -1,20 +1,24 @@
 # On Deck — Database Schema
 
-**Last updated:** Public organization hub + resource links + welcome message session
+**Last updated:** Athlete identity + guardian-athlete management
 **Environment:** Production (`fjrtcxfqculymgyfrato`)
-**Status:** RLS ON for all tenant tables. Public organization hubs, org resource links, signup/access flow, stats workflow, team-admin dashboard, and org branding are shipped.
+**Status:** RLS ON for all tenant tables, including durable athlete identities and guardian-athlete relationships. Parent athlete assignment is shipped in Admin → Members.
 
 ---
 
 ## Overview
 
-The schema supports a multi-tenant SaaS for youth baseball organizations. Top-level tenant is `organizations`. Users belong to orgs via `memberships` (one row per role per user-org pair). Per-season data is scoped through `team_seasons` (Pattern C — permanent teams, per-season instances). Row Level Security (RLS) is now enabled on every tenant table.
+The schema supports a multi-tenant SaaS for youth baseball organizations. The top-level tenant is `organizations`. Users belong to organizations through `memberships`, with one row per role per user-organization pair. Permanent team identity is stored in `teams`, while per-season participation is scoped through `team_seasons`.
+
+Permanent athlete identity is stored in `athletes`. Seasonal roster assignments remain in `players` and link to the durable athlete through nullable `players.athlete_id`. Parent-to-athlete relationships are stored in `guardian_athletes`. Team access remains separate and is controlled through `parent_teams`.
+
+Row Level Security (RLS) is enabled on every tenant table.
 
 ---
 
 ## Current RLS state
 
-**RLS is ON for all tenant tables.** The cutover happened in 4 batches:
+**RLS is ON for all tenant tables.** The original multi-tenant cutover covered 17 tables in four batches. Later feature migrations added `athletes` and `guardian_athletes` with RLS enabled as part of their creation.
 
 | Batch | Tables |
 |---|---|
@@ -71,6 +75,42 @@ All helpers use `SECURITY DEFINER` to bypass RLS when checking permissions inter
 **Returns:** `boolean` — true if user is an org_admin of the team's org, a team_admin assigned to that team, or a parent linked to the team via parent_teams. All checks require approved membership status.
 
 **NOTE (dev):** this function was created during Feed v1 build but only in prod. Had to be created in dev separately during Chat v1 work. The chat-v1.sql migration file includes a defensive `create or replace function` for it.
+
+---
+
+## Management RPCs
+
+### replace_guardian_athletes(
+`p_membership_id uuid, p_athlete_ids uuid[], p_primary_athlete_id uuid default null`
+)
+
+**Returns:**
+
+| Column | Type | Notes |
+|---|---|---|
+| result_membership_id | uuid | Parent membership whose relationships were replaced |
+| result_assigned_count | integer | Number of selected athlete relationships after replacement |
+
+**Security:**
+- `SECURITY DEFINER`
+- `search_path` locked to `public, auth`
+- Requires an authenticated user.
+- Requires the caller to be an approved org_admin of the parent membership's organization.
+- Execute privilege is revoked from `public`.
+- Execute privilege is granted to `authenticated`.
+
+**Behavior:**
+- The target membership must be an approved `parent` membership.
+- Input athlete IDs are de-duplicated and null values are discarded.
+- The optional primary athlete must be included in the selected athlete IDs.
+- Every selected athlete must belong to the same organization as the parent membership.
+- Archived athletes cannot be assigned.
+- New relationships are inserted.
+- Existing retained relationships have `is_primary` updated.
+- Existing `relationship` labels are preserved.
+- Relationships omitted from the replacement set are deleted.
+- Passing an empty athlete array clears all athlete relationships for the parent.
+- The RPC does not read or modify `parent_teams`; team access remains unchanged.
 
 ---
 
@@ -303,6 +343,90 @@ Links parent memberships to teams.
 
 All tables in this section have `organization_id` NOT NULL with default Chicago Elite UUID (`75c11f73-5394-4ffc-bf39-9c708418e07b` in prod), FK organizations, ON DELETE CASCADE, indexed via `idx_<tablename>_org`.
 
+### athletes
+
+Permanent organization-level athlete identity. An athlete can participate in multiple seasons through separate `players` rows.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| id | uuid | PK, default gen_random_uuid() | Durable athlete identifier |
+| organization_id | uuid | NOT NULL, FK organizations | Tenant scope |
+| display_name | text | NOT NULL, non-blank check | Athlete display name |
+| status | text | NOT NULL, default `active` | `active`, `inactive`, or `archived` |
+| created_at | timestamptz | NOT NULL, default now() | |
+| updated_at | timestamptz | NOT NULL, default now() | Maintained by trigger |
+
+**Constraints:**
+- `athletes_pkey` — primary key on `id`
+- `athletes_organization_id_fkey` — foreign key to `organizations.id`
+- `athletes_display_name_not_blank` — trimmed name must not be empty
+- `athletes_status_valid` — status must be `active`, `inactive`, or `archived`
+- `athletes_id_organization_unique` — unique `(id, organization_id)` for composite tenant-safe foreign keys
+
+**Indexes:**
+- `idx_athletes_organization` on `organization_id`
+- `idx_athletes_organization_name` on `(organization_id, lower(trim(display_name)))`
+
+**RLS Policies (ACTIVE):**
+- SELECT: approved members can read athletes in their organization through `current_user_org_ids()`.
+- INSERT: org_admins only for their own organization.
+- UPDATE: org_admins only for their own organization.
+- DELETE: org_admins only for their own organization.
+
+**App behavior:**
+- `athletes` is the durable identity record.
+- Athlete identity is not recreated for each season.
+- Archived athletes are excluded from new guardian assignments.
+- Seasonal removal or restoration operates on `players`, not on the durable athlete.
+- Historical statistics continue referencing seasonal `players.id`.
+- Prefer status changes such as `inactive` or `archived` over deleting an athlete that has historical roster assignments.
+
+---
+
+### guardian_athletes
+
+Links approved parent memberships to durable athletes. These relationships describe family association only and do not grant team access.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| id | uuid | PK, default gen_random_uuid() | Relationship identifier |
+| organization_id | uuid | NOT NULL | Tenant scope |
+| membership_id | uuid | NOT NULL | Parent membership |
+| athlete_id | uuid | NOT NULL | Durable athlete |
+| relationship | text | nullable, non-blank when present | Optional relationship label |
+| is_primary | boolean | NOT NULL, default false | Optional primary-athlete designation |
+| created_at | timestamptz | NOT NULL, default now() | |
+| updated_at | timestamptz | NOT NULL, default now() | Maintained by trigger |
+
+**Constraints:**
+- `guardian_athletes_pkey` — primary key on `id`
+- `guardian_athletes_unique` — unique `(membership_id, athlete_id)`
+- `guardian_athletes_relationship_not_blank` — relationship must be null or non-blank
+- `guardian_athletes_athlete_org_fkey` — composite foreign key `(athlete_id, organization_id)` to `athletes(id, organization_id)`, ON DELETE CASCADE
+- `guardian_athletes_membership_org_fkey` — composite foreign key `(membership_id, organization_id)` to `memberships(id, organization_id)`, ON DELETE CASCADE
+
+**Indexes:**
+- `idx_guardian_athletes_organization` on `organization_id`
+- `idx_guardian_athletes_membership` on `membership_id`
+- `idx_guardian_athletes_athlete` on `athlete_id`
+
+**RLS Policies (ACTIVE):**
+- SELECT: users can read relationships belonging to their own membership; org_admins can read all relationships in their organization.
+- INSERT: org_admins only.
+- UPDATE: org_admins only.
+- DELETE: org_admins only.
+
+**App behavior:**
+- One parent can be linked to multiple athletes.
+- One athlete can be linked to multiple parent memberships.
+- The Admin → Members UI supports selecting multiple athletes and designating zero or one as primary.
+- The replacement RPC maintains the primary designation used by the app.
+- Relationship labels are preserved when the selected athlete set is replaced.
+- `guardian_athletes` never grants access to teams, events, messages, rosters, or statistics.
+- Parent team access and default-team selection remain controlled by `parent_teams`.
+
+---
+
 ### teams
 Permanent team identity within an organization. Seasonal participation is represented separately through `team_seasons`.
 
@@ -334,7 +458,38 @@ Permanent team identity within an organization. Seasonal participation is repres
 - `team_admins` and `parent_teams` link to permanent `teams.id`, not `team_seasons.id`.
 ---
 
-### players, events, fields, league_games, standings, box_scores, player_stats, game_status_log, event_imports, weather_forecasts
+### players — athlete identity additions
+
+`players` remains the seasonal roster-assignment table. Statistics and game participation continue to reference `players.id`.
+
+**Athlete identity column:**
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| athlete_id | uuid | nullable composite FK with organization_id | Links a seasonal roster assignment to a durable athlete |
+
+**Constraint:**
+- `players_athlete_organization_fkey` — `(athlete_id, organization_id)` references `athletes(id, organization_id)`
+
+**Indexes:**
+- `idx_players_athlete` on `athlete_id`
+- `idx_players_unique_athlete_team_season` — partial unique index on `(athlete_id, team_season_id)` where `athlete_id is not null`
+
+**Behavior:**
+- An athlete can have at most one roster assignment for a given `team_season_id`.
+- `athlete_id` remains nullable to support conservative migration and legacy compatibility.
+- The initial backfill created one athlete per existing seasonal player row.
+- Backfill identities reused the existing `players.id` as the initial `athletes.id`.
+- Existing rows were not merged merely because player names matched.
+- Athlete names are durable identity data.
+- Jersey number, position, roster status, and statistics remain seasonal.
+- Removing a player from the active roster does not delete the linked athlete.
+- Restoring a player reactivates the seasonal roster assignment.
+- Historical `player_stats` continue pointing to `players.id`, not directly to `athletes.id`.
+
+---
+
+### events, fields, league_games, standings, box_scores, player_stats, game_status_log, event_imports, weather_forecasts
 
 All under RLS now (post-cutover).
 
@@ -589,10 +744,10 @@ alter publication supabase_realtime add table public.team_message_reactions;
 
 ## RLS pattern summary
 
-**Read pattern (SELECT):** Approved members can read all data in their orgs (via `organization_id IN current_user_org_ids()`). Cross-team visibility within an org is allowed.
+**Read pattern (SELECT):** Approved members can generally read tenant data in their organization through `organization_id IN current_user_org_ids()`. Cross-team visibility within an organization is allowed. `guardian_athletes` is narrower: users can read their own guardian relationships, while org_admins can read all relationships in the organization.
 
 **Write pattern — Org-wide (org_admin only):**
-teams, fields, league_games, standings, event_imports, weather_forecasts, team_seasons, seasons, game_status_log, organizations
+organizations, seasons, teams, team_seasons, athletes, guardian_athletes, fields, league_games, standings, event_imports, weather_forecasts, game_status_log
 
 **Write pattern — Team-scoped (team_admin OR org_admin):**
 players, events, box_scores, player_stats, team_posts, team_post_reactions
@@ -607,6 +762,8 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 ## Migration files in repo
 
+- `lib/db/migrations/athlete-identity-v1.sql` — creates durable `athletes`, creates `guardian_athletes`, adds nullable `players.athlete_id`, performs the conservative identity backfill, adds indexes/triggers, and enables RLS. **Already applied. Do not rerun against the current production database.**
+- `lib/db/migrations/guardian-athlete-management-v1.sql` — creates the org-admin-only `replace_guardian_athletes` RPC used by Admin → Members. **Already applied. Do not rerun against the current production database.**
 - `lib/db/migrations/chat-v1.sql` — Chat v1 schema, RLS, Realtime publication, Storage policies. **Already RUN against dev AND prod.**
 
 **Other migrations run ad-hoc and not saved to repo:**
@@ -659,6 +816,9 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - Admin → Stats is now the canonical post-game/manual stats entry surface. It supports bulk save, validation, unsaved-change detection, Fill batting order, and Clear pitching.
 - Team-admin dashboard is intentionally limited to operational tabs/actions: Dashboard, Status, Score, Stats, Events.
 - GameChanger-style live scoring is parked. Future stats import should be CSV-based and should wait for a real GameChanger Staff export sample.
+- Admin → Members supports linking an approved parent membership to multiple durable athletes and selecting an optional primary athlete.
+- Guardian-athlete relationships do not modify `parent_teams`; team access and default-team behavior remain independent.
+- The parent-facing athlete experience is not yet shipped. The current feature is the durable schema and org-admin management workflow.
 
 ## Outstanding items
 
@@ -669,7 +829,9 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 5. ✅ **Tournament box scores bug** — FIXED (app-side, not data/RLS). Opponent box_score row shares Elite's team_season_id and is distinguished by `team_id = null`; the line-score finder was rewritten in `app/event/[id]/page.tsx` to match the "us" row on `team_id` rather than differing team_season_id.
 6. ✅ **organization-logos storage policy** — FIXED (6-22-26). INSERT is now restricted to approved org_admins uploading inside their own org folder via `is_org_admin`.
 7. ✅ **Tighten organization-logos INSERT policy** — DONE. Uploads are scoped to approved org_admins for their own org folder.
-
+8. **Parent athlete experience** — guardian relationships are stored and manageable, but the parent-facing Team-page experience still needs to be built.
+9. **Relationship labels** — the schema supports `guardian_athletes.relationship`, and the replacement RPC preserves it, but the current Members UI does not edit relationship labels.
+10. **Primary athlete database enforcement** — the RPC maintains zero or one primary athlete for normal app writes, but the database does not currently have a partial unique constraint enforcing one primary row per membership.
 ---
 
 ## Notes for production migration (historical)
