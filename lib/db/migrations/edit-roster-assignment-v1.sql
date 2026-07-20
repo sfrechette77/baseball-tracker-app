@@ -30,6 +30,9 @@ declare
   v_display_name text;
   v_jersey_number text;
   v_position text;
+  v_roster_status text;
+  v_current_display_name text;
+  v_is_org_admin boolean;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -43,23 +46,45 @@ begin
     raise exception 'Player name is required';
   end if;
 
-  select
-    player.team_season_id,
-    player.organization_id,
-    player.athlete_id
-  into
-    v_team_season_id,
-    v_organization_id,
-    v_athlete_id
-  from public.players player
-  where player.id = p_player_id;
+    select
+      player.team_season_id,
+      player.organization_id,
+      player.athlete_id,
+      player.roster_status,
+      coalesce(athlete.display_name, player.name)
+    into
+      v_team_season_id,
+      v_organization_id,
+      v_athlete_id,
+      v_roster_status,
+      v_current_display_name
+    from public.players player
+    left join public.athletes athlete
+      on athlete.id = player.athlete_id
+    and athlete.organization_id = player.organization_id
+    where player.id = p_player_id;
 
   if v_team_season_id is null then
     raise exception 'Roster assignment not found';
   end if;
 
+  if v_roster_status is distinct from 'active' then
+    raise exception 'Only active roster assignments can be edited';
+  end if;
+
   if not public.can_admin_team_season(v_team_season_id) then
     raise exception 'Not authorized';
+  end if;
+
+  v_is_org_admin := public.is_org_admin(v_organization_id);
+
+  if not v_is_org_admin
+     and v_display_name is distinct from v_current_display_name then
+    raise exception 'Only organization admins can change athlete names';
+  end if;
+
+  if not v_is_org_admin then
+    v_display_name := v_current_display_name;
   end if;
 
   -- Repair a legacy roster row that is missing a permanent athlete identity.
@@ -79,20 +104,22 @@ begin
     where player.id = p_player_id;
   end if;
 
-  -- The athlete name is durable and should stay consistent across seasons.
-  update public.athletes athlete
-  set display_name = v_display_name
-  where athlete.id = v_athlete_id
-    and athlete.organization_id = v_organization_id;
+  -- Only org admins may change the durable athlete name.
+  if v_is_org_admin then
+    update public.athletes athlete
+    set display_name = v_display_name
+    where athlete.id = v_athlete_id
+      and athlete.organization_id = v_organization_id;
 
-  if not found then
-    raise exception 'Athlete identity not found';
+    if not found then
+      raise exception 'Athlete identity not found';
+    end if;
+
+    update public.players player
+    set name = v_display_name
+    where player.athlete_id = v_athlete_id
+      and player.organization_id = v_organization_id;
   end if;
-
-  update public.players player
-  set name = v_display_name
-  where player.athlete_id = v_athlete_id
-    and player.organization_id = v_organization_id;
 
   -- Jersey and position are specific to this seasonal assignment.
   update public.players player
@@ -126,5 +153,4 @@ grant execute on function public.update_roster_assignment(
   text,
   text
 ) to authenticated;
-
 commit;

@@ -38,6 +38,7 @@ import {
   createAthleteRosterAssignment,
   assignExistingAthleteToTeamSeason,
   getAssignableAthletes,
+  updateRosterAssignment,
   removePlayerFromRoster,
   restorePlayerToRoster,
   type AssignableAthlete,
@@ -536,6 +537,14 @@ export default function AdminPage() {
   const [existingAthleteId, setExistingAthleteId] = useState('')
   const [existingAthleteJersey, setExistingAthleteJersey] = useState('')
   const [existingAthletePosition, setExistingAthletePosition] = useState('')
+
+  const [editingRosterPlayerId, setEditingRosterPlayerId] =
+    useState<string | null>(null)
+
+  const [editingRosterName, setEditingRosterName] = useState('')
+  const [editingRosterJersey, setEditingRosterJersey] = useState('')
+  const [editingRosterPosition, setEditingRosterPosition] = useState('')
+  const [rosterEditSaving, setRosterEditSaving] = useState(false)
 
   const uploadOrgLogo = async (file: File) => {
     if (!org || !isOrgAdmin) return
@@ -2004,6 +2013,52 @@ const submitExistingAthlete = async () => {
   setRosterSaving(false)
 }
 
+const beginRosterEdit = (player: ManagedRosterPlayer) => {
+  setEditingRosterPlayerId(player.id)
+  setEditingRosterName(player.name)
+  setEditingRosterJersey(player.jersey_number ?? '')
+  setEditingRosterPosition(player.position ?? '')
+  setRosterMsg(null)
+}
+
+const cancelRosterEdit = () => {
+  setEditingRosterPlayerId(null)
+  setEditingRosterName('')
+  setEditingRosterJersey('')
+  setEditingRosterPosition('')
+}
+
+const saveRosterEdit = async () => {
+  if (!editingRosterPlayerId || rosterEditSaving) return
+
+  const displayName = editingRosterName.trim()
+
+  if (!displayName) {
+    setRosterMsg('Error: Player name is required.')
+    return
+  }
+
+  setRosterEditSaving(true)
+  setRosterMsg(null)
+
+  const result = await updateRosterAssignment({
+    playerId: editingRosterPlayerId,
+    displayName,
+    jerseyNumber: editingRosterJersey,
+    position: editingRosterPosition,
+  })
+
+  if (result.ok) {
+    cancelRosterEdit()
+    setRosterMsg(`${result.displayName} was updated.`)
+    await loadManagedRoster()
+  } else {
+    setRosterMsg(`Error: ${result.error}`)
+  }
+
+  setRosterEditSaving(false)
+}
+
   const removeManagedPlayer = async (player: ManagedRosterPlayer) => {
     if (rosterStatusSavingId) return
 
@@ -2955,43 +3010,150 @@ const visibleAdminTabs = isOrgAdmin
                       </div>
                     ) : (
                       <div className="mt-4 space-y-2">
-                        {activeRosterPlayers.map(player => (
-                          <div
-                            key={player.id}
-                            className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
-                          >
+                        {activeRosterPlayers.map(player => {
+                          const isEditing = editingRosterPlayerId === player.id
+
+                          if (isEditing) {
+                            return (
+                              <div
+                                key={player.id}
+                                className="rounded-xl border bg-black/30 p-4"
+                                style={{ borderColor: `${brandColor}80` }}
+                              >
+                                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_110px_minmax(0,1fr)]">
+                                  <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-400">
+                                      Player name
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editingRosterName}
+                                      onChange={event => setEditingRosterName(event.target.value)}
+                                      disabled={rosterEditSaving || !isOrgAdmin}
+                                      className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400 disabled:opacity-50"
+                                    />
+                                    {!isOrgAdmin && (
+                                      <p className="mt-1 text-[11px] text-slate-500">
+                                        Only organization admins can change athlete names.
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-400">
+                                      Jersey number
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editingRosterJersey}
+                                      onChange={event => setEditingRosterJersey(event.target.value)}
+                                      placeholder="Optional"
+                                      disabled={rosterEditSaving}
+                                      className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400 disabled:opacity-50"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-400">
+                                      Position
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editingRosterPosition}
+                                      onChange={event => setEditingRosterPosition(event.target.value)}
+                                      placeholder="Optional"
+                                      disabled={rosterEditSaving}
+                                      className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-slate-400 disabled:opacity-50"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={cancelRosterEdit}
+                                    disabled={rosterEditSaving}
+                                    className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-bold text-slate-300 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Cancel
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => void saveRosterEdit()}
+                                    disabled={rosterEditSaving || !editingRosterName.trim()}
+                                    className="rounded-lg px-4 py-1.5 text-xs font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                                    style={{ backgroundColor: brandColor }}
+                                  >
+                                    {rosterEditSaving ? 'Saving…' : 'Save'}
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          }
+
+                          return (
                             <div
-                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-white"
-                              style={{ backgroundColor: brandColor }}
+                              key={player.id}
+                              className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
                             >
-                              {player.jersey_number || '—'}
+                              <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-white"
+                                style={{ backgroundColor: brandColor }}
+                              >
+                                {player.jersey_number || '—'}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-bold text-white">
+                                  {player.name}
+                                </p>
+                                <p className="mt-0.5 text-xs text-slate-400">
+                                  {player.position || 'No position entered'}
+                                </p>
+                              </div>
+
+                              {!player.athlete_id && (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                                  Identity missing
+                                </span>
+                              )}
+
+                              <div className="ml-auto flex shrink-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => beginRosterEdit(player)}
+                                  disabled={
+                                    rosterEditSaving ||
+                                    rosterStatusSavingId !== null
+                                  }
+                                  title="Edit player"
+                                  className="rounded-lg border px-3 py-1.5 text-xs font-bold transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                                  style={{
+                                    borderColor: brandColor,
+                                    color: brandColor,
+                                  }}
+                                >
+                                  Edit
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => void removeManagedPlayer(player)}
+                                  disabled={
+                                    rosterStatusSavingId !== null ||
+                                    rosterEditSaving
+                                  }
+                                  className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {rosterStatusSavingId === player.id
+                                    ? 'Removing…'
+                                    : 'Remove'}
+                                </button>
+                              </div>
                             </div>
-
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-bold text-white">
-                                {player.name}
-                              </p>
-                              <p className="mt-0.5 text-xs text-slate-400">
-                                {player.position || 'No position entered'}
-                              </p>
-                            </div>
-
-                            {!player.athlete_id && (
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                                Identity missing
-                              </span>
-                            )}
-
-                          <button
-                            type="button"
-                            onClick={() => void removeManagedPlayer(player)}
-                            disabled={rosterStatusSavingId !== null}
-                            className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {rosterStatusSavingId === player.id ? 'Removing…' : 'Remove'}
-                          </button>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
