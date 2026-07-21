@@ -1,0 +1,6 @@
+A Rivera #12 (CF) 3 2 2 1 1 0
+M O'Neil (SS) 0 1 0 0 3 0
+INVALID BATTING ROW
+M Stone #7 (P) 2.2 1 0 0 2 5 0
+J Cole 1.1 2 1 1 0 2 0
+P-S: M Stone 48-30, J Cole 21-13, WP: M Stone 1, BF: M Stone 12, J Cole 6
