@@ -273,3 +273,46 @@ export type ResolvedGameChangerImportPayload = {
   teamName: string
   rows: ResolvedGameChangerImportRow[]
 }
+
+export type CurrentPlayerStatsBulkRow = {
+  playerId: string
+  batting_order_position: number | null
+  at_bats: number
+  hits: number
+  rbi: number
+  runs: number
+  walks: number
+  strikeouts: number
+  pitch_count: number
+  innings_pitched: number
+  strikeouts_pitching: number
+  walks_allowed: number
+  hits_allowed: number
+  earned_runs: number
+}
+
+export type UnstoredGameChangerStatName =
+  | 'totalBases'
+  | 'doubles'
+  | 'triples'
+  | 'homeRuns'
+  | 'stolenBases'
+  | 'caughtStealing'
+  | 'runsAllowed'
+  | 'homeRunsAllowed'
+  | 'strikes'
+  | 'battersFaced'
+  | 'wildPitches'
+
+export type UnstoredGameChangerStat = {
+  sourceKey: string
+  sourceName: string
+  playerId: string
+  stat: UnstoredGameChangerStatName
+  value: number
+}
+
+export type GameChangerPlayerStatsMapping = {
+  stats: CurrentPlayerStatsBulkRow[]
+  unstoredStats: UnstoredGameChangerStat[]
+}
