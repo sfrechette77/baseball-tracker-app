@@ -129,3 +129,190 @@ export type ParsedPitchingNotes = {
   wildPitches: ParsedNamedCountNote[]
   warnings: ParseWarning[]
 }
+
+export type RosterPlayerForImport = {
+  id: string
+  name: string
+  jerseyNumber: string | null
+}
+
+export type PlayerMatchCandidate = {
+  playerId: string
+  name: string
+  normalizedName: string
+  jerseyNumber: string | null
+}
+
+export type PlayerMatchStatus =
+  | 'matched'
+  | 'needs_review'
+  | 'unmatched'
+
+export type PlayerMatchConfidence =
+  | 'high'
+  | 'medium'
+  | 'none'
+
+export type PlayerMatchReason =
+  | 'exact-name-and-jersey'
+  | 'exact-name'
+  | 'abbreviated-name-and-jersey'
+  | 'abbreviated-name'
+  | 'unique-jersey'
+  | 'ambiguous-exact-name-and-jersey'
+  | 'ambiguous-exact-name'
+  | 'ambiguous-abbreviated-name-and-jersey'
+  | 'ambiguous-abbreviated-name'
+  | 'ambiguous-jersey'
+  | 'no-match'
+
+export type PlayerMatchResult = {
+  sourceName: string
+  normalizedSourceName: string
+  sourceJerseyNumber: string | null
+
+  status: PlayerMatchStatus
+  confidence: PlayerMatchConfidence
+  reason: PlayerMatchReason
+
+  playerId: string | null
+  candidates: PlayerMatchCandidate[]
+}
+
+export type ReviewImportSource =
+  | 'batting'
+  | 'pitching'
+  | 'both'
+
+export type ReviewImportRow = {
+  sourceKey: string
+  sourceName: string
+  normalizedSourceName: string
+  sourceJerseyNumber: string | null
+  sourcePosition: string | null
+  sourceSections: ReviewImportSource
+
+  batting: ParsedBattingLine | null
+  pitching: ParsedPitchingLine | null
+
+  match: PlayerMatchResult
+  suggestedPlayerId: string | null
+  selectedPlayerId: string | null
+  include: boolean
+
+  warnings: ParseWarning[]
+}
+
+export type GameChangerImportReviewSummary = {
+  totalRows: number
+  matched: number
+  needsReview: number
+  unmatched: number
+  requiresResolution: number
+}
+
+export type GameChangerImportReview = {
+  teamIndex: number
+  teamName: string
+  rows: ReviewImportRow[]
+  summary: GameChangerImportReviewSummary
+  readyToImport: boolean
+  warnings: ParseWarning[]
+}
+
+export type ReviewValidationIssueCode =
+  | 'no-rows-included'
+  | 'unresolved-player'
+  | 'duplicate-player-assignment'
+
+export type ReviewValidationIssue = {
+  code: ReviewValidationIssueCode
+  message: string
+  sourceKeys: string[]
+  playerId?: string
+}
+
+export type ResolvedGameChangerImportRow = {
+  sourceKey: string
+  sourceName: string
+  playerId: string
+  sourceSections: ReviewImportSource
+
+  battingOrderPosition: number | null
+  atBats: number | null
+  runs: number | null
+  hits: number | null
+  runsBattedIn: number | null
+  walks: number | null
+  battingStrikeouts: number | null
+
+  totalBases: number | null
+  doubles: number | null
+  triples: number | null
+  homeRuns: number | null
+  stolenBases: number | null
+  caughtStealing: number | null
+
+  inningsPitched: string | null
+  inningsOuts: number | null
+  hitsAllowed: number | null
+  runsAllowed: number | null
+  earnedRuns: number | null
+  walksAllowed: number | null
+  pitchingStrikeouts: number | null
+  homeRunsAllowed: number | null
+
+  pitchCount: number | null
+  strikes: number | null
+  battersFaced: number | null
+  wildPitches: number | null
+}
+
+export type ResolvedGameChangerImportPayload = {
+  teamIndex: number
+  teamName: string
+  rows: ResolvedGameChangerImportRow[]
+}
+
+export type CurrentPlayerStatsBulkRow = {
+  playerId: string
+  batting_order_position: number | null
+  at_bats: number
+  hits: number
+  rbi: number
+  runs: number
+  walks: number
+  strikeouts: number
+  pitch_count: number
+  innings_pitched: number
+  strikeouts_pitching: number
+  walks_allowed: number
+  hits_allowed: number
+  earned_runs: number
+}
+
+export type UnstoredGameChangerStatName =
+  | 'totalBases'
+  | 'doubles'
+  | 'triples'
+  | 'homeRuns'
+  | 'stolenBases'
+  | 'caughtStealing'
+  | 'runsAllowed'
+  | 'homeRunsAllowed'
+  | 'strikes'
+  | 'battersFaced'
+  | 'wildPitches'
+
+export type UnstoredGameChangerStat = {
+  sourceKey: string
+  sourceName: string
+  playerId: string
+  stat: UnstoredGameChangerStatName
+  value: number
+}
+
+export type GameChangerPlayerStatsMapping = {
+  stats: CurrentPlayerStatsBulkRow[]
+  unstoredStats: UnstoredGameChangerStat[]
+}
