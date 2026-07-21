@@ -219,3 +219,57 @@ export type GameChangerImportReview = {
   readyToImport: boolean
   warnings: ParseWarning[]
 }
+
+export type ReviewValidationIssueCode =
+  | 'no-rows-included'
+  | 'unresolved-player'
+  | 'duplicate-player-assignment'
+
+export type ReviewValidationIssue = {
+  code: ReviewValidationIssueCode
+  message: string
+  sourceKeys: string[]
+  playerId?: string
+}
+
+export type ResolvedGameChangerImportRow = {
+  sourceKey: string
+  sourceName: string
+  playerId: string
+  sourceSections: ReviewImportSource
+
+  battingOrderPosition: number | null
+  atBats: number | null
+  runs: number | null
+  hits: number | null
+  runsBattedIn: number | null
+  walks: number | null
+  battingStrikeouts: number | null
+
+  totalBases: number | null
+  doubles: number | null
+  triples: number | null
+  homeRuns: number | null
+  stolenBases: number | null
+  caughtStealing: number | null
+
+  inningsPitched: string | null
+  inningsOuts: number | null
+  hitsAllowed: number | null
+  runsAllowed: number | null
+  earnedRuns: number | null
+  walksAllowed: number | null
+  pitchingStrikeouts: number | null
+  homeRunsAllowed: number | null
+
+  pitchCount: number | null
+  strikes: number | null
+  battersFaced: number | null
+  wildPitches: number | null
+}
+
+export type ResolvedGameChangerImportPayload = {
+  teamIndex: number
+  teamName: string
+  rows: ResolvedGameChangerImportRow[]
+}
