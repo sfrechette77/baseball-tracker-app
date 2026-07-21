@@ -178,3 +178,44 @@ export type PlayerMatchResult = {
   playerId: string | null
   candidates: PlayerMatchCandidate[]
 }
+
+export type ReviewImportSource =
+  | 'batting'
+  | 'pitching'
+  | 'both'
+
+export type ReviewImportRow = {
+  sourceKey: string
+  sourceName: string
+  normalizedSourceName: string
+  sourceJerseyNumber: string | null
+  sourcePosition: string | null
+  sourceSections: ReviewImportSource
+
+  batting: ParsedBattingLine | null
+  pitching: ParsedPitchingLine | null
+
+  match: PlayerMatchResult
+  suggestedPlayerId: string | null
+  selectedPlayerId: string | null
+  include: boolean
+
+  warnings: ParseWarning[]
+}
+
+export type GameChangerImportReviewSummary = {
+  totalRows: number
+  matched: number
+  needsReview: number
+  unmatched: number
+  requiresResolution: number
+}
+
+export type GameChangerImportReview = {
+  teamIndex: number
+  teamName: string
+  rows: ReviewImportRow[]
+  summary: GameChangerImportReviewSummary
+  readyToImport: boolean
+  warnings: ParseWarning[]
+}
