@@ -7,6 +7,7 @@ import {
   getPendingMemberships,
   getOrgTeams,
   approveMembership,
+  rejectMembership,
   getApprovedParents,
   updateMemberTeams,
   removeMembership,
@@ -702,6 +703,10 @@ export default function AdminPage() {
   const [approveTeamIds, setApproveTeamIds] = useState<Set<string>>(new Set())
   const [approveDefaultTeamId, setApproveDefaultTeamId] = useState<string>('')
   const [approveSaving, setApproveSaving] = useState(false)
+  const [rejectingId, setRejectingId] =
+    useState<string | null>(null)
+  const [rejectSaving, setRejectSaving] =
+    useState(false)
 
   // Members tab
   const [membersList, setMembersList] = useState<ApprovedParent[]>([])
@@ -1443,6 +1448,7 @@ useEffect(() => {
   // Open the approve modal for a specific pending membership.
   // Default: all org teams checked, the first one selected as default.
   const startApprove = (membershipId: string) => {
+    setRejectingId(null)
     setApprovingId(membershipId)
     setApproveTeamIds(new Set(orgTeams.map(t => t.id)))
     setApproveDefaultTeamId(orgTeams[0]?.id ?? '')
@@ -1453,6 +1459,45 @@ useEffect(() => {
     setApprovingId(null)
     setApproveTeamIds(new Set())
     setApproveDefaultTeamId('')
+  }
+
+  const startReject = (membershipId: string) => {
+    setApprovingId(null)
+    setApproveTeamIds(new Set())
+    setApproveDefaultTeamId('')
+    setRejectingId(membershipId)
+    setPendingMsg(null)
+  }
+
+  const cancelReject = () => {
+    setRejectingId(null)
+  }
+
+  const submitReject = async () => {
+    if (!rejectingId) return
+
+    setRejectSaving(true)
+    setPendingMsg(null)
+
+    const result = await rejectMembership(rejectingId)
+
+    setRejectSaving(false)
+
+    if (!result.ok) {
+      setPendingMsg(`❌ ${result.error}`)
+      return
+    }
+
+    setPendingList(prev =>
+      prev.filter(item => item.id !== rejectingId)
+    )
+
+    setDashboardPendingCount(prev =>
+      prev === null ? null : Math.max(0, prev - 1)
+    )
+
+    setPendingMsg('✅ Access request rejected')
+    cancelReject()
   }
 
   const startPromoteMember = (member: ApprovedParent) => {
@@ -1571,8 +1616,18 @@ const submitGrantTeamAdmin = async () => {
       return
     }
     setPendingMsg('✅ Approved')
-    // Remove from list and close modal
-    setPendingList(prev => prev.filter(p => p.id !== approvingId))
+
+    // Remove from list
+    setPendingList(prev =>
+      prev.filter(p => p.id !== approvingId)
+    )
+
+    // Update the dashboard count
+    setDashboardPendingCount(prev =>
+      prev === null ? null : Math.max(0, prev - 1)
+    )
+
+    // Close the approval panel
     cancelApprove()
   }
 
@@ -3400,6 +3455,7 @@ const visibleAdminTabs = isOrgAdmin
               <div className="space-y-2">
                 {pendingList.map(p => {
                   const isApproving = approvingId === p.id
+                  const isRejecting = rejectingId === p.id
                   return (
                     <div key={p.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                       <div>
@@ -3414,14 +3470,60 @@ const visibleAdminTabs = isOrgAdmin
                         </p>
                       </div>
 
-                      {!isApproving && (
-                        <button
-                          onClick={() => startApprove(p.id)}
-                          className="w-full rounded-xl py-2 text-sm font-bold text-white transition"
-                          style={{ backgroundColor: settingsPrimaryColor }}
-                        >
-                          Approve
-                        </button>
+                      {!isApproving && !isRejecting && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => startApprove(p.id)}
+                            className="rounded-xl py-2 text-sm font-bold text-white transition"
+                            style={{ backgroundColor: settingsPrimaryColor }}
+                          >
+                            Approve
+                          </button>
+
+                          <button
+                            onClick={() => startReject(p.id)}
+                            className="rounded-xl bg-red-600 py-2 text-sm font-bold text-white transition hover:bg-red-500"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+
+                      {isRejecting && (
+                        <div className="space-y-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-red-400">
+                              Reject access request
+                            </p>
+
+                            <p className="mt-1 text-xs leading-relaxed text-slate-300">
+                              Reject the request from{' '}
+                              <span className="font-semibold text-white">
+                                {p.full_name || p.email || 'this user'}
+                              </span>
+                              ? They will not receive organization access, but they may
+                              request access again later.
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={submitReject}
+                              disabled={rejectSaving}
+                              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-50"
+                            >
+                              {rejectSaving ? 'Rejecting…' : 'Confirm Reject'}
+                            </button>
+
+                            <button
+                              onClick={cancelReject}
+                              disabled={rejectSaving}
+                              className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/20 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
                       )}
 
                       {isApproving && (

@@ -77,6 +77,7 @@ export async function getPendingMemberships(): Promise<
     .from('memberships')
     .select('id, user_id, organization_id, created_at')
     .eq('organization_id', guard.membership.organization_id)
+    .eq('role', 'parent')
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
 
@@ -159,6 +160,13 @@ export async function approveMembership(
   if (target.organization_id !== guard.membership.organization_id) {
     return { ok: false, error: 'Cannot approve memberships outside your org' }
   }
+
+  if (target.role !== 'parent') {
+    return {
+      ok: false,
+      error: 'Only pending parent requests can be approved here',
+    }
+  }
   if (target.status !== 'pending') {
     return { ok: false, error: `Membership is already ${target.status}` }
   }
@@ -200,6 +208,90 @@ export async function approveMembership(
     return {
       ok: false,
       error: `Membership approved but team assignment failed: ${ptError.message}`,
+    }
+  }
+
+  revalidatePath('/admin')
+  return { ok: true }
+}
+
+// ─── rejectMembership ──────────────────────────────────────────────────────
+
+export async function rejectMembership(
+  membershipId: string
+): Promise<SimpleResult> {
+  if (!membershipId) {
+    return { ok: false, error: 'Missing membershipId' }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+
+  if (!guard.ok) {
+    return { ok: false, error: guard.error }
+  }
+
+  const { data: target, error: targetError } = await supabase
+    .from('memberships')
+    .select('id, organization_id, status, role')
+    .eq('id', membershipId)
+    .maybeSingle()
+
+  if (targetError) {
+    return { ok: false, error: targetError.message }
+  }
+
+  if (!target) {
+    return { ok: false, error: 'Membership not found' }
+  }
+
+  if (
+    target.organization_id !==
+    guard.membership.organization_id
+  ) {
+    return {
+      ok: false,
+      error: 'Cannot reject memberships outside your org',
+    }
+  }
+
+  if (target.role !== 'parent') {
+    return {
+      ok: false,
+      error: 'Only pending parent requests can be rejected here',
+    }
+  }
+
+  if (target.status !== 'pending') {
+    return {
+      ok: false,
+      error: `Membership is already ${target.status}`,
+    }
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from('memberships')
+    .update({
+      status: 'rejected',
+      approved_by: null,
+      approved_at: null,
+    })
+    .eq('id', membershipId)
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle()
+
+  if (updateError) {
+    return {
+      ok: false,
+      error: `Reject failed: ${updateError.message}`,
+    }
+  }
+
+  if (!updated) {
+    return {
+      ok: false,
+      error: 'This membership is no longer pending',
     }
   }
 

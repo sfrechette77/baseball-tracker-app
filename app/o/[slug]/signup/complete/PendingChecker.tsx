@@ -9,10 +9,10 @@ type Props = {
 }
 
 /**
- * Checks the user's membership status in this org on mount and on tab focus.
- * If the user is now approved, redirects them to the dashboard.
- *
- * This component renders nothing visible — it just runs the check in the background.
+ * Checks the user's membership status on mount and when the tab
+ * regains focus. Approved users are redirected to the app.
+ * Rejected requests refresh the server page so the rejection
+ * state is displayed.
  */
 export function PendingChecker({ orgId }: Props) {
   const router = useRouter()
@@ -28,12 +28,22 @@ export function PendingChecker({ orgId }: Props) {
         .select('status')
         .eq('user_id', user.id)
         .eq('organization_id', orgId)
-        .eq('status', 'approved')
-        .limit(1)
+        .eq('role', 'parent')
+        .in('status', ['approved', 'rejected'])
 
-      if (memberships && memberships.length > 0) {
-        // They're approved — bounce to the dashboard
+      const statuses = new Set(
+        (memberships ?? []).map(
+          membership => membership.status
+        )
+      )
+
+      if (statuses.has('approved')) {
         router.push('/')
+        router.refresh()
+        return
+      }
+
+      if (statuses.has('rejected')) {
         router.refresh()
       }
     }
