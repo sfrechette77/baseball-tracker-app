@@ -129,3 +129,52 @@ export type ParsedPitchingNotes = {
   wildPitches: ParsedNamedCountNote[]
   warnings: ParseWarning[]
 }
+
+export type RosterPlayerForImport = {
+  id: string
+  name: string
+  jerseyNumber: string | null
+}
+
+export type PlayerMatchCandidate = {
+  playerId: string
+  name: string
+  normalizedName: string
+  jerseyNumber: string | null
+}
+
+export type PlayerMatchStatus =
+  | 'matched'
+  | 'needs_review'
+  | 'unmatched'
+
+export type PlayerMatchConfidence =
+  | 'high'
+  | 'medium'
+  | 'none'
+
+export type PlayerMatchReason =
+  | 'exact-name-and-jersey'
+  | 'exact-name'
+  | 'abbreviated-name-and-jersey'
+  | 'abbreviated-name'
+  | 'unique-jersey'
+  | 'ambiguous-exact-name-and-jersey'
+  | 'ambiguous-exact-name'
+  | 'ambiguous-abbreviated-name-and-jersey'
+  | 'ambiguous-abbreviated-name'
+  | 'ambiguous-jersey'
+  | 'no-match'
+
+export type PlayerMatchResult = {
+  sourceName: string
+  normalizedSourceName: string
+  sourceJerseyNumber: string | null
+
+  status: PlayerMatchStatus
+  confidence: PlayerMatchConfidence
+  reason: PlayerMatchReason
+
+  playerId: string | null
+  candidates: PlayerMatchCandidate[]
+}
