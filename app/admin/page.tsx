@@ -2825,12 +2825,14 @@ const visibleAdminTabs = isOrgAdmin
                           Start Date
                         </label>
 
-                        <input
-                          type="date"
-                          value={newSeasonStartDate}
-                          onChange={e => setNewSeasonStartDate(e.target.value)}
-                          className="block w-full max-w-full min-w-0 box-border rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
-                        />
+                        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/10">
+                          <input
+                            type="date"
+                            value={newSeasonStartDate}
+                            onChange={e => setNewSeasonStartDate(e.target.value)}
+                            className="block w-full min-w-0 max-w-full bg-transparent px-3 py-2 text-sm text-white focus:outline-none"
+                          />
+                        </div>
                       </div>
 
                       <div className="min-w-0 space-y-2 overflow-hidden">
@@ -2838,12 +2840,14 @@ const visibleAdminTabs = isOrgAdmin
                           End Date
                         </label>
 
-                        <input
-                          type="date"
-                          value={newSeasonEndDate}
-                          onChange={e => setNewSeasonEndDate(e.target.value)}
-                          className="block w-full max-w-full min-w-0 box-border rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
-                        />
+                        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/10">
+                          <input
+                            type="date"
+                            value={newSeasonEndDate}
+                            onChange={e => setNewSeasonEndDate(e.target.value)}
+                            className="block w-full min-w-0 max-w-full bg-transparent px-3 py-2 text-sm text-white focus:outline-none"
+                          />
+                        </div>
                       </div>
                     </div>
 
