@@ -2819,7 +2819,7 @@ const visibleAdminTabs = isOrgAdmin
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
                       <div className="min-w-0">
                         <label className="text-xs text-slate-400">
                           Start Date
