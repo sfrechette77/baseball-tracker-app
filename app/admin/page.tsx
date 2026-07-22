@@ -2819,24 +2819,28 @@ const visibleAdminTabs = isOrgAdmin
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-400">Start Date</label>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="min-w-0">
+                        <label className="text-xs text-slate-400">
+                          Start Date
+                        </label>
                         <input
                           type="date"
                           value={newSeasonStartDate}
                           onChange={e => setNewSeasonStartDate(e.target.value)}
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                          className="mt-1 block w-full min-w-0 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-400">End Date</label>
+                      <div className="min-w-0">
+                        <label className="text-xs text-slate-400">
+                          End Date
+                        </label>
                         <input
                           type="date"
                           value={newSeasonEndDate}
                           onChange={e => setNewSeasonEndDate(e.target.value)}
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                          className="mt-1 block w-full min-w-0 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
                         />
                       </div>
                     </div>
