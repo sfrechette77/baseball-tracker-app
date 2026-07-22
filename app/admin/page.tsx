@@ -451,28 +451,104 @@ export default function AdminPage() {
     setLaunchReadinessLoading(false)
   }
 
-  const launchReadinessItems = launchReadiness
-    ? [
-        { label: 'Organization logo', complete: launchReadiness.logoConfigured },
-        { label: 'Brand color', complete: launchReadiness.brandColorConfigured },
-        { label: 'Current season', complete: launchReadiness.currentSeasonExists },
-        { label: 'At least one team', complete: launchReadiness.teamExists },
-        { label: 'Approved org admin', complete: launchReadiness.orgAdminExists },
-        { label: 'Signup link', complete: launchReadiness.signupLinkAvailable },
-        {
-          label: 'Public welcome message',
-          complete: launchReadiness.publicDescriptionConfigured,
-        },
-        {
-          label: 'Public resource link',
-          complete: launchReadiness.publicLinkExists,
-        },
-      ]
-    : []
+  type LaunchReadinessItem = {
+  label: string
+  complete: boolean
+  targetTab?: Tab
+  targetSettingsSubTab?: SettingsSubTab
+  manualSetup?: boolean
+}
+
+  const launchReadinessItems: LaunchReadinessItem[] =
+    launchReadiness
+      ? [
+          {
+            label: 'Organization logo',
+            complete: launchReadiness.logoConfigured,
+            targetTab: 'settings',
+            targetSettingsSubTab: 'branding',
+          },
+          {
+            label: 'Brand color',
+            complete: launchReadiness.brandColorConfigured,
+            targetTab: 'settings',
+            targetSettingsSubTab: 'branding',
+          },
+          {
+            label: 'Current season',
+            complete: launchReadiness.currentSeasonExists,
+            targetTab: 'settings',
+            targetSettingsSubTab: 'season',
+          },
+          {
+            label: 'At least one team',
+            complete: launchReadiness.teamExists,
+            manualSetup: true,
+          },
+          {
+            label: 'Roster started',
+            complete: launchReadiness.rosterStarted,
+            targetTab: 'roster',
+          },
+          {
+            label: 'Team admin assigned',
+            complete: launchReadiness.teamAdminAssigned,
+            targetTab: 'members',
+          },
+          {
+            label: 'Approved org admin',
+            complete: launchReadiness.orgAdminExists,
+          },
+          {
+            label: 'Signup link',
+            complete: launchReadiness.signupLinkAvailable,
+            targetTab: 'settings',
+            targetSettingsSubTab: 'access',
+          },
+          {
+            label: 'Public welcome message',
+            complete: launchReadiness.publicDescriptionConfigured,
+            targetTab: 'settings',
+            targetSettingsSubTab: 'general',
+          },
+          {
+            label: 'Public resource link',
+            complete: launchReadiness.publicLinkExists,
+            targetTab: 'settings',
+            targetSettingsSubTab: 'links',
+          },
+        ]
+      : []
 
   const completedLaunchItems = launchReadinessItems.filter(
     item => item.complete
   ).length
+
+  const launchReadinessPercent =
+    launchReadinessItems.length > 0
+      ? Math.round(
+          (completedLaunchItems /
+            launchReadinessItems.length) *
+            100
+        )
+      : 0
+
+  const openLaunchSetup = (
+    item: LaunchReadinessItem
+  ) => {
+    if (item.targetSettingsSubTab) {
+      setSettingsSubTab(item.targetSettingsSubTab)
+    }
+
+    if (item.targetTab) {
+      setTab(item.targetTab)
+    }
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
 
   const submitSeasonRollover = async () => {
   if (!newSeasonName.trim()) {
@@ -2292,11 +2368,29 @@ const visibleAdminTabs = isOrgAdmin
                     </div>
 
                     {!launchReadinessLoading && launchReadiness && (
-                      <span className="shrink-0 text-xs font-semibold text-slate-300">
-                        {completedLaunchItems}/{launchReadinessItems.length}
-                      </span>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold text-white">
+                          {launchReadinessPercent}%
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {completedLaunchItems}/
+                          {launchReadinessItems.length} complete
+                        </p>
+                      </div>
                     )}
                   </div>
+
+                  {!launchReadinessLoading && launchReadiness && (
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${launchReadinessPercent}%`,
+                          backgroundColor: brandColor,
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {launchReadinessLoading && (
                     <p className="mt-4 text-sm text-slate-400">Checking setup…</p>
@@ -2307,18 +2401,42 @@ const visibleAdminTabs = isOrgAdmin
                       {launchReadinessItems.map(item => (
                         <div
                           key={item.label}
-                          className="flex items-center justify-between rounded-lg bg-slate-900/70 px-3 py-2"
+                          className="flex items-center justify-between gap-3 rounded-lg bg-slate-900/70 px-3 py-2"
                         >
-                          <span className="text-sm text-slate-200">{item.label}</span>
-                          <span
-                            className={
-                              item.complete
-                                ? 'text-xs font-semibold text-emerald-400'
-                                : 'text-xs font-semibold text-amber-400'
-                            }
-                          >
-                            {item.complete ? 'Complete' : 'Needs setup'}
-                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm text-slate-200">
+                              {item.label}
+                            </p>
+
+                            {!item.complete && item.manualSetup && (
+                              <p className="mt-0.5 text-[10px] text-slate-500">
+                                Team creation is currently handled during
+                                organization provisioning.
+                              </p>
+                            )}
+                          </div>
+
+                          {item.complete ? (
+                            <span className="shrink-0 text-xs font-semibold text-emerald-400">
+                              Complete
+                            </span>
+                          ) : item.targetTab ? (
+                            <button
+                              type="button"
+                              onClick={() => openLaunchSetup(item)}
+                              className="shrink-0 rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-white/5"
+                              style={{
+                                borderColor: brandColor,
+                                color: brandColor,
+                              }}
+                            >
+                              Set up
+                            </button>
+                          ) : (
+                            <span className="shrink-0 text-xs font-semibold text-amber-400">
+                              Manual setup
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>

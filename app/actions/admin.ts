@@ -926,6 +926,8 @@ export type OrganizationLaunchReadiness = {
   brandColorConfigured: boolean
   currentSeasonExists: boolean
   teamExists: boolean
+  rosterStarted: boolean
+  teamAdminAssigned: boolean
   orgAdminExists: boolean
   signupLinkAvailable: boolean
   publicDescriptionConfigured: boolean
@@ -950,8 +952,10 @@ export async function getOrganizationLaunchReadiness(): Promise<
     seasonResult,
     teamResult,
     adminResult,
+    teamAdminResult,
     publicLinkResult,
   ] = await Promise.all([
+
     supabase
       .from('organizations')
       .select('slug, logo_url, primary_color, public_description')
@@ -981,6 +985,21 @@ export async function getOrganizationLaunchReadiness(): Promise<
       .limit(1),
 
     supabase
+  .from('team_admins')
+  .select(`
+    membership_id,
+    memberships!inner (
+      organization_id,
+      role,
+      status
+    )
+  `)
+  .eq('memberships.organization_id', organizationId)
+  .eq('memberships.role', 'team_admin')
+  .eq('memberships.status', 'approved')
+  .limit(1),  
+
+    supabase
       .from('organization_links')
       .select('id')
       .eq('organization_id', organizationId)
@@ -994,6 +1013,7 @@ export async function getOrganizationLaunchReadiness(): Promise<
     seasonResult.error ||
     teamResult.error ||
     adminResult.error ||
+    teamAdminResult.error ||
     publicLinkResult.error
 
   if (firstError) {
@@ -1005,6 +1025,50 @@ export async function getOrganizationLaunchReadiness(): Promise<
 
   const organization = organizationResult.data
 
+  let rosterStarted = false
+
+  const currentSeasonId = seasonResult.data?.[0]?.id
+
+  if (currentSeasonId) {
+    const { data: teamSeasons, error: teamSeasonsError } =
+      await supabase
+        .from('team_seasons')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('season_id', currentSeasonId)
+
+    if (teamSeasonsError) {
+      return {
+        ok: false,
+        error: teamSeasonsError.message,
+      }
+    }
+
+    const teamSeasonIds = (teamSeasons ?? []).map(
+      teamSeason => teamSeason.id
+    )
+
+    if (teamSeasonIds.length > 0) {
+      const { count, error: playersError } = await supabase
+        .from('players')
+        .select('id', {
+          count: 'exact',
+          head: true,
+        })
+        .in('team_season_id', teamSeasonIds)
+        .eq('roster_status', 'active')
+
+      if (playersError) {
+        return {
+          ok: false,
+          error: playersError.message,
+        }
+      }
+
+      rosterStarted = (count ?? 0) > 0
+    }
+  }
+
   return {
     ok: true,
     readiness: {
@@ -1012,6 +1076,8 @@ export async function getOrganizationLaunchReadiness(): Promise<
       brandColorConfigured: Boolean(organization.primary_color?.trim()),
       currentSeasonExists: Boolean(seasonResult.data?.length),
       teamExists: Boolean(teamResult.data?.length),
+      rosterStarted,
+      teamAdminAssigned: Boolean(teamAdminResult.data?.length), 
       orgAdminExists: Boolean(adminResult.data?.length),
       signupLinkAvailable: Boolean(organization.slug?.trim()),
       publicDescriptionConfigured: Boolean(
