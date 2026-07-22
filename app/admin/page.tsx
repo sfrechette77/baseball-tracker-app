@@ -2819,28 +2819,30 @@ const visibleAdminTabs = isOrgAdmin
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="space-y-2">
+                    <div className="w-full min-w-0 space-y-3">
+                      <div className="min-w-0 space-y-2 overflow-hidden">
                         <label className="text-xs text-slate-400">
                           Start Date
                         </label>
+
                         <input
                           type="date"
                           value={newSeasonStartDate}
                           onChange={e => setNewSeasonStartDate(e.target.value)}
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                          className="block w-full max-w-full min-w-0 box-border rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
                         />
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-2 overflow-hidden">
                         <label className="text-xs text-slate-400">
                           End Date
                         </label>
+
                         <input
                           type="date"
                           value={newSeasonEndDate}
                           onChange={e => setNewSeasonEndDate(e.target.value)}
-                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                          className="block w-full max-w-full min-w-0 box-border rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none"
                         />
                       </div>
                     </div>
