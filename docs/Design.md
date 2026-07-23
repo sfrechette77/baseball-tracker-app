@@ -7,7 +7,7 @@
 **Recently completed:**
 - ✅ Admin → Stats workflow upgraded and smoke tested in production: desktop table UI, bulk Save All Stats endpoint, client-side validation, unsaved-change tracking, Fill batting order, and Clear pitching helper.
 - ✅ Team-admin dashboard polished and smoke tested: cleaner header, no emoji-style quick actions, clearer "View Team Page" action, centered Roster Health status, and simpler dashboard copy.
-- ✅ Team-admin tab visibility verified: team_admin sees Dashboard, Roster, Status, Score, Stats, Events; org_admin-only tabs remain hidden from the team-admin tab bar.
+- ✅ Team-admin tab visibility verified: team_admin sees Dashboard, Status, Score, Stats, Events; org_admin-only tabs remain hidden from the team-admin tab bar.
 - ✅ Branch cleanup completed after stats/team-admin polish.
 - ✅ Intro email sent to Frankie at Elite Baseball asking for product feedback and a GameChanger stats CSV/box-score export sample.
 - ✅ Org branding rollout — logo + primary_color across Team/Home/Schedule/Stats/Messages/Admin/nav.
@@ -19,6 +19,17 @@
 - ✅ Durable athlete identity and guardian-athlete management shipped: org admins can link approved parent memberships to one or more organization athletes, mark an optional primary athlete, and clear or replace assignments without changing team access.
 - ✅ Parent athlete roster experience shipped: parents see linked athletes in a dedicated My Athletes section, linked roster rows are highlighted, multiple siblings are supported, and the optional primary athlete is identified without changing team access.
 - ✅ Admin roster assignment editing shipped: org admins can edit durable athlete names plus seasonal jersey number and position, while team admins can edit seasonal fields only.
+- ✅ Pending membership rejection workflow completed.
+  - Org admins can reject pending parent requests.
+  - Parents receive a clear rejection state.
+  - Parents can request access again without creating duplicate memberships.
+  - Pending approval page now handles approved, pending, rejected, and resubmitted states.
+
+- ✅ Organization Launch Readiness expanded.
+  - Added current-season roster readiness.
+  - Added team-admin assignment readiness.
+  - Added progress percentage and progress bar.
+  - Added contextual "Set up" actions for incomplete items.
 
 **Active items (pick one):**
 1. **GameChanger CSV import discovery** — wait for a real CSV export from a team Staff account before building import. Do not implement against guessed columns.
@@ -175,6 +186,8 @@ Scope: org_admins can manage approved members, parent team access, team-admin as
 - **Make Admin** → grants team-admin access for selected teams.
 - Existing team-admin assignments appear in a separate section with per-team removal controls.
 - **Remove** → confirmation step for removing a parent membership.
+Mobile polish:
+- Season rollover Start Date / End Date fields now stack vertically on narrow screens to avoid Safari date input overflow.
 
 ### Server Actions (`app/actions/admin.ts`)
 - `getApprovedParents` — loads approved member records, profile information, parent team access, team-admin assignments, and guardian-athlete assignments.
@@ -382,10 +395,24 @@ Scope: public, shareable organization landing page for prospective families and 
 
 ## Admin Settings tab — SHIPPED
 
-- Settings remains org_admin-only. Team-admin tabs are Dashboard, Roster, Status, Score, Stats, and Events.
+- New Settings tab in /admin, **org_admin only** (`teamAdminAllowedTabs` unchanged: status, score, stats, events).
 - Contains: Organization Name, read-only Slug, Branding (logo upload + preview, color picker), Access (signup link + Copy button), Season (active season name, read-only).
 - Saves: name, logo_url, primary_color. Slug read-only (changing it would break signup links).
 - UX: visible Logo URL field removed (too technical) — logo_url still saved internally. Advanced hex section removed; color picker with plain-English helper. Access heading: "Share this link with parents, coaches, and players so they can request access."
+- Launch Readiness now guides new organizations through onboarding.
+Current checks:
+- Logo configured
+- Brand color configured
+- Current season exists
+- At least one team exists
+- Current-season roster started
+- Team admin assigned
+- Approved org admin exists
+- Signup link available
+- Public welcome message configured
+- Public resource link configured
+
+Incomplete items include contextual navigation directly to the appropriate setup area.
 
 ## Admin Overview tab — SHIPPED
 
@@ -395,8 +422,8 @@ Scope: public, shareable organization landing page for prospective families and 
 
 ## Admin tab inventory (current)
 
-- org_admin: dashboard/overview, roster, pending, members, status, score, stats, events, league, standings, settings
-- team_admin: dashboard, roster, status, score, stats, events (no Pending, Members, League, Standings, or Settings)
+- org_admin: dashboard/overview, pending, members, status, score, stats, events, league, standings, settings
+- team_admin: dashboard, status, score, stats, events (no Pending, Members, League, Standings, or Settings)
 
 ## Admin → Stats workflow — SHIPPED
 
@@ -423,7 +450,7 @@ Scope: make post-game stat entry efficient for team admins on a laptop while pre
 ## Team Admin dashboard — POLISHED
 
 - Team admins land on a dedicated Dashboard with a next-event card, Quick Actions, and Roster Health.
-- Quick Actions route to Roster, Status, Score, Events, and Stats.
+- Quick Actions route to Status, Score, Events, and Stats.
 - View Team Page routes to `/team` and intentionally does not imply roster editing.
 - Dashboard visuals use brand color, simple dots/text, and no emoji-style action icons.
 - Roster Health shows Players, Missing #, Missing Pos; the healthy state is centered below the three cards.

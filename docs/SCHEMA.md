@@ -438,7 +438,6 @@ Links approved parent memberships to durable athletes. These relationships descr
 - `guardian_athletes_relationship_not_blank` — relationship must be null or non-blank
 - `guardian_athletes_athlete_org_fkey` — composite foreign key `(athlete_id, organization_id)` to `athletes(id, organization_id)`, ON DELETE CASCADE
 - `guardian_athletes_membership_org_fkey` — composite foreign key `(membership_id, organization_id)` to `memberships(id, organization_id)`, ON DELETE CASCADE
-- `memberships_id_organization_unique` UNIQUE (`id`, `organization_id`) — supports tenant-safe composite foreign keys from `guardian_athletes`.
 
 **Indexes:**
 - `idx_guardian_athletes_organization` on `organization_id`
@@ -797,7 +796,7 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 ## Migration files in repo
 
-- `lib/db/migrations/athlete-identity-v1.sql` — creates durable `athletes`, creates `guardian_athletes`, adds nullable `players.athlete_id`, performs the conservative identity backfill, adds indexes/triggers, and enables RLS. The source includes compatibility creation of the tenant-safe membership composite key and shared `set_row_updated_at` trigger helper for older environments. **Already applied. Do not rerun against the current production database.**
+- `lib/db/migrations/athlete-identity-v1.sql` — creates durable `athletes`, creates `guardian_athletes`, adds nullable `players.athlete_id`, performs the conservative identity backfill, adds indexes/triggers, and enables RLS. **Already applied. Do not rerun against the current production database.**
 - `lib/db/migrations/guardian-athlete-management-v1.sql` — creates the org-admin-only `replace_guardian_athletes` RPC used by Admin → Members. **Already applied. Do not rerun against the current production database.**
 - `lib/db/migrations/chat-v1.sql` — Chat v1 schema, RLS, Realtime publication, Storage policies. **Already RUN against dev AND prod.**
 - `lib/db/migrations/roster-status-v1.sql` — adds active/inactive roster status, removal metadata, and the remove/restore roster RPCs. **Already applied to development and production.**
@@ -870,6 +869,12 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 - Jersey number and position remain specific to the selected seasonal assignment.
 - Legacy active player rows missing `athlete_id` can be repaired through the edit workflow.
 - Inactive roster assignments cannot be edited.
+Pending parent memberships now support:
+- pending
+- approved
+- rejected
+
+Rejected memberships may be resubmitted by the same authenticated user without creating duplicate membership rows.
 
 ## Outstanding items
 
