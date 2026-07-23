@@ -161,9 +161,9 @@ Scope: org-scoped self-registration for parents, admin approval queue with team 
 - PendingChecker.tsx — embedded client component that polls on mount + on window focus. When user is approved, redirects to /. No periodic polling.
 
 ### Public route handling
-- middleware.ts whitelists /o/[slug]/signup and /o/[slug]/signup/complete (regex match)
+- proxy.ts whitelists /o/[slug]/signup and /o/[slug]/signup/complete (regex match)
 - AppShell component (components/app-shell.tsx) hides the global Header on pre-auth routes. Renders just `<main>{children}</main>` for those.
-- Public routes are duplicated in both middleware.ts AND app-shell.tsx — must stay in sync if changing.
+- Public routes are duplicated in both proxy.ts AND app-shell.tsx — must stay in sync if changing.
 
 ### Admin approval
 - /admin Pending tab (7th tab)
@@ -474,7 +474,7 @@ Scope: make post-game stat entry efficient for team admins on a laptop while pre
 ## "On Deck" product branding decisions
 
 - `generateMetadata`: title + applicationName + appleWebApp.title = "On Deck" (product); description + openGraph stay per-org for share previews.
-- PWA manifest: static `public/manifest.json` named "On Deck" (dynamic per-org manifest reverted; `app/manifest/route.ts` deleted; middleware matcher excludes manifest.json). iOS install name = "On Deck".
+- PWA manifest: static `public/manifest.json` named "On Deck" (dynamic per-org manifest reverted; `app/manifest/route.ts` deleted; proxy matcher excludes manifest.json).
 - Desktop-Chrome "No manifest detected" warning persists but manifest serves valid JSON and iOS/Android installs work — ignore for now.
 
 ## Env var cleanup — SHIPPED
@@ -575,7 +575,7 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 
 - Path-based: org-scoped pre-auth pages under /o/{slug}/
 - Non-org pages at root: /login, /account, etc.
-- Middleware enforces: not-public route → must be logged in. Org-scoped post-auth middleware deferred.
+- Proxy enforces: not-public route → must be logged in..
 
 ## Decisions made
 
