@@ -795,9 +795,11 @@ export default function AdminPage() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
   const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
   const [promoteTeamIds, setPromoteTeamIds] = useState<Set<string>>(new Set())
+  const [promoteStaffTitle, setPromoteStaffTitle] = useState('')
   const [promoteSaving, setPromoteSaving] = useState(false)
   const [grantAdminEmail, setGrantAdminEmail] = useState('')
   const [grantAdminTeamIds, setGrantAdminTeamIds] = useState<Set<string>>(new Set())
+  const [grantAdminStaffTitle, setGrantAdminStaffTitle] = useState('')
   const [grantAdminSaving, setGrantAdminSaving] = useState(false)
 
   const [organizationAthletes, setOrganizationAthletes] =
@@ -1597,12 +1599,16 @@ useEffect(() => {
   const startPromoteMember = (member: ApprovedParent) => {
   setPromotingMemberId(member.id)
   setPromoteTeamIds(new Set(member.teams.map(t => t.id)))
+  setPromoteStaffTitle(
+    member.team_admin_teams.find(team => team.staff_title)?.staff_title ?? ''
+  )
   setMembersMsg(null)
 }
 
 const cancelPromoteMember = () => {
   setPromotingMemberId(null)
   setPromoteTeamIds(new Set())
+  setPromoteStaffTitle('')
 }
 
 const togglePromoteTeam = (teamId: string) => {
@@ -1617,7 +1623,11 @@ const savePromoteMember = async () => {
   setPromoteSaving(true)
   setMembersMsg(null)
 
-  const result = await makeMemberTeamAdmin(promotingMemberId, Array.from(promoteTeamIds))
+  const result = await makeMemberTeamAdmin(
+    promotingMemberId,
+    Array.from(promoteTeamIds),
+    promoteStaffTitle
+  )
 
   setPromoteSaving(false)
 
@@ -1626,6 +1636,7 @@ const savePromoteMember = async () => {
     return
   }
 
+  await reloadMembers()
   setMembersMsg('✅ Team admin assigned')
   cancelPromoteMember()
 }
@@ -1662,7 +1673,11 @@ const submitGrantTeamAdmin = async () => {
   setGrantAdminSaving(true)
   setMembersMsg(null)
 
-  const result = await grantTeamAdminByEmail(grantAdminEmail, Array.from(grantAdminTeamIds))
+  const result = await grantTeamAdminByEmail(
+    grantAdminEmail,
+    Array.from(grantAdminTeamIds),
+    grantAdminStaffTitle
+  )
 
   setGrantAdminSaving(false)
 
@@ -1673,6 +1688,7 @@ const submitGrantTeamAdmin = async () => {
 
   setGrantAdminEmail('')
   setGrantAdminTeamIds(new Set())
+  setGrantAdminStaffTitle('')
   setMembersMsg('✅ Team admin assigned')
   await reloadMembers()
 }
@@ -3795,6 +3811,23 @@ const visibleAdminTabs = isOrgAdmin
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"
               />
 
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  Staff title
+                </label>
+                <input
+                  type="text"
+                  value={grantAdminStaffTitle}
+                  onChange={e => setGrantAdminStaffTitle(e.target.value)}
+                  maxLength={80}
+                  placeholder="Head Coach, Assistant Coach, Team Manager..."
+                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-400 focus:outline-none"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Optional. Defaults to Coach / Team Staff.
+                </p>
+              </div>
+
               {orgTeams.length === 0 ? (
                 <p className="text-xs text-amber-400">No teams found.</p>
               ) : (
@@ -3890,16 +3923,24 @@ const visibleAdminTabs = isOrgAdmin
                         {m.team_admin_teams.length > 0 && (
                           <div className="mt-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
                             <p className="text-[10px] uppercase tracking-wide text-yellow-400 font-semibold">
-                              Team Admin
+                              Coach / Team Staff
                             </p>
 
                             <div className="mt-2 space-y-2">
                               {m.team_admin_teams.map(t => (
                                 <div key={t.id} className="flex items-center justify-between gap-2">
-                                  <p className="text-xs text-yellow-100">{t.name}</p>
+                                  <div className="min-w-0">
+                                    <p className="truncate text-xs font-semibold text-yellow-100">
+                                      {t.staff_title || 'Coach / Team Staff'}
+                                    </p>
+                                    <p className="truncate text-[10px] text-yellow-200/70">
+                                      {t.name}
+                                    </p>
+                                  </div>
+
                                   <button
                                     onClick={() => removeTeamAdminTeam(m.id, t.id)}
-                                    className="rounded-lg border border-yellow-500/30 px-2 py-1 text-[10px] font-bold text-yellow-100 hover:bg-yellow-500/10"
+                                    className="rounded-lg border border-red-500/40 px-2 py-1 text-[10px] font-bold text-red-400 transition hover:bg-red-500/10"
                                   >
                                     Remove
                                   </button>
@@ -4209,6 +4250,23 @@ const visibleAdminTabs = isOrgAdmin
                             Make team admin
                           </p>
 
+                          <div>
+                            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                              Staff title
+                            </label>
+                            <input
+                              type="text"
+                              value={promoteStaffTitle}
+                              onChange={e => setPromoteStaffTitle(e.target.value)}
+                              maxLength={80}
+                              placeholder="Head Coach, Assistant Coach, Team Manager..."
+                              className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-slate-400 focus:outline-none"
+                            />
+                            <p className="mt-1 text-[10px] text-slate-500">
+                              Optional. Applied to each selected team.
+                            </p>
+                          </div>
+
                           {orgTeams.length === 0 ? (
                             <p className="text-xs text-amber-400">No teams found.</p>
                           ) : (
@@ -4236,7 +4294,8 @@ const visibleAdminTabs = isOrgAdmin
                             <button
                               onClick={savePromoteMember}
                               disabled={promoteSaving || promoteTeamIds.size === 0}
-                              className="flex-1 rounded-xl bg-yellow-500 py-2 text-xs font-bold text-black hover:bg-yellow-400 disabled:opacity-50"
+                              className="flex-1 rounded-xl py-2 text-xs font-bold text-white transition disabled:opacity-50"
+                              style={{ backgroundColor: settingsPrimaryColor }}
                             >
                               {promoteSaving ? 'Saving...' : 'Save Admin'}
                             </button>

@@ -329,6 +329,7 @@ export type ApprovedParent = {
   team_admin_teams: {
     id: string
     name: string
+    staff_title: string | null
   }[]
   athletes: GuardianAthleteAssignment[]
   created_at: string
@@ -429,7 +430,7 @@ if (guardianAthletesError) {
   const { data: teamAdminRows } = teamAdminMembershipIds.length > 0
     ? await supabase
         .from('team_admins')
-        .select('membership_id, team_id, teams(id, name)')
+        .select('membership_id, team_id, staff_title, teams(id, name)')
         .in('membership_id', teamAdminMembershipIds)
     : { data: [] }
 
@@ -438,7 +439,14 @@ if (guardianAthletesError) {
     teamAdminMembershipById[m.id] = { user_id: m.user_id }
   }
 
-  const teamAdminTeamsByUserId: Record<string, { id: string; name: string }[]> = {}
+  const teamAdminTeamsByUserId: Record<
+    string,
+    {
+      id: string
+      name: string
+      staff_title: string | null
+    }[]
+  > = {}
   for (const row of teamAdminRows ?? []) {
     const membership = teamAdminMembershipById[row.membership_id]
     if (!membership) continue
@@ -452,6 +460,7 @@ if (guardianAthletesError) {
       teamAdminTeamsByUserId[membership.user_id].push({
         id: team.id,
         name: team.name,
+        staff_title: row.staff_title ?? null,
       })
     }
   }
@@ -669,10 +678,20 @@ export async function updateGuardianAthleteAssignments(input: {
 
 export async function makeMemberTeamAdmin(
   parentMembershipId: string,
-  teamIds: string[]
+  teamIds: string[],
+  staffTitleInput?: string | null
 ): Promise<SimpleResult> {
   if (!parentMembershipId) return { ok: false, error: 'Missing parentMembershipId' }
   if (teamIds.length === 0) return { ok: false, error: 'Pick at least one team' }
+
+  const staffTitle = staffTitleInput?.trim() || null
+
+  if (staffTitle && staffTitle.length > 80) {
+    return {
+      ok: false,
+      error: 'Staff title must be 80 characters or fewer',
+    }
+  }
 
   const supabase = await createClient()
   const guard = await requireOrgAdmin()
@@ -740,6 +759,7 @@ export async function makeMemberTeamAdmin(
   const rows = teamIds.map(teamId => ({
     membership_id: teamAdminMembershipId,
     team_id: teamId,
+    staff_title: staffTitle,
   }))
 
   const { error: assignError } = await supabase
@@ -755,11 +775,21 @@ export async function makeMemberTeamAdmin(
 
 export async function grantTeamAdminByEmail(
   email: string,
-  teamIds: string[]
+  teamIds: string[],
+  staffTitleInput?: string | null
 ): Promise<SimpleResult> {
   const normalizedEmail = email.trim().toLowerCase()
   if (!normalizedEmail) return { ok: false, error: 'Enter an email address' }
   if (teamIds.length === 0) return { ok: false, error: 'Pick at least one team' }
+
+  const staffTitle = staffTitleInput?.trim() || null
+
+  if (staffTitle && staffTitle.length > 80) {
+    return {
+      ok: false,
+      error: 'Staff title must be 80 characters or fewer',
+    }
+  }
 
   const supabase = await createClient()
   const guard = await requireOrgAdmin()
@@ -819,6 +849,7 @@ export async function grantTeamAdminByEmail(
   const rows = uniqueTeamIds.map(teamId => ({
     membership_id: membershipId,
     team_id: teamId,
+    staff_title: staffTitle,
   }))
 
   const { error: assignError } = await supabase
