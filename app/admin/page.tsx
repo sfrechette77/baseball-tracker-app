@@ -809,6 +809,9 @@ export default function AdminPage() {
   const [memberAthleteIds, setMemberAthleteIds] =
     useState<Set<string>>(new Set())
 
+  const [memberAthleteRelationships, setMemberAthleteRelationships] =
+    useState<Record<string, string>>({})
+
   const [memberPrimaryAthleteId, setMemberPrimaryAthleteId] =
     useState('')
 
@@ -1096,6 +1099,15 @@ export default function AdminPage() {
       member.athletes.find(athlete => athlete.is_primary)?.id ?? ''
     )
 
+    setMemberAthleteRelationships(
+      Object.fromEntries(
+        member.athletes.map(athlete => [
+          athlete.id,
+          athlete.relationship ?? '',
+        ])
+      )
+    )
+
     setEditingMemberId(null)
     setRemovingMemberId(null)
     setPromotingMemberId(null)
@@ -1123,6 +1135,7 @@ export default function AdminPage() {
   const cancelEditingMemberAthletes = () => {
     setEditingAthletesMemberId(null)
     setMemberAthleteIds(new Set())
+    setMemberAthleteRelationships({})
     setMemberPrimaryAthleteId('')
     setMembersMsg(null)
   }
@@ -1135,7 +1148,11 @@ export default function AdminPage() {
 
     const result = await updateGuardianAthleteAssignments({
       membershipId: editingAthletesMemberId,
-      athleteIds: Array.from(memberAthleteIds),
+      assignments: Array.from(memberAthleteIds).map(athleteId => ({
+        athleteId,
+        relationship:
+          memberAthleteRelationships[athleteId] || null,
+      })),
       primaryAthleteId: memberPrimaryAthleteId || null,
     })
 
@@ -1148,6 +1165,7 @@ export default function AdminPage() {
 
       setEditingAthletesMemberId(null)
       setMemberAthleteIds(new Set())
+      setMemberAthleteRelationships({})
       setMemberPrimaryAthleteId('')
 
       await reloadMembers()
@@ -3855,11 +3873,16 @@ const visibleAdminTabs = isOrgAdmin
                               {m.athletes.length === 0
                                 ? 'No athletes linked'
                                 : m.athletes
-                                    .map(athlete =>
-                                      athlete.is_primary
-                                        ? `${athlete.display_name} ★`
-                                        : athlete.display_name
-                                    )
+                                    .map(athlete => {
+                                      const relationship =
+                                        athlete.relationship
+                                          ? ` (${athlete.relationship})`
+                                          : ''
+
+                                      return athlete.is_primary
+                                        ? `${athlete.display_name}${relationship} ★`
+                                        : `${athlete.display_name}${relationship}`
+                                    })
                                     .join(', ')}
                             </p>
                           </div>
@@ -3972,50 +3995,86 @@ const visibleAdminTabs = isOrgAdmin
                                 return (
                                   <div
                                     key={athlete.id}
-                                    className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
+                                    className="rounded-lg bg-white/5 px-3 py-2"
                                   >
-                                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() => toggleMemberAthlete(athlete.id)}
-                                        disabled={memberAthletesSaving}
-                                        className="h-4 w-4"
-                                      />
-
-                                      <span className="truncate text-sm text-white">
-                                        {athlete.display_name}
-                                      </span>
-                                    </label>
-
-                                    {checked && (
-                                      <label className="flex cursor-pointer items-center gap-1 text-xs">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
                                         <input
-                                          type="radio"
-                                          name={`primary-athlete-${m.id}`}
-                                          checked={isPrimary}
+                                          type="checkbox"
+                                          checked={checked}
                                           onChange={() =>
-                                            setMemberPrimaryAthleteId(athlete.id)
+                                            toggleMemberAthlete(athlete.id)
                                           }
                                           disabled={memberAthletesSaving}
-                                          className="h-3 w-3"
+                                          className="h-4 w-4"
                                         />
 
-                                        <span
-                                          className={
-                                            isPrimary
-                                              ? 'font-semibold'
-                                              : 'text-slate-500'
-                                          }
-                                          style={
-                                            isPrimary
-                                              ? { color: settingsPrimaryColor }
-                                              : undefined
-                                          }
-                                        >
-                                          Primary
+                                        <span className="truncate text-sm text-white">
+                                          {athlete.display_name}
                                         </span>
                                       </label>
+
+                                      {checked && (
+                                        <label className="flex cursor-pointer items-center gap-1 text-xs">
+                                          <input
+                                            type="radio"
+                                            name={`primary-athlete-${m.id}`}
+                                            checked={isPrimary}
+                                            onChange={() =>
+                                              setMemberPrimaryAthleteId(athlete.id)
+                                            }
+                                            disabled={memberAthletesSaving}
+                                            className="h-3 w-3"
+                                          />
+
+                                          <span
+                                            className={
+                                              isPrimary
+                                                ? 'font-semibold'
+                                                : 'text-slate-500'
+                                            }
+                                            style={
+                                              isPrimary
+                                                ? {
+                                                    color:
+                                                      settingsPrimaryColor,
+                                                  }
+                                                : undefined
+                                            }
+                                          >
+                                            Primary
+                                          </span>
+                                        </label>
+                                      )}
+                                    </div>
+
+                                    {checked && (
+                                      <div className="mt-2 pl-6">
+                                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                          Relationship
+                                        </label>
+
+                                        <input
+                                          type="text"
+                                          value={
+                                            memberAthleteRelationships[
+                                              athlete.id
+                                            ] ?? ''
+                                          }
+                                          onChange={event =>
+                                            setMemberAthleteRelationships(
+                                              previous => ({
+                                                ...previous,
+                                                [athlete.id]:
+                                                  event.target.value,
+                                              })
+                                            )
+                                          }
+                                          placeholder="Parent, guardian, grandparent..."
+                                          disabled={memberAthletesSaving}
+                                          className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-slate-400 disabled:opacity-50"
+                                        />
+                                      </div>
                                     )}
                                   </div>
                                 )
