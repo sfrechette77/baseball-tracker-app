@@ -540,7 +540,10 @@ export async function getOrganizationAthletes(): Promise<
 
 export async function updateGuardianAthleteAssignments(input: {
   membershipId: string
-  athleteIds: string[]
+  assignments: {
+    athleteId: string
+    relationship?: string | null
+  }[]
   primaryAthleteId?: string | null
 }): Promise<
   | {
@@ -554,13 +557,23 @@ export async function updateGuardianAthleteAssignments(input: {
 > {
   const membershipId = input.membershipId.trim()
 
-  const athleteIds = Array.from(
-    new Set(
-      input.athleteIds
-        .map(athleteId => athleteId.trim())
-        .filter(Boolean)
-    )
+  const assignments = input.assignments
+    .map(assignment => ({
+      athleteId: assignment.athleteId.trim(),
+      relationship: assignment.relationship?.trim() || null,
+    }))
+    .filter(assignment => Boolean(assignment.athleteId))
+
+  const athleteIds = assignments.map(
+    assignment => assignment.athleteId
   )
+
+  if (new Set(athleteIds).size !== athleteIds.length) {
+    return {
+      ok: false,
+      error: 'Athlete assignments must not contain duplicates',
+    }
+  }
 
   const primaryAthleteId =
     input.primaryAthleteId?.trim() || null
@@ -602,6 +615,35 @@ export async function updateGuardianAthleteAssignments(input: {
     return {
       ok: false,
       error: error.message,
+    }
+  }
+
+  for (const assignment of assignments) {
+    const {
+      data: updatedRelationship,
+      error: relationshipError,
+    } = await supabase
+      .from('guardian_athletes')
+      .update({
+        relationship: assignment.relationship,
+      })
+      .eq('membership_id', membershipId)
+      .eq('athlete_id', assignment.athleteId)
+      .select('id')
+      .maybeSingle()
+
+    if (relationshipError) {
+      return {
+        ok: false,
+        error: relationshipError.message,
+      }
+    }
+
+    if (!updatedRelationship) {
+      return {
+        ok: false,
+        error: 'Athlete relationship row was not found',
+      }
     }
   }
 
