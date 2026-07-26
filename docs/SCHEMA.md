@@ -335,15 +335,18 @@ Links team_admin memberships to specific teams.
 | id | uuid | PK, default gen_random_uuid() | |
 | membership_id | uuid | NOT NULL, FK memberships, ON DELETE CASCADE | |
 | team_id | uuid | NOT NULL, FK teams, ON DELETE CASCADE | |
+| staff_title | text | nullable; trimmed nonblank value up to 80 characters | Display title only, such as Head Coach or Team Manager; authorization remains `team_admin` |
 | created_at | timestamptz | NOT NULL, default now() | |
 
-**Constraints:** `team_admins_unique` UNIQUE (membership_id, team_id)
+**Constraints:**
+- `team_admins_unique` UNIQUE (membership_id, team_id)
+- `team_admins_staff_title_valid` CHECK (`staff_title` is NULL or its trimmed value is nonblank and no longer than 80 characters)
 
 **Indexes:**
 - `idx_team_admins_membership`, `idx_team_admins_team`
 
 **RLS Policies (ACTIVE):**
-- SELECT: users can read own team_admin assignments OR org_admins can read all in their org (combined into one policy in prod, two policies in dev — functionally equivalent)
+- SELECT: users can read their own team-admin assignments, and org admins can read assignments in their organization
 - INSERT/UPDATE/DELETE: org_admins of the membership's org (via EXISTS subquery on memberships)
 
 ---
@@ -798,6 +801,8 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 
 - `lib/db/migrations/athlete-identity-v1.sql` — creates durable `athletes`, creates `guardian_athletes`, adds nullable `players.athlete_id`, performs the conservative identity backfill, adds indexes/triggers, and enables RLS. **Already applied. Do not rerun against the current production database.**
 - `lib/db/migrations/guardian-athlete-management-v1.sql` — creates the org-admin-only `replace_guardian_athletes` RPC used by Admin → Members. **Already applied. Do not rerun against the current production database.**
+- `lib/db/migrations/guardian-athlete-details-v1.sql` — adds guardian relationship labels and enforces one primary athlete per guardian membership. **Already applied to development and production.**
+- `lib/db/migrations/team-admin-staff-titles-v1.sql` — adds nullable per-team `team_admins.staff_title` display titles with trimmed nonblank and 80-character validation. Authorization remains `team_admin`. **Already applied to development and production.**
 - `lib/db/migrations/chat-v1.sql` — Chat v1 schema, RLS, Realtime publication, Storage policies. **Already RUN against dev AND prod.**
 - `lib/db/migrations/roster-status-v1.sql` — adds active/inactive roster status, removal metadata, and the remove/restore roster RPCs. **Already applied to development and production.**
 - `lib/db/migrations/admin-roster-rpcs-v1.sql` — creates the durable-athlete roster creation and returning-athlete assignment RPCs used by Admin → Roster. **Already applied to development and production.**
@@ -806,11 +811,11 @@ profiles (own row only), memberships (own pending row on insert; org_admins can 
 **Other migrations run ad-hoc and not saved to repo:**
 - Mute UI: added `push_subscriptions.membership_id` column (nullable FK to memberships, ON DELETE CASCADE), with `idx_push_subscriptions_membership` index. Run against dev and prod.
 - Chunk 4b: `alter table public.fields drop column team_id;` — run against dev AND prod.
-- Test harness: User D profile backfilled (`44444444-4444-4444-4444-444444444444` → "Daniel Davis", userd@example.com).
-- Test harness: User C linked to Moore via parent_teams.
+- Legacy paused-development test harness included synthetic users, profiles, and parent-team assignments. These fixtures are retired and should not be recreated in the current development project.
 - `teams.is_opponent` boolean NOT NULL default false — added dev + prod. Backfilled: 15 league opponent teams set to true.
-- Storage bucket `organization-logos` created (prod). INSERT policy later hardened to approved org_admins uploading only into their own org folder via `is_org_admin`.- Florida Vandals org created in prod (`4801e4d4-bc14-410f-8b00-62b27e6827ef`, slug `florida-vandals`) with teams Orange/Black, Spring 2026 season, team_seasons.
-- Dev org renamed: Northside Knights → Florida Vandals (`6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`).
+- Storage bucket `organization-logos` created in production. INSERT policy later hardened to approved org admins uploading only into their own organization folder via `is_org_admin`.
+- Florida Vandals organization created in production (`4801e4d4-bc14-410f-8b00-62b27e6827ef`, slug `florida-vandals`) with teams Orange/Black, Spring 2026 season, and team_seasons.
+- Current development database mirrors the production Florida Vandals organization (`4801e4d4-bc14-410f-8b00-62b27e6827ef`). The synthetic Northside Knights fixture belongs only to the paused legacy development project.
 - **Membership backfill (production incident fix):** approved `parent` memberships + `parent_teams` (Moore default) created for every membership-less `auth.users` row. Pre-multi-tenant parents had never been backfilled; the DB-driven picker exposed it.
 - Steve's Florida Vandals membership approved via SQL + parent_teams rows inserted for all FV own teams.
 
