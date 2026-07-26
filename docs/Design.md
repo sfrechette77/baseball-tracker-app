@@ -69,15 +69,22 @@
 
 ## Key identifiers (DO NOT LOSE)
 
-- **Chicago Elite org UUID (prod):** `75c11f73-5394-4ffc-bf39-9c708418e07b`
-- **Chicago Elite org UUID (dev):** `25c71684-dcdb-4ccc-9e8b-4f4357c3b8ee`
-- **Northside Knights org UUID (dev, for cross-tenant tests):** `6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`
+### Supabase environments
+
+- **Production project:** `fjrtcxfqculymgyfrato`
+- **Current development project:** `yrhhojuucoxcvnyxkcab`
+- **Paused legacy development project:** `gpsqykddcubponpbwule`
+- The current development database was restored from a production mirror and therefore uses production-matching organization and record UUIDs.
+- Local `.env.local` targets the current development project.
+- `.env.local.prod.bak` is a local backup of the production configuration and must remain uncommitted.
+- Vercel production uses its own configured environment variables; it does not read local `.env.local`.
+
+- **Chicago Elite org UUID (production and current dev mirror):** `75c11f73-5394-4ffc-bf39-9c708418e07b`
 - **Steve's auth.users.id:** `6c87af4c-8e23-45ad-8453-6530116b3deb`
 - **Steve's membership_id** (org_admin, Chicago Elite): `7cbfaaa5-e502-4f5f-a576-a0dbd668cf98`
 - **Moore team UUID:** `4beb0750-1883-4b56-a386-db280675036c`
 - **Ayeski team UUID:** `0c8cc8d0-2398-41c2-8ba0-036d62ee13a6`
-- **Florida Vandals org UUID (prod):** `4801e4d4-bc14-410f-8b00-62b27e6827ef` (slug `florida-vandals`)
-- **Florida Vandals org UUID (dev, ex-Northside Knights):** `6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`
+- **Florida Vandals org UUID (production and current dev mirror):** `4801e4d4-bc14-410f-8b00-62b27e6827ef` (slug `florida-vandals`)
 - **Affected backfill-test parent (prod):** `549054cf-f128-4df6-a447-c04840614668`
 
 
@@ -459,7 +466,7 @@ Scope: make post-game stat entry efficient for team admins on a laptop while pre
 
 - Prod org `4801e4d4-bc14-410f-8b00-62b27e6827ef`, slug `florida-vandals`, admin frechettegaming22@gmail.com, colors orange `#F97316`/black.
 - Teams Orange/Black + Spring 2026 season + team_seasons created.
-- Dev org renamed Northside Knights → Florida Vandals (`6cadb1e5-905d-4dee-9d62-46cb7d4f2b62`); cross-tenant test role unchanged.
+- The current development project mirrors the production Florida Vandals organization and uses UUID `4801e4d4-bc14-410f-8b00-62b27e6827ef`.
 - Multi-tenant isolation verified via impersonation.
 - Steve's own FV membership approved via SQL (pending → approved + parent_teams for all FV own teams).
 
@@ -533,8 +540,10 @@ The four helper functions (`current_user_org_ids`, `is_org_admin`, `can_read_tea
 ### Cron / service-key safety
 Before flipping RLS on `weather_forecasts`, `event_imports`, `game_status_log`, verified that all writes go through `SUPABASE_SERVICE_KEY` paths (cron job in `/api/update-weather`, admin route in `/api/admin`). Service key bypasses RLS entirely, so cron stays unaffected.
 
-### Cross-tenant test seed in dev
-Northside Knights is seeded in dev with 1 team + 1 team_season + 4 players + 1 event + 1 league_game. This lets us prove cross-tenant isolation by impersonating User B (NK org_admin) and confirming they see ONLY northside-knights data, never chicago-elite.
+### Legacy cross-tenant test seed — RETIRED
+The original development project used a synthetic Northside Knights tenant and fake-user impersonation harness. That fixture belongs only to the paused legacy development project and must not be treated as the current development baseline.
+
+The replacement development project mirrors production data, including Chicago Elite and Florida Vandals, and supports cross-tenant testing with real mirrored memberships and separate development authentication configuration.
 
 ## Context
 
@@ -663,7 +672,7 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - ✅ Guardian-athlete management v1 — `guardian_athletes`, replacement RPC, admin data layer, and Members-tab assignment UI
 
 ### Pre-prod cleanup
-Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., etc.) should NOT be carried over.
+The original fake-membership development harness is retired and belongs only to the paused legacy project. Use the current mirrored development database and its normal Auth users for ongoing testing.
 
 ### Feed v1 lessons learned
 - Server Actions need `allowedOrigins` in next.config.ts for Codespace dev URL
@@ -703,10 +712,10 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - **The cutover silently broke public signup.** Pre-auth routes that read tenant tables (here: `organizations` for slug validation) fail under RLS because the visitor has no membership → `current_user_org_ids()` is empty. Symptom was a 404, not an obvious permission error.
 - **profiles has no INSERT policy** — the /complete route's profile upsert also needed the service client, not just the org lookup.
 - The fix is a dedicated service-role client (lib/supabase/service.ts). Keep it server-only; it bypasses RLS entirely.
-- `SUPABASE_SERVICE_ROLE_KEY` must be set in **both** local .env.local and Vercel, scoped to **Production**. A missing/mis-scoped var throws "Missing Supabase service env vars" at runtime (shows as a server-side exception with a digest; check Vercel Runtime Logs for the real message).
-- **OAuth flows can't be tested from Codespaces.** The Google sign-in page loads, but the redirect back resolves to a wrong/unreachable address (`…-3000.app.github.dev:3000`). Test all login/signup flows on the deployed prod site.
-- **Dev project has no real auth.users** — all dev memberships use the fake test UUIDs, which can't log in. Anything behind requireOrgAdmin() can't be exercised in dev via real login; test those on prod.
-- `.env.local` env-swap workflow: back up prod values (`cp .env.local .env.local.prod.bak`) before pointing local at dev; restore with `cp .env.local.prod.bak .env.local`. Keep local on prod by default.
+- `SUPABASE_SERVICE_ROLE_KEY` is environment-specific: local `.env.local` uses the current development project's service-role key, while Vercel Production uses the production project's service-role key. A missing or mismatched value throws "Missing Supabase service env vars" at runtime; check Vercel Runtime Logs for the underlying server error.
+- **OAuth works from Codespaces in the current development project.** The callback route honors forwarded host/protocol headers, and the development Google OAuth client is configured for the replacement Supabase project.
+- **The current development project contains real mirrored Auth users and memberships.** Admin-protected workflows can be exercised locally with authorized development sign-in.
+- `.env.local` should remain pointed at the current development project by default. `.env.local.prod.bak` is only a protected local backup for deliberate production troubleshooting. Vercel production configuration is managed separately.
 
 ### Cutover lessons learned
 - **Order matters.** Leaf tables first, then dependents, then the foundational table (memberships) last. If memberships breaks, every other policy breaks too.
@@ -717,22 +726,11 @@ Before any new prod customer, fake memberships in dev (UUIDs 1111..., 2222..., e
 - **Cron and admin routes use service key.** Verified before flipping RLS on tables those routes write to. Service key bypasses RLS entirely.
 - **Test on prod after every flip.** Even when dev validated cleanly, the prod test caught one issue (tournament box scores) that we then diagnosed and ruled out as RLS-caused.
 
-## RLS test harness (in on-deck-dev only)
+## Legacy RLS test harness — RETIRED
 
-5 fake user UUIDs seeded into on-deck-dev for testing RLS policies. The `memberships.user_id` FK to `auth.users` is dropped in dev. The `memberships.approved_by` FK is NOT dropped — workaround is to omit approved_by in dev tests.
+The original `on-deck-dev` project used five fake user UUIDs, a relaxed `memberships.user_id` foreign key, and synthetic Northside Knights data. That harness exists only as historical context for the paused legacy project.
 
-### Fake users in on-deck-dev
-
-| User ID                              | Org                | Role        | Status   | Notes                          |
-|--------------------------------------|--------------------|-------------|----------|--------------------------------|
-| 11111111-1111-1111-1111-111111111111 | chicago-elite      | org_admin   | approved | User A                         |
-| 22222222-2222-2222-2222-222222222222 | northside-knights  | org_admin   | approved | User B — used for cross-tenant tests |
-| 33333333-3333-3333-3333-333333333333 | chicago-elite      | parent      | approved | User C — linked to Moore       |
-| 44444444-4444-4444-4444-444444444444 | chicago-elite      | parent      | pending  | User D — Daniel Davis (profile backfilled). For approval queue testing.|
-| 55555555-5555-5555-5555-555555555555 | chicago-elite      | team_admin  | approved | User E — scoped to Moore only  |
-
-User C is linked to Moore via parent_teams.
-Northside Knights is seeded with 1 team + 1 team_season + 4 players + 1 event + 1 league_game for cross-tenant testing.
+The current development project is a production-data mirror with real Auth users, normal foreign keys, Chicago Elite, and Florida Vandals. Do not use the retired fake UUIDs or assume that legacy seed counts exist in the current development database.
 
 ### Impersonation pattern (for testing RLS policies)
 
