@@ -12,6 +12,7 @@ import {
   updateMemberTeams,
   removeMembership,
   makeMemberTeamAdmin,
+  updateMemberTeamAdminTitle,
   removeMemberTeamAdmin,
   grantTeamAdminByEmail,
   startNewSeason,
@@ -801,6 +802,11 @@ export default function AdminPage() {
   const [grantAdminTeamIds, setGrantAdminTeamIds] = useState<Set<string>>(new Set())
   const [grantAdminStaffTitle, setGrantAdminStaffTitle] = useState('')
   const [grantAdminSaving, setGrantAdminSaving] = useState(false)
+
+  const [editingStaffTitleKey, setEditingStaffTitleKey] =
+    useState<string | null>(null)
+  const [editingStaffTitleValue, setEditingStaffTitleValue] = useState('')
+  const [editingStaffTitleSaving, setEditingStaffTitleSaving] = useState(false)
 
   const [organizationAthletes, setOrganizationAthletes] =
     useState<OrganizationAthleteOption[]>([])
@@ -1639,6 +1645,43 @@ const savePromoteMember = async () => {
   await reloadMembers()
   setMembersMsg('✅ Team admin assigned')
   cancelPromoteMember()
+}
+
+const startEditStaffTitle = (
+  memberId: string,
+  teamId: string,
+  currentTitle: string | null
+) => {
+  setEditingStaffTitleKey(`${memberId}:${teamId}`)
+  setEditingStaffTitleValue(currentTitle ?? '')
+  setMembersMsg(null)
+}
+
+const cancelEditStaffTitle = () => {
+  setEditingStaffTitleKey(null)
+  setEditingStaffTitleValue('')
+}
+
+const saveStaffTitle = async (memberId: string, teamId: string) => {
+  setEditingStaffTitleSaving(true)
+  setMembersMsg(null)
+
+  const result = await updateMemberTeamAdminTitle(
+    memberId,
+    teamId,
+    editingStaffTitleValue
+  )
+
+  setEditingStaffTitleSaving(false)
+
+  if (!result.ok) {
+    setMembersMsg(`❌ ${result.error}`)
+    return
+  }
+
+  await reloadMembers()
+  setMembersMsg('✅ Staff title updated')
+  cancelEditStaffTitle()
 }
 
 const removeTeamAdminTeam = async (memberId: string, teamId: string) => {
@@ -3927,25 +3970,104 @@ const visibleAdminTabs = isOrgAdmin
                             </p>
 
                             <div className="mt-2 space-y-2">
-                              {m.team_admin_teams.map(t => (
-                                <div key={t.id} className="flex items-center justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <p className="truncate text-xs font-semibold text-yellow-100">
-                                      {t.staff_title || 'Coach / Team Staff'}
-                                    </p>
-                                    <p className="truncate text-[10px] text-yellow-200/70">
-                                      {t.name}
-                                    </p>
-                                  </div>
+                              {m.team_admin_teams.map(t => {
+                                const staffTitleKey = `${m.id}:${t.id}`
+                                const isEditingStaffTitle =
+                                  editingStaffTitleKey === staffTitleKey
 
-                                  <button
-                                    onClick={() => removeTeamAdminTeam(m.id, t.id)}
-                                    className="rounded-lg border border-red-500/40 px-2 py-1 text-[10px] font-bold text-red-400 transition hover:bg-red-500/10"
+                                return (
+                                  <div
+                                    key={t.id}
+                                    className="flex items-center justify-between gap-2"
                                   >
-                                    Remove
-                                  </button>
-                                </div>
-                              ))}
+                                    <div className="min-w-0 flex-1">
+                                      {isEditingStaffTitle ? (
+                                        <input
+                                          type="text"
+                                          value={editingStaffTitleValue}
+                                          onChange={event =>
+                                            setEditingStaffTitleValue(event.target.value)
+                                          }
+                                          onKeyDown={event => {
+                                            if (event.key === 'Enter') {
+                                              event.preventDefault()
+                                              void saveStaffTitle(m.id, t.id)
+                                            }
+
+                                            if (event.key === 'Escape') {
+                                              cancelEditStaffTitle()
+                                            }
+                                          }}
+                                          maxLength={80}
+                                          disabled={editingStaffTitleSaving}
+                                          autoFocus
+                                          aria-label={`Staff title for ${t.name}`}
+                                          placeholder="Coach / Team Staff"
+                                          className="w-full rounded-lg border border-yellow-400/40 bg-black/30 px-2 py-1 text-xs font-semibold text-yellow-100 outline-none transition focus:border-yellow-300 disabled:opacity-60"
+                                        />
+                                      ) : (
+                                        <p className="truncate text-xs font-semibold text-yellow-100">
+                                          {t.staff_title || 'Coach / Team Staff'}
+                                        </p>
+                                      )}
+
+                                      <p className="mt-0.5 truncate text-[10px] text-yellow-200/70">
+                                        {t.name}
+                                      </p>
+                                    </div>
+
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      {isEditingStaffTitle ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => saveStaffTitle(m.id, t.id)}
+                                            disabled={editingStaffTitleSaving}
+                                            className="rounded-lg border border-yellow-400/40 px-2 py-1 text-[10px] font-bold text-yellow-200 transition hover:bg-yellow-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            {editingStaffTitleSaving ? 'Saving…' : 'Save'}
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={cancelEditStaffTitle}
+                                            disabled={editingStaffTitleSaving}
+                                            className="rounded-lg border border-white/10 px-2 py-1 text-[10px] font-bold text-slate-300 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              startEditStaffTitle(
+                                                m.id,
+                                                t.id,
+                                                t.staff_title
+                                              )
+                                            }
+                                            className="rounded-lg border border-yellow-400/40 px-2 py-1 text-[10px] font-bold text-yellow-200 transition hover:bg-yellow-400/10"
+                                          >
+                                            Edit
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              removeTeamAdminTeam(m.id, t.id)
+                                            }
+                                            className="rounded-lg border border-red-500/40 px-2 py-1 text-[10px] font-bold text-red-400 transition hover:bg-red-500/10"
+                                          >
+                                            Remove
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )}
