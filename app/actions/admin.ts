@@ -862,6 +862,89 @@ export async function grantTeamAdminByEmail(
   return { ok: true }
 }
 
+export async function updateMemberTeamAdminTitle(
+  parentMembershipId: string,
+  teamId: string,
+  staffTitleInput?: string | null
+): Promise<SimpleResult> {
+  if (!parentMembershipId) {
+    return { ok: false, error: 'Missing parentMembershipId' }
+  }
+
+  if (!teamId) {
+    return { ok: false, error: 'Missing teamId' }
+  }
+
+  const staffTitle = staffTitleInput?.trim() || null
+
+  if (staffTitle && staffTitle.length > 80) {
+    return {
+      ok: false,
+      error: 'Staff title must be 80 characters or fewer',
+    }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data: sourceMembership, error: sourceError } = await supabase
+    .from('memberships')
+    .select('id, user_id, organization_id')
+    .eq('id', parentMembershipId)
+    .maybeSingle()
+
+  if (sourceError) return { ok: false, error: sourceError.message }
+  if (!sourceMembership) {
+    return { ok: false, error: 'Membership not found' }
+  }
+
+  if (sourceMembership.organization_id !== guard.membership.organization_id) {
+    return { ok: false, error: 'Cannot manage memberships outside your org' }
+  }
+
+  const { data: team, error: teamError } = await supabase
+    .from('teams')
+    .select('id')
+    .eq('id', teamId)
+    .eq('organization_id', guard.membership.organization_id)
+    .maybeSingle()
+
+  if (teamError) return { ok: false, error: teamError.message }
+  if (!team) {
+    return { ok: false, error: 'Team not found in your organization' }
+  }
+
+  const { data: teamAdminMembership, error: adminError } = await supabase
+    .from('memberships')
+    .select('id')
+    .eq('user_id', sourceMembership.user_id)
+    .eq('organization_id', guard.membership.organization_id)
+    .eq('role', 'team_admin')
+    .maybeSingle()
+
+  if (adminError) return { ok: false, error: adminError.message }
+  if (!teamAdminMembership) {
+    return { ok: false, error: 'Team admin membership not found' }
+  }
+
+  const { data: updatedAssignment, error: updateError } = await supabase
+    .from('team_admins')
+    .update({ staff_title: staffTitle })
+    .eq('membership_id', teamAdminMembership.id)
+    .eq('team_id', teamId)
+    .select('id')
+    .maybeSingle()
+
+  if (updateError) return { ok: false, error: updateError.message }
+  if (!updatedAssignment) {
+    return { ok: false, error: 'Team admin assignment not found' }
+  }
+
+  revalidatePath('/admin')
+  return { ok: true }
+}
+
 export async function removeMemberTeamAdmin(
   parentMembershipId: string,
   teamId: string
