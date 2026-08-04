@@ -3,6 +3,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { ORG_TEAM_IDS } from '@/lib/orgTeams'
+import {
+  sendParentAccessApprovedEmail,
+  sendTeamStaffAssignedEmail,
+} from '@/lib/email/access'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -151,7 +155,7 @@ export async function approveMembership(
 
   const { data: target, error: targetError } = await supabase
     .from('memberships')
-    .select('id, organization_id, status, role')
+    .select('id, user_id, organization_id, status, role')
     .eq('id', membershipId)
     .maybeSingle()
 
@@ -173,7 +177,7 @@ export async function approveMembership(
 
   const { data: teamCheck, error: teamError } = await supabase
     .from('teams')
-    .select('id')
+    .select('id, name')
     .in('id', teamIds)
     .eq('organization_id', guard.membership.organization_id)
 
@@ -209,6 +213,75 @@ export async function approveMembership(
       ok: false,
       error: `Membership approved but team assignment failed: ${ptError.message}`,
     }
+  }
+
+  try {
+    const [
+      { data: profile, error: profileError },
+      { data: organization, error: organizationError },
+    ] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', target.user_id)
+        .maybeSingle(),
+
+      supabase
+        .from('organizations')
+        .select('name, slug, primary_color, logo_url')
+        .eq('id', guard.membership.organization_id)
+        .maybeSingle(),
+    ])
+
+    if (profileError) {
+      console.error(
+        'Parent approval email profile lookup failed:',
+        profileError
+      )
+    } else if (organizationError) {
+      console.error(
+        'Parent approval email organization lookup failed:',
+        organizationError
+      )
+    } else if (!profile?.email) {
+      console.warn(
+        'Parent approval email skipped because the profile has no email:',
+        membershipId
+      )
+    } else if (!organization) {
+      console.warn(
+        'Parent approval email skipped because the organization was not found:',
+        guard.membership.organization_id
+      )
+    } else {
+      const emailResult =
+        await sendParentAccessApprovedEmail({
+          membershipId,
+          to: profile.email,
+          recipientName: profile.full_name,
+          organization: {
+            name: organization.name,
+            slug: organization.slug,
+            primaryColor: organization.primary_color,
+            logoUrl: organization.logo_url,
+          },
+          teamNames: teamCheck
+            .map(team => team.name)
+            .sort((a, b) => a.localeCompare(b)),
+        })
+
+      if (!emailResult.ok) {
+        console.error(
+          'Parent approval email failed:',
+          emailResult.error
+        )
+      }
+    }
+  } catch (error) {
+    console.error(
+      'Unexpected parent approval email failure:',
+      error
+    )
   }
 
   revalidatePath('/admin')
@@ -682,7 +755,12 @@ export async function makeMemberTeamAdmin(
   staffTitleInput?: string | null
 ): Promise<SimpleResult> {
   if (!parentMembershipId) return { ok: false, error: 'Missing parentMembershipId' }
-  if (teamIds.length === 0) return { ok: false, error: 'Pick at least one team' }
+
+  const uniqueTeamIds = Array.from(new Set(teamIds))
+
+  if (uniqueTeamIds.length === 0) {
+    return { ok: false, error: 'Pick at least one team' }
+  }
 
   const staffTitle = staffTitleInput?.trim() || null
 
@@ -717,12 +795,12 @@ export async function makeMemberTeamAdmin(
 
   const { data: teamCheck, error: teamError } = await supabase
     .from('teams')
-    .select('id')
-    .in('id', teamIds)
+    .select('id, name')
+    .in('id', uniqueTeamIds)
     .eq('organization_id', guard.membership.organization_id)
 
   if (teamError) return { ok: false, error: teamError.message }
-  if (!teamCheck || teamCheck.length !== teamIds.length) {
+  if (!teamCheck || teamCheck.length !== uniqueTeamIds.length) {
     return { ok: false, error: 'One or more teams do not belong to your org' }
   }
 
@@ -756,7 +834,31 @@ export async function makeMemberTeamAdmin(
     teamAdminMembershipId = inserted.id
   }
 
-  const rows = teamIds.map(teamId => ({
+  const {
+    data: existingAssignments,
+    error: existingAssignmentsError,
+  } = await supabase
+    .from('team_admins')
+    .select('team_id')
+    .eq('membership_id', teamAdminMembershipId)
+    .in('team_id', uniqueTeamIds)
+
+  if (existingAssignmentsError) {
+    return {
+      ok: false,
+      error: existingAssignmentsError.message,
+    }
+  }
+
+  const existingTeamIds = new Set(
+    (existingAssignments ?? []).map(row => row.team_id)
+  )
+
+  const newlyAssignedTeamIds = uniqueTeamIds.filter(
+    teamId => !existingTeamIds.has(teamId)
+  )
+
+  const rows = uniqueTeamIds.map(teamId => ({
     membership_id: teamAdminMembershipId,
     team_id: teamId,
     staff_title: staffTitle,
@@ -767,6 +869,81 @@ export async function makeMemberTeamAdmin(
     .upsert(rows, { onConflict: 'membership_id,team_id' })
 
   if (assignError) return { ok: false, error: assignError.message }
+
+  if (newlyAssignedTeamIds.length > 0) {
+    try {
+      const [
+        { data: profile, error: profileError },
+        { data: organization, error: organizationError },
+      ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', parentMembership.user_id)
+          .maybeSingle(),
+
+        supabase
+          .from('organizations')
+          .select('name, slug, primary_color, logo_url')
+          .eq('id', guard.membership.organization_id)
+          .maybeSingle(),
+      ])
+
+      if (profileError) {
+        console.error(
+          'Team staff email profile lookup failed:',
+          profileError
+        )
+      } else if (organizationError) {
+        console.error(
+          'Team staff email organization lookup failed:',
+          organizationError
+        )
+      } else if (!profile?.email) {
+        console.warn(
+          'Team staff email skipped because the profile has no email:',
+          parentMembership.user_id
+        )
+      } else if (!organization) {
+        console.warn(
+          'Team staff email skipped because the organization was not found:',
+          guard.membership.organization_id
+        )
+      } else {
+        const newTeamIdSet = new Set(newlyAssignedTeamIds)
+
+        const emailResult = await sendTeamStaffAssignedEmail({
+          teamAdminMembershipId,
+          newlyAssignedTeamIds,
+          to: profile.email,
+          recipientName: profile.full_name,
+          organization: {
+            name: organization.name,
+            slug: organization.slug,
+            primaryColor: organization.primary_color,
+            logoUrl: organization.logo_url,
+          },
+          teamNames: teamCheck
+            .filter(team => newTeamIdSet.has(team.id))
+            .map(team => team.name)
+            .sort((a, b) => a.localeCompare(b)),
+          staffTitle,
+        })
+
+        if (!emailResult.ok) {
+          console.error(
+            'Team staff assignment email failed:',
+            emailResult.error
+          )
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Unexpected team staff assignment email failure:',
+        error
+      )
+    }
+  }
 
   revalidatePath('/admin')
   return { ok: true }
@@ -797,7 +974,7 @@ export async function grantTeamAdminByEmail(
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, full_name, email')
     .eq('email', normalizedEmail)
     .maybeSingle()
 
@@ -807,7 +984,7 @@ export async function grantTeamAdminByEmail(
   const uniqueTeamIds = Array.from(new Set(teamIds))
   const { data: teamCheck, error: teamError } = await supabase
     .from('teams')
-    .select('id')
+    .select('id, name')
     .in('id', uniqueTeamIds)
     .eq('organization_id', guard.membership.organization_id)
 
@@ -846,6 +1023,30 @@ export async function grantTeamAdminByEmail(
     membershipId = inserted.id
   }
 
+  const {
+    data: existingAssignments,
+    error: existingAssignmentsError,
+  } = await supabase
+    .from('team_admins')
+    .select('team_id')
+    .eq('membership_id', membershipId)
+    .in('team_id', uniqueTeamIds)
+
+  if (existingAssignmentsError) {
+    return {
+      ok: false,
+      error: existingAssignmentsError.message,
+    }
+  }
+
+  const existingTeamIds = new Set(
+    (existingAssignments ?? []).map(row => row.team_id)
+  )
+
+  const newlyAssignedTeamIds = uniqueTeamIds.filter(
+    teamId => !existingTeamIds.has(teamId)
+  )
+
   const rows = uniqueTeamIds.map(teamId => ({
     membership_id: membershipId,
     team_id: teamId,
@@ -857,6 +1058,63 @@ export async function grantTeamAdminByEmail(
     .upsert(rows, { onConflict: 'membership_id,team_id' })
 
   if (assignError) return { ok: false, error: assignError.message }
+
+  if (newlyAssignedTeamIds.length > 0) {
+    try {
+      const {
+        data: organization,
+        error: organizationError,
+      } = await supabase
+        .from('organizations')
+        .select('name, slug, primary_color, logo_url')
+        .eq('id', guard.membership.organization_id)
+        .maybeSingle()
+
+      if (organizationError) {
+        console.error(
+          'Team staff email organization lookup failed:',
+          organizationError
+        )
+      } else if (!organization) {
+        console.warn(
+          'Team staff email skipped because the organization was not found:',
+          guard.membership.organization_id
+        )
+      } else {
+        const newTeamIdSet = new Set(newlyAssignedTeamIds)
+
+        const emailResult = await sendTeamStaffAssignedEmail({
+          teamAdminMembershipId: membershipId,
+          newlyAssignedTeamIds,
+          to: profile.email || normalizedEmail,
+          recipientName: profile.full_name,
+          organization: {
+            name: organization.name,
+            slug: organization.slug,
+            primaryColor: organization.primary_color,
+            logoUrl: organization.logo_url,
+          },
+          teamNames: teamCheck
+            .filter(team => newTeamIdSet.has(team.id))
+            .map(team => team.name)
+            .sort((a, b) => a.localeCompare(b)),
+          staffTitle,
+        })
+
+        if (!emailResult.ok) {
+          console.error(
+            'Team staff assignment email failed:',
+            emailResult.error
+          )
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Unexpected team staff assignment email failure:',
+        error
+      )
+    }
+  }
 
   revalidatePath('/admin')
   return { ok: true }
