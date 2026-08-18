@@ -8,6 +8,9 @@
 ☑ Create season
 ☑ Create divisions
 ☑ Create teams
+☑ Confirm each own team has a `team_seasons` row for the active season
+☑ Confirm season-specific team display name, division, and age group are correct
+☑ Confirm historical season selector preserves prior-season team identity, standings, and results
 ☑ Assign org admin
 ☑ Generate/copy signup link
 ☑ Test login as org admin

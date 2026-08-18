@@ -597,9 +597,12 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Two admin tiers: org_admin and team_admin
 - Brand strings and colors stored on the organizations record
 - Logo files will live in Supabase Storage; logo_url field stores URL
-- Pattern C for season handling: permanent teams + per-season instances
-- Season rollover is an admin action (not automatic) — once per year per org
-- Old seasons preserved, queryable, but not the default view
+- Pattern C for season handling: permanent teams + per-season instances.
+- Permanent `teams` records remain durable identity/access records; season-specific team name, division, and age live on `team_seasons`.
+- Season rollover is an admin action (not automatic) — once per year per org.
+- Rollover seeds the new season's display name/division from the most recent prior team-season but intentionally does not guess age progression.
+- Old seasons are preserved and browsable through season selectors on Team, Schedule, Stats, and Standings; season-scoped records, results, rosters, statistics, and standings remain isolated.
+- The global team picker represents the permanent team using its **current-season** display name/division. Historical pages independently render the selected season's identity.
 - Approval workflow: pending → approved is for self-registration. Admin-initiated role grants skip pending.
 - Routing: path-based (/o/{slug}/...). Subdomain routing deferred to post-revenue.
 - Per-season tables link to team_seasons. Permanent team_id dropped post-cutover (Chunk 4b).
@@ -624,6 +627,8 @@ See SCHEMA.md for current state of tables, columns, constraints, and RLS policie
 - Admin Members tab: Remove = hard delete of membership (not status flip); scoped to parents only.
 -  `teams.is_opponent` separates league opponents from own teams; picker filters on it.
 -  Cross-team visibility: every approved member sees all of the org's own teams in the picker.
+-  Picker labels use the current `team_seasons.display_name` / `division` when available, with permanent `teams` values as fallback.
+-  Historical Team/Standings views use the selected season's team identity rather than the current-season picker label.
 -  Brand color via `--brand` CSS var + Tailwind red-* remap; design rule: brand = identity/primary actions, red = errors/destructive/losses.
 -  Org logos: public URLs in `organizations.logo_url`, bucket `organization-logos`, uploaded via Admin Settings.
 -  Slug is read-only in Settings v1 (changing breaks signup links).
