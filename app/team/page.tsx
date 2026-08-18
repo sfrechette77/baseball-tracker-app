@@ -120,10 +120,19 @@ function TeamPageInner() {
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null)
   const effectiveSeasonId = selectedSeasonId ?? currentSeasonId
   const selectedSeason = seasons.find(season => season.id === effectiveSeasonId) ?? null
-  const { teamSeasonId, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(
+  const {
+    teamSeasonId,
+    displayName: teamSeasonDisplayName,
+    division: teamSeasonDivision,
+    loading: teamSeasonLoading,
+    notFound: teamSeasonNotFound,
+  } = useTeamSeason(
     currentTeam.id,
     effectiveSeasonId
-)
+  )
+
+  const seasonDisplayName = teamSeasonDisplayName ?? currentTeam.fullName
+  const seasonDivision = teamSeasonDivision ?? currentTeam.division
   const [teamAdminAssignments, setTeamAdminAssignments] = useState<DashboardTeamAdminAssignment[]>([])
   const [teamAdminsLoading, setTeamAdminsLoading] = useState(true)
   const [overviewPlayerCount, setOverviewPlayerCount] = useState<number | null>(null)
@@ -215,19 +224,33 @@ function TeamPageInner() {
 
   useEffect(() => {
     const loadOverviewEvents = async () => {
+      if (seasonsLoading || teamSeasonLoading) {
+        return
+      }
+
+      if (teamSeasonNotFound || !teamSeasonId) {
+        setOverviewEvents([])
+        return
+      }
+
       const supabase = createClient()
 
       const { data } = await supabase
         .from('events')
         .select('id, event_type, result')
-        .eq('team_id', currentTeam.id)
+        .eq('team_season_id', teamSeasonId)
         .not('result', 'is', null)
 
       setOverviewEvents((data ?? []) as TeamOverviewEvent[])
     }
 
     loadOverviewEvents()
-  }, [currentTeam.id])
+  }, [
+    teamSeasonId,
+    teamSeasonLoading,
+    teamSeasonNotFound,
+    seasonsLoading,
+  ])
 
   if (teamSeasonNotFound) {
     return (
@@ -285,7 +308,7 @@ function TeamPageInner() {
           </div>
         )}
 
-        <p className="text-sm text-slate-400 mt-1">{currentTeam.division}</p>
+        <p className="text-sm text-slate-400 mt-1">{seasonDivision}</p>
       </div>
 
       {/* Toggle */}
@@ -340,10 +363,10 @@ function TeamPageInner() {
                       Team Overview
                     </p>
                     <h2 className="mt-1 text-lg font-extrabold text-white">
-                      {currentTeam.fullName}
+                      {seasonDisplayName}
                     </h2>
                     <p className="mt-1 text-sm text-slate-400">
-                      {currentTeam.division}
+                      {seasonDivision}
                     </p>
                   </div>
                 </div>
@@ -421,13 +444,18 @@ function TeamPageInner() {
         )}
         {view === 'standings' && (
           <StandingsView
-            division={currentTeam.division}
+            division={seasonDivision}
+            seasonId={effectiveSeasonId}
+            seasonName={selectedSeason?.name ?? null}
             currentTeamId={currentTeam.id}
             brandColor={brandColor}
           />
         )}
         {view === 'results' && (
-          <ResultsView division={currentTeam.division} />
+          <ResultsView
+            division={seasonDivision}
+            seasonId={effectiveSeasonId}
+          />
         )}
         {view === 'roster' && (
           <RosterView teamSeasonId={teamSeasonId} teamSeasonLoading={teamSeasonLoading} />
@@ -443,10 +471,14 @@ function TeamPageInner() {
 
 function StandingsView({
   division,
+  seasonId,
+  seasonName,
   currentTeamId,
   brandColor,
 }: {
   division: string
+  seasonId: string | null
+  seasonName: string | null
   currentTeamId: string
   brandColor: string
 }) {
@@ -455,11 +487,19 @@ function StandingsView({
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true)
+
       try {
+        if (!seasonId) {
+          setStandings([])
+          return
+        }
+
         const supabase = createClient()
         const { data } = await supabase
           .from('computed_standings')
           .select('id, team_name, games_played, wins, losses, ties, runs_for, runs_against')
+          .eq('season_id', seasonId)
           .eq('division', division)
         setStandings((data ?? []) as StandingRow[])
       } catch (err) {
@@ -469,7 +509,7 @@ function StandingsView({
       }
     }
     load()
-  }, [division])
+  }, [division, seasonId])
 
   const sorted = useMemo(() => {
     return [...standings].sort((a, b) => {
@@ -562,9 +602,11 @@ function StandingsView({
       </tbody>
       </table>
       <div className="pt-4 text-center">
-        <Link href="/team/rules" className="text-xs text-slate-500 hover:text-slate-300 transition">
-          MSBL 2026 Rules →
-        </Link>
+        {seasonName === 'Spring 2026' && (
+          <Link href="/team/rules" className="text-xs text-slate-500 hover:text-slate-300 transition">
+            MSBL 2026 Rules →
+          </Link>
+        )}
       </div>
     </>
   )
@@ -572,13 +614,26 @@ function StandingsView({
 
 // ─── Results sub-view ─────────────────────────────────────────────────────
 
-function ResultsView({ division }: { division: string }) {
+function ResultsView({
+  division,
+  seasonId,
+}: {
+  division: string
+  seasonId: string | null
+}) {
   const [leagueGames, setLeagueGames] = useState<LeagueGameRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadLeagueGames = async () => {
+      setLoading(true)
+
       try {
+        if (!seasonId) {
+          setLeagueGames([])
+          return
+        }
+
         const supabase = createClient()
         const { data, error } = await supabase
           .from('league_games')
@@ -586,10 +641,16 @@ function ResultsView({ division }: { division: string }) {
             id, played_at, home_score, away_score, status,
             home_team_season:home_team_season_id (
               id,
+              season_id,
+              display_name,
+              division,
               teams:team_id ( id, name, division )
             ),
             away_team_season:away_team_season_id (
               id,
+              season_id,
+              display_name,
+              division,
               teams:team_id ( id, name, division )
             ),
             events!events_league_game_id_fkey (id)
@@ -606,21 +667,53 @@ function ResultsView({ division }: { division: string }) {
         const normalized = data.map((g: any) => {
           const homeTs = Array.isArray(g.home_team_season) ? g.home_team_season[0] : g.home_team_season
           const awayTs = Array.isArray(g.away_team_season) ? g.away_team_season[0] : g.away_team_season
+
+          const homeTeam = homeTs?.teams
+            ? (Array.isArray(homeTs.teams) ? homeTs.teams[0] : homeTs.teams)
+            : null
+          const awayTeam = awayTs?.teams
+            ? (Array.isArray(awayTs.teams) ? awayTs.teams[0] : awayTs.teams)
+            : null
+
           return {
             ...g,
-            home_team: homeTs?.teams
-              ? (Array.isArray(homeTs.teams) ? homeTs.teams[0] : homeTs.teams)
+            home_team: homeTeam
+              ? {
+                  ...homeTeam,
+                  name: homeTs?.display_name ?? homeTeam.name,
+                  division: homeTs?.division ?? homeTeam.division,
+                }
               : null,
-            away_team: awayTs?.teams
-              ? (Array.isArray(awayTs.teams) ? awayTs.teams[0] : awayTs.teams)
+            away_team: awayTeam
+              ? {
+                  ...awayTeam,
+                  name: awayTs?.display_name ?? awayTeam.name,
+                  division: awayTs?.division ?? awayTeam.division,
+                }
               : null,
           }
         })
 
-        // Filter to games where at least one team is in our division
-        const filtered = normalized.filter((g: any) =>
-          g.home_team?.division === division || g.away_team?.division === division
-        )
+        // Filter to the selected season and games where at least one team
+        // is in our division.
+        const filtered = normalized.filter((g: any) => {
+          const homeTs = Array.isArray(g.home_team_season)
+            ? g.home_team_season[0]
+            : g.home_team_season
+          const awayTs = Array.isArray(g.away_team_season)
+            ? g.away_team_season[0]
+            : g.away_team_season
+
+          const isSelectedSeason =
+            homeTs?.season_id === seasonId ||
+            awayTs?.season_id === seasonId
+
+          const isDivisionGame =
+            g.home_team?.division === division ||
+            g.away_team?.division === division
+
+          return isSelectedSeason && isDivisionGame
+        })
         setLeagueGames(filtered as LeagueGameRow[])
       } catch (err) {
         console.error(err)
@@ -629,7 +722,7 @@ function ResultsView({ division }: { division: string }) {
       }
     }
     loadLeagueGames()
-  }, [division])
+  }, [division, seasonId])
 
   if (loading) {
     return (
