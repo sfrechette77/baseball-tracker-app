@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 
 type TeamSeasonState = {
   teamSeasonId: string | null
+  displayName: string | null
+  division: string | null
+  ageGroup: string | null
   arrivalBufferMinutes: number | null
   loading: boolean
   notFound: boolean  // true once loading finishes if no matching team_season exists
@@ -13,6 +16,9 @@ type TeamSeasonState = {
 
 const INITIAL_STATE: TeamSeasonState = {
   teamSeasonId: null,
+  displayName: null,
+  division: null,
+  ageGroup: null,
   arrivalBufferMinutes: null,
   loading: true,
   notFound: false,
@@ -55,6 +61,9 @@ const INITIAL_STATE: TeamSeasonState = {
           .from('team_seasons')
           .select(`
             id,
+            display_name,
+            division,
+            age_group,
             teams:team_id ( arrival_buffer_minutes ),
             seasons:season_id!inner ( is_current )
           `)
@@ -69,6 +78,9 @@ const INITIAL_STATE: TeamSeasonState = {
         if (error) {
           setState({
             teamSeasonId: null,
+            displayName: null,
+            division: null,
+            ageGroup: null,
             arrivalBufferMinutes: null,
             loading: false,
             notFound: false,
@@ -83,6 +95,9 @@ const INITIAL_STATE: TeamSeasonState = {
           // when the season was created.
           setState({
             teamSeasonId: null,
+            displayName: null,
+            division: null,
+            ageGroup: null,
             arrivalBufferMinutes: null,
             loading: false,
             notFound: true,
@@ -96,6 +111,9 @@ const INITIAL_STATE: TeamSeasonState = {
 
         setState({
           teamSeasonId: data.id,
+          displayName: data.display_name ?? null,
+          division: data.division ?? null,
+          ageGroup: data.age_group ?? null,
           arrivalBufferMinutes: arrivalBuffer,
           loading: false,
           notFound: false,
@@ -105,6 +123,9 @@ const INITIAL_STATE: TeamSeasonState = {
         if (!cancelled) {
           setState({
             teamSeasonId: null,
+            displayName: null,
+            division: null,
+            ageGroup: null,
             arrivalBufferMinutes: null,
             loading: false,
             notFound: false,

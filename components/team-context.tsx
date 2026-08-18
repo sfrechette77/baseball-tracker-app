@@ -18,6 +18,12 @@ type RawTeam = {
   division: string | null
 }
 
+type RawTeamSeason = {
+  team_id: string
+  display_name: string | null
+  division: string | null
+}
+
 type TeamContextValue = {
   currentTeam: PickableTeam
   setCurrentTeamId: (id: string) => void
@@ -80,7 +86,38 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           .eq('is_opponent', false)
           .order('name')
 
-        const teams = (teamRows ?? []) as RawTeam[]
+        const permanentTeams = (teamRows ?? []) as RawTeam[]
+
+        // Use the current season's team identity for the global team picker.
+        // Fall can therefore show "Elite 12U - Moore" while historical pages
+        // can still render their own selected season identity separately.
+        const { data: currentTeamSeasonRows } = await supabase
+          .from('team_seasons')
+          .select(`
+            team_id,
+            display_name,
+            division,
+            seasons:season_id!inner ( is_current )
+          `)
+          .eq('organization_id', orgId)
+          .eq('seasons.is_current', true)
+
+        const currentTeamSeasons =
+          (currentTeamSeasonRows ?? []) as RawTeamSeason[]
+
+        const currentSeasonByTeamId = new Map(
+          currentTeamSeasons.map(row => [row.team_id, row])
+        )
+
+        const teams = permanentTeams.map(team => {
+          const currentSeason = currentSeasonByTeamId.get(team.id)
+
+          return {
+            ...team,
+            name: currentSeason?.display_name ?? team.name,
+            division: currentSeason?.division ?? team.division,
+          }
+        })
 
         // A parent's home/default team, if they have one.
         const { data: defaultRows } = await supabase
