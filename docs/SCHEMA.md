@@ -307,14 +307,26 @@ Per-season instance of a team.
 |---|---|---|---|
 | id | uuid | PK, default gen_random_uuid() | |
 | organization_id | uuid | NOT NULL, FK organizations, ON DELETE CASCADE | |
-| team_id | uuid | NOT NULL, FK teams, ON DELETE CASCADE | |
+| team_id | uuid | NOT NULL, FK teams, ON DELETE CASCADE | Permanent team identity |
 | season_id | uuid | NOT NULL, FK seasons, ON DELETE CASCADE | |
+| display_name | text | nullable, nonblank when set | Season-specific team name; falls back to `teams.name` |
+| division | text | nullable, nonblank when set | Season-specific division; falls back to `teams.division` |
 | age_group | text | nullable | "11U", "12U", etc. |
 | head_coach_name | text | nullable | |
 | created_at | timestamptz | NOT NULL, default now() | |
 | updated_at | timestamptz | NOT NULL, default now() | |
 
-**Constraints:** `team_seasons_unique` UNIQUE (team_id, season_id)
+**Constraints:**
+- `team_seasons_unique` UNIQUE (team_id, season_id)
+- `team_seasons_display_name_not_blank`
+- `team_seasons_division_not_blank`
+
+**Season rollover behavior:**
+- `start_new_season(...)` creates one `team_seasons` row for each non-opponent permanent team.
+- `display_name` and `division` seed from the most recent prior team-season, with permanent `teams` values as fallback.
+- `age_group` is intentionally not auto-incremented or guessed.
+- Optional roster copy uses only the most recent prior season.
+- Historical team identity remains on the historical `team_seasons` row even when the current-season identity changes.
 
 **Indexes:**
 - `idx_team_seasons_org`, `idx_team_seasons_team`, `idx_team_seasons_season`
@@ -559,7 +571,14 @@ All under RLS now (post-cutover).
 ---
 
 ### computed_standings (VIEW)
-Aggregated standings view. Rewritten in Chunk 6 to expose `organization_id`. Views don't have their own RLS; access is controlled by RLS on underlying tables.
+Season-aware aggregated standings view.
+
+- One row per `team_seasons` row, including zero-game teams.
+- Game results aggregate through `league_games.home_team_season_id` / `away_team_season_id`; records no longer combine multiple seasons for the same permanent team.
+- Team name and division use `team_seasons.display_name` / `team_seasons.division`, with permanent `teams` values as fallback.
+- Existing leading columns remain compatible: `id` (permanent team id), `team_name`, `division`, games/wins/losses/ties, runs, `win_pct`, `organization_id`.
+- Appended season-aware columns: `team_season_id`, `season_id`, `age_group`.
+- Defined with `security_invoker = true`; access is governed by RLS on the underlying tenant tables.
 
 ---
 
