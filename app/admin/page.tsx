@@ -16,6 +16,8 @@ import {
   removeMemberTeamAdmin,
   grantTeamAdminByEmail,
   startNewSeason,
+  getCurrentSeasonTeamSetup,
+  updateSeasonTeamSetup,
   getOrganizationLinks,
   saveOrganizationLink,
   deleteOrganizationLink,
@@ -28,6 +30,7 @@ import {
   type OrganizationLink,
   type OrganizationLaunchReadiness,
   type OrganizationAthleteOption,
+  type SeasonTeamSetupRow,
 } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
@@ -265,6 +268,13 @@ export default function AdminPage() {
   const [settingsSeasonLoading, setSettingsSeasonLoading] = useState(false)
   const [settingsSeasonMsg, setSettingsSeasonMsg] = useState<string | null>(null)
 
+  const [seasonTeamSetupRows, setSeasonTeamSetupRows] =
+    useState<SeasonTeamSetupRow[]>([])
+  const [seasonTeamSetupLoading, setSeasonTeamSetupLoading] = useState(false)
+  const [seasonTeamSetupMsg, setSeasonTeamSetupMsg] = useState<string | null>(null)
+  const [seasonTeamSetupSavingId, setSeasonTeamSetupSavingId] =
+    useState<string | null>(null)
+
   const [launchReadiness, setLaunchReadiness] =
   useState<OrganizationLaunchReadiness | null>(null)
 
@@ -437,6 +447,79 @@ export default function AdminPage() {
       }
     }
 
+  const loadSeasonTeamSetup = async () => {
+    if (!isOrgAdmin) return
+
+    setSeasonTeamSetupLoading(true)
+    setSeasonTeamSetupMsg(null)
+
+    const result = await getCurrentSeasonTeamSetup()
+
+    if (result.ok) {
+      setSeasonTeamSetupRows(result.teams)
+      setSettingsSeasonName(result.seasonName)
+    } else {
+      setSeasonTeamSetupRows([])
+      setSeasonTeamSetupMsg(`❌ ${result.error}`)
+    }
+
+    setSeasonTeamSetupLoading(false)
+  }
+
+  const updateSeasonTeamSetupField = (
+    teamId: string,
+    field: 'displayName' | 'division' | 'ageGroup',
+    value: string
+  ) => {
+    setSeasonTeamSetupRows(previous =>
+      previous.map(row =>
+        row.teamId === teamId
+          ? {
+              ...row,
+              [field]: value,
+            }
+          : row
+      )
+    )
+
+    setSeasonTeamSetupMsg(null)
+  }
+
+  const saveSeasonTeamSetup = async (row: SeasonTeamSetupRow) => {
+    if (!isOrgAdmin) return
+
+    if (!row.teamSeasonId) {
+      setSeasonTeamSetupMsg(
+        `❌ ${row.permanentName} does not have a team-season record for the active season.`
+      )
+      return
+    }
+
+    if (!row.displayName.trim()) {
+      setSeasonTeamSetupMsg('❌ Team display name is required.')
+      return
+    }
+
+    setSeasonTeamSetupSavingId(row.teamSeasonId)
+    setSeasonTeamSetupMsg(null)
+
+    const result = await updateSeasonTeamSetup({
+      teamSeasonId: row.teamSeasonId,
+      displayName: row.displayName,
+      division: row.division,
+      ageGroup: row.ageGroup,
+    })
+
+    if (result.ok) {
+      setSeasonTeamSetupMsg(`✅ ${row.displayName.trim()} updated.`)
+      await loadLaunchReadiness()
+    } else {
+      setSeasonTeamSetupMsg(`❌ ${result.error}`)
+    }
+
+    setSeasonTeamSetupSavingId(null)
+  }
+
   const loadLaunchReadiness = async () => {
     setLaunchReadinessLoading(true)
     setLaunchReadinessMsg(null)
@@ -596,6 +679,8 @@ export default function AdminPage() {
   setNewSeasonEndDate('')
   setCopyRostersForward(false)
   setSeasonRolloverMsg('✅ New season started. Current-season pages now point to the new season.')
+  await loadSeasonTeamSetup()
+  await loadLaunchReadiness()
 }
 
   const [managedRosterPlayers, setManagedRosterPlayers] =
@@ -696,6 +781,12 @@ export default function AdminPage() {
     useEffect(() => {
       if (!isOrgAdmin || settingsSubTab !== 'links') return
       loadOrganizationLinks()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOrgAdmin, settingsSubTab])
+
+    useEffect(() => {
+      if (!isOrgAdmin || settingsSubTab !== 'season') return
+      loadSeasonTeamSetup()
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOrgAdmin, settingsSubTab])
 
@@ -2879,9 +2970,139 @@ const visibleAdminTabs = isOrgAdmin
 
                   <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
                     <div>
+                      <h4 className="text-sm font-bold text-white">
+                        Current Season Teams
+                      </h4>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Set the name, age group, and division shown for each team in this season.
+                        These changes do not rename the permanent team or alter historical seasons.
+                      </p>
+                    </div>
+
+                    {seasonTeamSetupLoading ? (
+                      <p className="text-sm text-slate-400">
+                        Loading season teams...
+                      </p>
+                    ) : seasonTeamSetupRows.length === 0 ? (
+                      <p className="text-sm text-slate-400">
+                        No teams found for the active season.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {seasonTeamSetupRows.map(row => {
+                          const isSaving =
+                            seasonTeamSetupSavingId === row.teamSeasonId
+
+                          return (
+                            <div
+                              key={row.teamId}
+                              className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-3"
+                            >
+                              <div>
+                                <p className="text-sm font-bold text-white">
+                                  {row.displayName || row.permanentName}
+                                </p>
+                              </div>
+
+                              {!row.teamSeasonId && (
+                                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                                  This team is missing its active-season team record.
+                                </p>
+                              )}
+
+                              <div className="space-y-2">
+                                <label className="text-xs text-slate-400">
+                                  Team Display Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={row.displayName}
+                                  onChange={event =>
+                                    updateSeasonTeamSetupField(
+                                      row.teamId,
+                                      'displayName',
+                                      event.target.value
+                                    )
+                                  }
+                                  disabled={isSaving || !row.teamSeasonId}
+                                  placeholder={row.permanentName}
+                                  className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-slate-400 focus:outline-none disabled:opacity-50"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                  <label className="text-xs text-slate-400">
+                                    Age Group
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={row.ageGroup}
+                                    onChange={event =>
+                                      updateSeasonTeamSetupField(
+                                        row.teamId,
+                                        'ageGroup',
+                                        event.target.value
+                                      )
+                                    }
+                                    disabled={isSaving || !row.teamSeasonId}
+                                    placeholder="12U"
+                                    className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-slate-400 focus:outline-none disabled:opacity-50"
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-xs text-slate-400">
+                                    Division
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={row.division}
+                                    onChange={event =>
+                                      updateSeasonTeamSetupField(
+                                        row.teamId,
+                                        'division',
+                                        event.target.value
+                                      )
+                                    }
+                                    disabled={isSaving || !row.teamSeasonId}
+                                    placeholder="12U American Division"
+                                    className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-slate-400 focus:outline-none disabled:opacity-50"
+                                  />
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => saveSeasonTeamSetup(row)}
+                                disabled={
+                                  seasonTeamSetupSavingId !== null ||
+                                  !row.teamSeasonId ||
+                                  !row.displayName.trim()
+                                }
+                                className="w-full rounded-xl py-2 text-sm font-bold text-white transition disabled:opacity-50"
+                                style={{ backgroundColor: brandColor }}
+                              >
+                                {isSaving ? 'Saving...' : 'Save Team Settings'}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {seasonTeamSetupMsg && (
+                      <p className="text-center text-sm text-slate-300">
+                        {seasonTeamSetupMsg}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                    <div>
                       <h4 className="text-sm font-bold text-white">Start New Season</h4>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        Archives the current season, creates fresh team-season records, and makes the new season active. Old season data is preserved, but current-season pages will switch to the new season. Historical season browsing is not available yet.
+                        Archives the current season, creates fresh team-season records, and makes the new season active. Old season data is preserved and remains available through the app's season selectors.
                       </p>
                     </div>
 

@@ -1626,6 +1626,190 @@ export async function removeMembership(membershipId: string): Promise<SimpleResu
   return { ok: true }
 }
 
+// ─── Season Team Setup ────────────────────────────────────────────────────
+
+export type SeasonTeamSetupRow = {
+  teamSeasonId: string | null
+  teamId: string
+  permanentName: string
+  displayName: string
+  division: string
+  ageGroup: string
+}
+
+export type CurrentSeasonTeamSetupResult =
+  | {
+      ok: true
+      seasonId: string
+      seasonName: string
+      teams: SeasonTeamSetupRow[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+export async function getCurrentSeasonTeamSetup():
+  Promise<CurrentSeasonTeamSetupResult> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+
+  if (!guard.ok) {
+    return { ok: false, error: guard.error }
+  }
+
+  const organizationId = guard.membership.organization_id
+
+  const { data: season, error: seasonError } = await supabase
+    .from('seasons')
+    .select('id, name')
+    .eq('organization_id', organizationId)
+    .eq('is_current', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (seasonError) {
+    return { ok: false, error: seasonError.message }
+  }
+
+  if (!season) {
+    return { ok: false, error: 'No active season found' }
+  }
+
+  const { data: teams, error: teamsError } = await supabase
+    .from('teams')
+    .select('id, name, division')
+    .eq('organization_id', organizationId)
+    .eq('is_opponent', false)
+    .order('name')
+
+  if (teamsError) {
+    return { ok: false, error: teamsError.message }
+  }
+
+  if (!teams || teams.length === 0) {
+    return {
+      ok: true,
+      seasonId: season.id,
+      seasonName: season.name,
+      teams: [],
+    }
+  }
+
+  const teamIds = teams.map(team => team.id)
+
+  const { data: teamSeasons, error: teamSeasonsError } = await supabase
+    .from('team_seasons')
+    .select('id, team_id, display_name, division, age_group')
+    .eq('organization_id', organizationId)
+    .eq('season_id', season.id)
+    .in('team_id', teamIds)
+
+  if (teamSeasonsError) {
+    return { ok: false, error: teamSeasonsError.message }
+  }
+
+  const teamSeasonByTeamId = new Map(
+    (teamSeasons ?? []).map(teamSeason => [teamSeason.team_id, teamSeason])
+  )
+
+  return {
+    ok: true,
+    seasonId: season.id,
+    seasonName: season.name,
+    teams: teams.map(team => {
+      const teamSeason = teamSeasonByTeamId.get(team.id)
+
+      return {
+        teamSeasonId: teamSeason?.id ?? null,
+        teamId: team.id,
+        permanentName: team.name,
+        displayName: teamSeason?.display_name ?? team.name,
+        division: teamSeason?.division ?? team.division ?? '',
+        ageGroup: teamSeason?.age_group ?? '',
+      }
+    }),
+  }
+}
+
+export async function updateSeasonTeamSetup(input: {
+  teamSeasonId: string
+  displayName: string
+  division: string
+  ageGroup: string
+}): Promise<SimpleResult> {
+  const displayName = input.displayName.trim()
+  const division = input.division.trim()
+  const ageGroup = input.ageGroup.trim()
+
+  if (!input.teamSeasonId) {
+    return { ok: false, error: 'Team-season record is required' }
+  }
+
+  if (!displayName) {
+    return { ok: false, error: 'Team display name is required' }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+
+  if (!guard.ok) {
+    return { ok: false, error: guard.error }
+  }
+
+  const organizationId = guard.membership.organization_id
+
+  const { data: target, error: targetError } = await supabase
+    .from('team_seasons')
+    .select(`
+      id,
+      organization_id,
+      season_id,
+      seasons:season_id!inner ( is_current ),
+      teams:team_id!inner ( is_opponent )
+    `)
+    .eq('id', input.teamSeasonId)
+    .eq('organization_id', organizationId)
+    .eq('seasons.is_current', true)
+    .eq('teams.is_opponent', false)
+    .maybeSingle()
+
+  if (targetError) {
+    return { ok: false, error: targetError.message }
+  }
+
+  if (!target) {
+    return {
+      ok: false,
+      error: 'Current-season team record not found',
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from('team_seasons')
+    .update({
+      display_name: displayName,
+      division: division || null,
+      age_group: ageGroup || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.teamSeasonId)
+    .eq('organization_id', organizationId)
+
+  if (updateError) {
+    return { ok: false, error: updateError.message }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  revalidatePath('/team')
+  revalidatePath('/schedule')
+  revalidatePath('/stats')
+  revalidatePath('/standings')
+
+  return { ok: true }
+}
+
 // ─── startNewSeason ────────────────────────────────────────────────────────
 
 export async function startNewSeason(
