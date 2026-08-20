@@ -403,8 +403,11 @@ Scope: public, shareable organization landing page for prospective families and 
 ## Admin Settings tab — SHIPPED
 
 - New Settings tab in /admin, **org_admin only** (`teamAdminAllowedTabs` unchanged: status, score, stats, events).
-- Contains: Organization Name, read-only Slug, Branding (logo upload + preview, color picker), Access (signup link + Copy button), Season (active season name, read-only).
-- Saves: name, logo_url, primary_color. Slug read-only (changing it would break signup links).
+- Contains: General, Branding, Access, Links, Fields, and Season settings.
+- General/Branding saves organization name, logo_url, and primary_color. Slug remains read-only because changing it would break signup links.
+- Fields lets org admins create and edit reusable organization fields, including address, optional latitude/longitude, parking notes, restroom notes, and seating notes.
+- Field coordinates must be supplied as a pair and are range-validated. Saved field changes refresh the Admin Events field selector immediately.
+- Selecting Edit from the field list repopulates the form and scrolls the editor into view. Delete is intentionally not exposed so historical event references are preserved.
 - UX: visible Logo URL field removed (too technical) — logo_url still saved internally. Advanced hex section removed; color picker with plain-English helper. Access heading: "Share this link with parents, coaches, and players so they can request access."
 - Launch Readiness now guides new organizations through onboarding.
 Current checks:
