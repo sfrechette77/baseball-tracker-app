@@ -8,6 +8,8 @@
 ☑ Create season
 ☑ Create divisions
 ☑ Create teams
+☑ Create organization fields in Admin → Settings → Fields
+☑ Confirm fields can be edited and selected when creating or editing events
 ☑ Confirm each own team has a `team_seasons` row for the active season
 ☑ Confirm season-specific team display name, division, and age group are correct
 ☑ Confirm historical season selector preserves prior-season team identity, standings, and results

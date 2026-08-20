@@ -559,6 +559,14 @@ All under RLS now (post-cutover).
 
 **Per-season tables** (players, events, box_scores, player_stats, league_games, standings) link via `team_season_id` to team_seasons. Old `team_id` columns DROPPED in Chunk 3 except on standings (which kept its team_name). `fields.team_id` (a NOT NULL legacy column) was dropped in **Chunk 4b** (dev + prod) — no per-season tenant table now carries a redundant team_id.
 
+**fields**
+- Organization-scoped reusable locations for games and practices.
+- Current field data includes: `id`, `organization_id`, `name`, `address_line`, `city`, `state`, `postal_code`, `latitude`, `longitude`, `parking_notes`, `restroom_notes`, `seating_notes`, and `created_at`.
+- Organization members may read their organization's fields; writes require `is_org_admin(organization_id)`.
+- Latitude and longitude are optional, but the Admin UI requires both together and validates their geographic ranges.
+- Fields are not season-specific. Existing events may continue referencing a field across seasons.
+- Admin → Settings → Fields supports create and edit. Delete is intentionally not exposed so historical event references are not accidentally disrupted.
+
 **Cron / service-key safety:** weather_forecasts and game_status_log writes go through service-key paths (cron `/api/update-weather`, admin `/api/admin`). Service key bypasses RLS entirely. event_imports has NO active writers as of cutover.
 
 **Admin stats save behavior (app/API):**
