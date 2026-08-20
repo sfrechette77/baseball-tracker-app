@@ -2080,6 +2080,22 @@ const deleteLeagueGame = async () => {
     })
   }
 
+  const duplicateEvent = () => {
+    if (!editingEventId) return
+
+    setEditingEventId(null)
+    setEventForm(prev => ({
+      ...prev,
+      opponent: '',
+      opponentTeamId: '',
+    }))
+    setEventMsg(
+      formMode === 'practice'
+        ? 'Duplicate ready — update the date/time, then create the new practice.'
+        : 'Duplicate ready — update the date/time and opponent, then create the new event.'
+    )
+  }
+
   const cancelEventForm = () => {
     setEditingEventId(null)
     setFormMode('none')
@@ -5330,6 +5346,17 @@ const visibleAdminTabs = isOrgAdmin
                   >
                   {eventSaving ? 'Saving...' : (editingEventId ? 'Save Changes' : 'Create Event')}
                 </button>
+
+                {editingEventId && (
+                  <button
+                    type="button"
+                    onClick={duplicateEvent}
+                    disabled={eventSaving}
+                    className="w-full rounded-xl border border-white/20 bg-white/10 py-2 text-xs font-bold text-white hover:bg-white/20 transition disabled:opacity-50"
+                  >
+                    Duplicate & Edit
+                  </button>
+                )}
 
                 {editingEventId && (
                   <button onClick={deleteEvent} disabled={eventSaving}
