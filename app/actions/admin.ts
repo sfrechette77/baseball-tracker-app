@@ -35,6 +35,21 @@ export type OrganizationLink = {
   sort_order: number
 }
 
+export type OrganizationField = {
+  id: string
+  organization_id: string
+  name: string
+  address_line: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+  latitude: number | null
+  longitude: number | null
+  parking_notes: string | null
+  restroom_notes: string | null
+  seating_notes: string | null
+}
+
 export type SimpleResult = { ok: true } | { ok: false; error: string }
 
 // ─── Auth guard ────────────────────────────────────────────────────────────
@@ -1586,6 +1601,122 @@ export async function deleteOrganizationLink(id: string): Promise<SimpleResult> 
 
   revalidatePath('/')
   revalidatePath('/admin')
+
+  return { ok: true }
+}
+
+// ─── Organization fields ───────────────────────────────────────────────────
+
+export async function getOrganizationFields(): Promise<
+  { ok: true; fields: OrganizationField[] } | { ok: false; error: string }
+> {
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  const { data, error } = await supabase
+    .from('fields')
+    .select(
+      'id, organization_id, name, address_line, city, state, postal_code, latitude, longitude, parking_notes, restroom_notes, seating_notes'
+    )
+    .eq('organization_id', guard.membership.organization_id)
+    .order('name', { ascending: true })
+
+  if (error) return { ok: false, error: error.message }
+
+  return {
+    ok: true,
+    fields: (data ?? []) as OrganizationField[],
+  }
+}
+
+export async function saveOrganizationField(input: {
+  id?: string
+  name: string
+  addressLine?: string | null
+  city?: string | null
+  state?: string | null
+  postalCode?: string | null
+  latitude?: string | number | null
+  longitude?: string | number | null
+  parkingNotes?: string | null
+  restroomNotes?: string | null
+  seatingNotes?: string | null
+}): Promise<SimpleResult> {
+  const name = input.name.trim()
+  if (!name) return { ok: false, error: 'Enter a field name' }
+
+  const parseCoordinate = (
+    value: string | number | null | undefined
+  ): number | null => {
+    if (value === null || value === undefined || value === '') return null
+    if (typeof value === 'string' && !value.trim()) return null
+
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : Number.NaN
+  }
+
+  const latitude = parseCoordinate(input.latitude)
+  const longitude = parseCoordinate(input.longitude)
+
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return { ok: false, error: 'Latitude and longitude must be valid numbers' }
+  }
+
+  if ((latitude === null) !== (longitude === null)) {
+    return {
+      ok: false,
+      error: 'Enter both latitude and longitude, or leave both blank',
+    }
+  }
+
+  if (latitude !== null && (latitude < -90 || latitude > 90)) {
+    return { ok: false, error: 'Latitude must be between -90 and 90' }
+  }
+
+  if (longitude !== null && (longitude < -180 || longitude > 180)) {
+    return { ok: false, error: 'Longitude must be between -180 and 180' }
+  }
+
+  const values = {
+    name,
+    address_line: input.addressLine?.trim() || null,
+    city: input.city?.trim() || null,
+    state: input.state?.trim() || null,
+    postal_code: input.postalCode?.trim() || null,
+    latitude,
+    longitude,
+    parking_notes: input.parkingNotes?.trim() || null,
+    restroom_notes: input.restroomNotes?.trim() || null,
+    seating_notes: input.seatingNotes?.trim() || null,
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+  if (!guard.ok) return { ok: false, error: guard.error }
+
+  if (input.id) {
+    const { error } = await supabase
+      .from('fields')
+      .update(values)
+      .eq('id', input.id)
+      .eq('organization_id', guard.membership.organization_id)
+
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase
+      .from('fields')
+      .insert({
+        organization_id: guard.membership.organization_id,
+        ...values,
+      })
+
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  revalidatePath('/schedule')
 
   return { ok: true }
 }
