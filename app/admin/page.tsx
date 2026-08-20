@@ -21,6 +21,8 @@ import {
   getOrganizationLinks,
   saveOrganizationLink,
   deleteOrganizationLink,
+  getOrganizationFields,
+  saveOrganizationField,
   getOrganizationLaunchReadiness,
   getOrganizationAthletes,
   updateGuardianAthleteAssignments,
@@ -28,6 +30,7 @@ import {
   type OrgTeam,
   type ApprovedParent,
   type OrganizationLink,
+  type OrganizationField,
   type OrganizationLaunchReadiness,
   type OrganizationAthleteOption,
   type SeasonTeamSetupRow,
@@ -117,7 +120,7 @@ type Standing = {
 }
 
 type Tab = 'dashboard' | 'pending' | 'members' | 'roster' | 'status' | 'score' | 'stats' | 'events' | 'league' | 'standings' | 'settings'
-type SettingsSubTab = 'general' | 'branding' | 'access' | 'links' | 'season'
+type SettingsSubTab = 'general' | 'branding' | 'access' | 'links' | 'fields' | 'season'
 
 type Field = {
   id: string
@@ -293,6 +296,22 @@ export default function AdminPage() {
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null)
   const [linkSaving, setLinkSaving] = useState(false)
 
+  const [settingsFields, setSettingsFields] = useState<OrganizationField[]>([])
+  const [settingsFieldsLoading, setSettingsFieldsLoading] = useState(false)
+  const [settingsFieldsMsg, setSettingsFieldsMsg] = useState<string | null>(null)
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
+  const [fieldName, setFieldName] = useState('')
+  const [fieldAddressLine, setFieldAddressLine] = useState('')
+  const [fieldCity, setFieldCity] = useState('')
+  const [fieldState, setFieldState] = useState('')
+  const [fieldPostalCode, setFieldPostalCode] = useState('')
+  const [fieldLatitude, setFieldLatitude] = useState('')
+  const [fieldLongitude, setFieldLongitude] = useState('')
+  const [fieldParkingNotes, setFieldParkingNotes] = useState('')
+  const [fieldRestroomNotes, setFieldRestroomNotes] = useState('')
+  const [fieldSeatingNotes, setFieldSeatingNotes] = useState('')
+  const [fieldSaving, setFieldSaving] = useState(false)
+
   const [newSeasonName, setNewSeasonName] = useState('')
   const [newSeasonStartDate, setNewSeasonStartDate] = useState('')
   const [newSeasonEndDate, setNewSeasonEndDate] = useState('')
@@ -446,6 +465,95 @@ export default function AdminPage() {
         setSettingsLinksMsg(`❌ ${result.error}`)
       }
     }
+
+  const resetFieldForm = () => {
+    setEditingFieldId(null)
+    setFieldName('')
+    setFieldAddressLine('')
+    setFieldCity('')
+    setFieldState('')
+    setFieldPostalCode('')
+    setFieldLatitude('')
+    setFieldLongitude('')
+    setFieldParkingNotes('')
+    setFieldRestroomNotes('')
+    setFieldSeatingNotes('')
+  }
+
+  const loadOrganizationFields = async () => {
+    if (!isOrgAdmin) return
+
+    setSettingsFieldsLoading(true)
+    setSettingsFieldsMsg(null)
+
+    const result = await getOrganizationFields()
+
+    if (result.ok) {
+      setSettingsFields(result.fields)
+      setFields(
+        result.fields.map(field => ({
+          id: field.id,
+          name: field.name,
+        }))
+      )
+    } else {
+      setSettingsFieldsMsg(`❌ ${result.error}`)
+    }
+
+    setSettingsFieldsLoading(false)
+  }
+
+  const editOrganizationField = (field: OrganizationField) => {
+    setEditingFieldId(field.id)
+    setFieldName(field.name)
+    setFieldAddressLine(field.address_line ?? '')
+    setFieldCity(field.city ?? '')
+    setFieldState(field.state ?? '')
+    setFieldPostalCode(field.postal_code ?? '')
+    setFieldLatitude(field.latitude?.toString() ?? '')
+    setFieldLongitude(field.longitude?.toString() ?? '')
+    setFieldParkingNotes(field.parking_notes ?? '')
+    setFieldRestroomNotes(field.restroom_notes ?? '')
+    setFieldSeatingNotes(field.seating_notes ?? '')
+    setSettingsFieldsMsg(null)
+
+    setTimeout(() => {
+      document
+        .getElementById('field-settings-form')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 0)
+  }
+
+  const submitOrganizationField = async () => {
+    if (!isOrgAdmin) return
+
+    setFieldSaving(true)
+    setSettingsFieldsMsg(null)
+
+    const result = await saveOrganizationField({
+      id: editingFieldId ?? undefined,
+      name: fieldName,
+      addressLine: fieldAddressLine,
+      city: fieldCity,
+      state: fieldState,
+      postalCode: fieldPostalCode,
+      latitude: fieldLatitude,
+      longitude: fieldLongitude,
+      parkingNotes: fieldParkingNotes,
+      restroomNotes: fieldRestroomNotes,
+      seatingNotes: fieldSeatingNotes,
+    })
+
+    if (result.ok) {
+      setSettingsFieldsMsg(editingFieldId ? 'Field updated.' : 'Field added.')
+      resetFieldForm()
+      await loadOrganizationFields()
+    } else {
+      setSettingsFieldsMsg(`❌ ${result.error}`)
+    }
+
+    setFieldSaving(false)
+  }
 
   const loadSeasonTeamSetup = async () => {
     if (!isOrgAdmin) return
@@ -781,6 +889,12 @@ export default function AdminPage() {
     useEffect(() => {
       if (!isOrgAdmin || settingsSubTab !== 'links') return
       loadOrganizationLinks()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOrgAdmin, settingsSubTab])
+
+    useEffect(() => {
+      if (!isOrgAdmin || settingsSubTab !== 'fields') return
+      loadOrganizationFields()
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOrgAdmin, settingsSubTab])
 
@@ -2516,6 +2630,7 @@ const visibleAdminTabs = isOrgAdmin
                   ['branding', 'Branding'],
                   ['access', 'Access'],
                   ['links', 'Links'],
+                  ['fields', 'Fields'],
                   ['season', 'Season'],
                 ] as const).map(([subTab, label]) => {
                   const isActive = settingsSubTab === subTab
@@ -2951,6 +3066,221 @@ const visibleAdminTabs = isOrgAdmin
 
                   {settingsLinksMsg && (
                     <p className="text-sm text-center text-slate-300">{settingsLinksMsg}</p>
+                  )}
+                </div>
+              )}
+
+              {settingsSubTab === 'fields' && (
+                <div role="tabpanel" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Fields</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Manage fields used for games and practices. Coordinates are optional but enable weather and travel calculations.
+                    </p>
+                  </div>
+
+                  <div
+                    id="field-settings-form"
+                    className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3"
+                  >
+                    {editingFieldId && (
+                      <p
+                        className="text-xs font-bold uppercase tracking-wide"
+                        style={{ color: brandColor }}
+                      >
+                        Editing Field
+                      </p>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Field Name</label>
+                      <input
+                        type="text"
+                        value={fieldName}
+                        onChange={e => setFieldName(e.target.value)}
+                        placeholder="Memorial Park Field 1"
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Street Address</label>
+                      <input
+                        type="text"
+                        value={fieldAddressLine}
+                        onChange={e => setFieldAddressLine(e.target.value)}
+                        placeholder="123 Main St"
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <label className="text-xs text-slate-400">City</label>
+                        <input
+                          type="text"
+                          value={fieldCity}
+                          onChange={e => setFieldCity(e.target.value)}
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs text-slate-400">State</label>
+                        <input
+                          type="text"
+                          value={fieldState}
+                          onChange={e => setFieldState(e.target.value)}
+                          placeholder="IL"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Postal Code</label>
+                      <input
+                        type="text"
+                        value={fieldPostalCode}
+                        onChange={e => setFieldPostalCode(e.target.value)}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <label className="text-xs text-slate-400">Latitude</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={fieldLatitude}
+                          onChange={e => setFieldLatitude(e.target.value)}
+                          placeholder="41.8781"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs text-slate-400">Longitude</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={fieldLongitude}
+                          onChange={e => setFieldLongitude(e.target.value)}
+                          placeholder="-87.6298"
+                          className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Parking Notes</label>
+                      <textarea
+                        value={fieldParkingNotes}
+                        onChange={e => setFieldParkingNotes(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Restroom Notes</label>
+                      <textarea
+                        value={fieldRestroomNotes}
+                        onChange={e => setFieldRestroomNotes(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400">Seating Notes</label>
+                      <textarea
+                        value={fieldSeatingNotes}
+                        onChange={e => setFieldSeatingNotes(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={submitOrganizationField}
+                        disabled={fieldSaving || !fieldName.trim()}
+                        className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {fieldSaving
+                          ? 'Saving...'
+                          : editingFieldId
+                            ? 'Update Field'
+                            : 'Add Field'}
+                      </button>
+
+                      {editingFieldId && (
+                        <button
+                          type="button"
+                          onClick={resetFieldForm}
+                          className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {settingsFieldsLoading && (
+                      <p className="text-sm text-slate-400">Loading fields...</p>
+                    )}
+
+                    {!settingsFieldsLoading && settingsFields.length === 0 && (
+                      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                        <p className="text-sm text-slate-400">No fields added yet.</p>
+                      </div>
+                    )}
+
+                    {!settingsFieldsLoading && settingsFields.map(field => (
+                      <div
+                        key={field.id}
+                        className="rounded-xl border border-white/10 bg-white/5 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white">{field.name}</p>
+
+                            {(field.address_line || field.city || field.state || field.postal_code) && (
+                              <p className="mt-1 text-xs text-slate-400">
+                                {[field.address_line, field.city, field.state, field.postal_code]
+                                  .filter(Boolean)
+                                  .join(', ')}
+                              </p>
+                            )}
+
+                            {field.latitude !== null && field.longitude !== null && (
+                              <p className="mt-1 text-[10px] text-slate-500">
+                                Coordinates configured
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => editOrganizationField(field)}
+                            className="shrink-0 rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {settingsFieldsMsg && (
+                    <p className="text-sm text-center text-slate-300">
+                      {settingsFieldsMsg}
+                    </p>
                   )}
                 </div>
               )}
