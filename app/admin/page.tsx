@@ -1045,6 +1045,11 @@ export default function AdminPage() {
   const [eventSaving, setEventSaving] = useState(false)
   const [eventMsg, setEventMsg] = useState<string | null>(null)
 
+  const [inlineFieldOpen, setInlineFieldOpen] = useState(false)
+  const [inlineFieldName, setInlineFieldName] = useState('')
+  const [inlineFieldSaving, setInlineFieldSaving] = useState(false)
+  const [inlineFieldMsg, setInlineFieldMsg] = useState<string | null>(null)
+
   useEffect(() => {
     const saved = localStorage.getItem(PASSWORD_KEY)
     if (saved) setPassword(saved)
@@ -2062,7 +2067,52 @@ const submitGrantTeamAdmin = async () => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
   }
 
+  const resetInlineFieldForm = () => {
+    setInlineFieldOpen(false)
+    setInlineFieldName('')
+    setInlineFieldSaving(false)
+    setInlineFieldMsg(null)
+  }
+
+  const saveInlineField = async () => {
+    if (!isOrgAdmin) return
+
+    const name = inlineFieldName.trim()
+    if (!name) {
+      setInlineFieldMsg('Enter a field name.')
+      return
+    }
+
+    setInlineFieldSaving(true)
+    setInlineFieldMsg(null)
+
+    const result = await saveOrganizationField({ name })
+
+    if (result.ok) {
+      setFields(previous =>
+        [
+          ...previous.filter(field => field.id !== result.field.id),
+          result.field,
+        ].sort((a, b) => a.name.localeCompare(b.name))
+      )
+
+      setEventForm(previous => ({
+        ...previous,
+        fieldId: result.field.id,
+      }))
+
+      setInlineFieldName('')
+      setInlineFieldOpen(false)
+      setEventMsg(`Field "${result.field.name}" added and selected.`)
+    } else {
+      setInlineFieldMsg(`❌ ${result.error}`)
+    }
+
+    setInlineFieldSaving(false)
+  }
+
   const startNewGame = () => {
+    resetInlineFieldForm()
     setEditingEventId(null)
     setFormMode('game')
     setEventMsg(null)
@@ -2163,6 +2213,7 @@ const deleteLeagueGame = async () => {
 }
 
   const startNewPractice = () => {
+    resetInlineFieldForm()
     setEditingEventId(null)
     setFormMode('practice')
     setEventMsg(null)
@@ -2173,6 +2224,7 @@ const deleteLeagueGame = async () => {
   }
 
   const editEvent = (ev: EventListRow) => {
+    resetInlineFieldForm()
     setEditingEventId(ev.id)
     setFormMode(ev.event_type === 'practice' ? 'practice' : 'game')
     setEventMsg(null)
@@ -2197,6 +2249,7 @@ const deleteLeagueGame = async () => {
   const duplicateEvent = () => {
     if (!editingEventId) return
 
+    resetInlineFieldForm()
     setEditingEventId(null)
     setEventForm(prev => ({
       ...prev,
@@ -2211,6 +2264,7 @@ const deleteLeagueGame = async () => {
   }
 
   const cancelEventForm = () => {
+    resetInlineFieldForm()
     setEditingEventId(null)
     setFormMode('none')
     setEventMsg(null)
@@ -5628,15 +5682,82 @@ const visibleAdminTabs = isOrgAdmin
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs text-slate-400">Field</label>
-                  <select value={eventForm.fieldId}
-                    onChange={e => setEventForm({ ...eventForm, fieldId: e.target.value })}
-                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs text-slate-400">Field</label>
+
+                    {isOrgAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (inlineFieldOpen) {
+                            resetInlineFieldForm()
+                          } else {
+                            setInlineFieldOpen(true)
+                            setInlineFieldMsg(null)
+                          }
+                        }}
+                        className="text-xs font-bold transition"
+                        style={{ color: brandColor }}
+                      >
+                        {inlineFieldOpen ? 'Cancel Add Field' : '+ Add Field'}
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={eventForm.fieldId}
+                    onChange={e =>
+                      setEventForm({ ...eventForm, fieldId: e.target.value })
+                    }
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                  >
                     <option value="">— No field —</option>
                     {fields.map(f => (
                       <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
                   </select>
+
+                  {isOrgAdmin && inlineFieldOpen && (
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                      <p className="text-xs font-semibold text-white">
+                        Add a field without leaving this event
+                      </p>
+
+                      <input
+                        type="text"
+                        value={inlineFieldName}
+                        onChange={e => {
+                          setInlineFieldName(e.target.value)
+                          setInlineFieldMsg(null)
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void saveInlineField()
+                          }
+                        }}
+                        placeholder="Field name"
+                        autoFocus
+                        className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-slate-400"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => void saveInlineField()}
+                        disabled={inlineFieldSaving || !inlineFieldName.trim()}
+                        className="w-full rounded-xl py-2 text-xs font-bold text-white transition disabled:opacity-50"
+                        style={{ backgroundColor: brandColor }}
+                      >
+                        {inlineFieldSaving ? 'Adding...' : 'Add & Select Field'}
+                      </button>
+
+                      {inlineFieldMsg && (
+                        <p className="text-xs text-center text-slate-300">
+                          {inlineFieldMsg}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {formMode === 'game' && (
