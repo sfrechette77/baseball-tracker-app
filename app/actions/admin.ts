@@ -52,6 +52,10 @@ export type OrganizationField = {
 
 export type SimpleResult = { ok: true } | { ok: false; error: string }
 
+export type SaveOrganizationFieldResult =
+  | { ok: true; field: { id: string; name: string } }
+  | { ok: false; error: string }
+
 // ─── Auth guard ────────────────────────────────────────────────────────────
 
 async function requireOrgAdmin(): Promise<
@@ -1642,7 +1646,7 @@ export async function saveOrganizationField(input: {
   parkingNotes?: string | null
   restroomNotes?: string | null
   seatingNotes?: string | null
-}): Promise<SimpleResult> {
+}): Promise<SaveOrganizationFieldResult> {
   const name = input.name.trim()
   if (!name) return { ok: false, error: 'Enter a field name' }
 
@@ -1695,30 +1699,41 @@ export async function saveOrganizationField(input: {
   const guard = await requireOrgAdmin()
   if (!guard.ok) return { ok: false, error: guard.error }
 
+  let savedField: { id: string; name: string } | null = null
+
   if (input.id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fields')
       .update(values)
       .eq('id', input.id)
       .eq('organization_id', guard.membership.organization_id)
+      .select('id, name')
+      .maybeSingle()
 
     if (error) return { ok: false, error: error.message }
+    if (!data) return { ok: false, error: 'Field not found' }
+
+    savedField = data
   } else {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fields')
       .insert({
         organization_id: guard.membership.organization_id,
         ...values,
       })
+      .select('id, name')
+      .single()
 
     if (error) return { ok: false, error: error.message }
+
+    savedField = data
   }
 
   revalidatePath('/')
   revalidatePath('/admin')
   revalidatePath('/schedule')
 
-  return { ok: true }
+  return { ok: true, field: savedField }
 }
 
 // ─── removeMembership ──────────────────────────────────────────────────────
