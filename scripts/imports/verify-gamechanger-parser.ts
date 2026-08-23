@@ -137,4 +137,42 @@ assert.deepEqual(pitchingNotes.battersFaced, [
 
 assert.equal(pitchingNotes.warnings.length, 0)
 
+
+
+const pitchingNotesWithExtraCategories = parsePitchingNotes(
+  'P-S: J Seidler 75-42, L Carter 10-3, J Loevy 39-18, ' +
+    'WP: J Seidler 2, L Carter 3, J Loevy 3, ' +
+    'HBP: L Carter, ' +
+    'BF: J Seidler 21, L Carter 3, J Loevy 8, ' +
+    'E: L Schwalenberg, S DeZara, H Christen 2, B Frechette'
+)
+
+assert.equal(pitchingNotesWithExtraCategories.pitchCounts.length, 3)
+assert.equal(pitchingNotesWithExtraCategories.wildPitches.length, 3)
+assert.equal(pitchingNotesWithExtraCategories.battersFaced.length, 3)
+assert.equal(pitchingNotesWithExtraCategories.warnings.length, 0)
+
+const pitchingNotesWithImplicitWildPitches = parsePitchingNotes(
+  'P-S: Wes S 38-24, Ryan D 51-28, Boone H 22-13, ' +
+    'WP: Ryan D, Boone H, ' +
+    'BF: Wes S 12, Ryan D 10, Boone H 5, ' +
+    'E: Quinn B, Donovan H'
+)
+
+assert.deepEqual(
+  pitchingNotesWithImplicitWildPitches.wildPitches.map((note) => ({
+    name: note.sourceName,
+    value: note.value,
+  })),
+  [
+    { name: 'Ryan D', value: 1 },
+    { name: 'Boone H', value: 1 },
+  ]
+)
+
+assert.equal(
+  pitchingNotesWithImplicitWildPitches.warnings.length,
+  0
+)
+
 console.log('GameChanger batting and pitching parser verified successfully.')

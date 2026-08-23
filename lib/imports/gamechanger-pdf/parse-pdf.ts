@@ -1,0 +1,62 @@
+import { buildTwoColumnPdfRows } from './pdf-layout'
+import { normalizeGameChangerPdfRows } from './normalize-pdf-rows'
+import { parseGameChangerBoxScoreText } from './parse-box-score-text'
+import type {
+  ParsedBoxScore,
+} from './types'
+
+export async function parseGameChangerPdf(
+  input: ArrayBuffer | Uint8Array
+): Promise<ParsedBoxScore> {
+  const pdfjs = await import(
+    'pdfjs-dist/legacy/build/pdf.mjs'
+  )
+
+  const data =
+    input instanceof Uint8Array
+      ? new Uint8Array(input)
+      : new Uint8Array(input)
+
+  const pdf = await pdfjs.getDocument({ data }).promise
+
+  if (pdf.numPages !== 1) {
+    throw new Error(
+      `Expected a one-page GameChanger box score, ` +
+        `but found ${pdf.numPages} pages`
+    )
+  }
+
+  const page = await pdf.getPage(1)
+  const viewport = page.getViewport({ scale: 1 })
+  const content = await page.getTextContent()
+
+  const items = content.items
+    .filter(
+      (
+        item
+      ): item is typeof item & {
+        str: string
+        transform: number[]
+      } =>
+        'str' in item &&
+        'transform' in item &&
+        typeof item.str === 'string'
+    )
+    .map(item => ({
+      text: item.str,
+      x: item.transform[4],
+      y: item.transform[5],
+    }))
+
+  const rows = buildTwoColumnPdfRows({
+    items,
+    pageWidth: viewport.width,
+  })
+
+  const normalizedText =
+    normalizeGameChangerPdfRows(rows)
+
+  return parseGameChangerBoxScoreText(
+    normalizedText
+  )
+}
