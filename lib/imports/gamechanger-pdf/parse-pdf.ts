@@ -12,6 +12,16 @@ export async function parseGameChangerPdf(
     'pdfjs-dist/legacy/build/pdf.mjs'
   )
 
+  const pdfjsWorker = await import(
+    'pdfjs-dist/legacy/build/pdf.worker.mjs'
+  )
+
+  ;(
+    globalThis as typeof globalThis & {
+      pdfjsWorker?: typeof pdfjsWorker
+    }
+  ).pdfjsWorker = pdfjsWorker
+
   const data =
     input instanceof Uint8Array
       ? new Uint8Array(input)

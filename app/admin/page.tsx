@@ -41,6 +41,18 @@ import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 import { useActiveOrg } from '@/components/org-context'
 import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
+import type {
+  GameChangerImportReview,
+  ParsedBoxScore,
+  RosterPlayerForImport,
+} from '@/lib/imports/gamechanger-pdf/types'
+import {
+  buildResolvedGameChangerImportPayload,
+  selectGameChangerReviewPlayer,
+} from '@/lib/imports/gamechanger-pdf/resolve-import-review'
+import {
+  mapGameChangerImportToCurrentPlayerStats,
+} from '@/lib/imports/gamechanger-pdf/map-import-to-player-stats'
 
 import {
   createAthleteRosterAssignment,
@@ -161,6 +173,16 @@ type EventListRow = {
 }
 
 type EventFilter = 'upcoming' | 'past' | 'all'
+
+type GameChangerPreviewResponse = {
+  ok: true
+  eventId: string
+  rosterCount: number
+  roster: RosterPlayerForImport[]
+  parsedGame: ParsedBoxScore['game']
+  reviews: GameChangerImportReview[]
+  suggestedTeamIndex: number | null
+}
 
 function formatDate(dateStr: string) {
   return new Intl.DateTimeFormat('en-US', {
@@ -927,6 +949,38 @@ export default function AdminPage() {
   const [savedPlayerStats, setSavedPlayerStats] = useState<Record<string, StatRow>>({})
   const [statsSaving, setStatsSaving] = useState(false)
   const [statsMsg, setStatsMsg] = useState<string | null>(null)
+  const [statsReloadKey, setStatsReloadKey] = useState(0)
+
+  const [gameChangerFile, setGameChangerFile] =
+    useState<File | null>(null)
+  const [gameChangerPreview, setGameChangerPreview] =
+    useState<GameChangerPreviewResponse | null>(null)
+  const [gameChangerPreviewLoading, setGameChangerPreviewLoading] =
+    useState(false)
+  const [gameChangerPreviewMsg, setGameChangerPreviewMsg] =
+    useState<string | null>(null)
+  const [gameChangerTeamIndex, setGameChangerTeamIndex] =
+    useState<number | null>(null)
+  const [gameChangerImportSaving, setGameChangerImportSaving] =
+    useState(false)
+  const [gameChangerImportMsg, setGameChangerImportMsg] =
+    useState<string | null>(null)
+
+  const selectedGameChangerReview =
+    gameChangerPreview && gameChangerTeamIndex !== null
+      ? gameChangerPreview.reviews.find(
+          review => review.teamIndex === gameChangerTeamIndex
+        ) ?? null
+      : null
+
+  const mappedGameChangerImport =
+    selectedGameChangerReview?.readyToImport
+      ? mapGameChangerImportToCurrentPlayerStats(
+          buildResolvedGameChangerImportPayload(
+            selectedGameChangerReview
+          )
+        )
+      : null
 
   // Standings
   const [standings, setStandings] = useState<Standing[]>([])
@@ -1541,7 +1595,7 @@ useEffect(() => {
   }
 
   load()
-}, [statsEventId, password])
+}, [statsEventId, password, statsReloadKey])
 
   const api = async (body: object) => {
     const res = await fetch('/api/admin', {
@@ -1673,6 +1727,115 @@ useEffect(() => {
   const hasUnsavedStats = players.some(player =>
     playerHasUnsavedBattingStats(player.id) || playerHasUnsavedPitchingStats(player.id)
   )
+
+  const previewGameChangerPdf = async () => {
+    if (!statsEventId || !gameChangerFile || !password) return
+
+    setGameChangerPreviewLoading(true)
+    setGameChangerPreviewMsg(null)
+    setGameChangerPreview(null)
+    setGameChangerTeamIndex(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('password', password)
+      formData.append('teamId', currentTeam.id)
+      formData.append('eventId', statsEventId)
+      formData.append('file', gameChangerFile)
+
+      const response = await fetch(
+        '/api/admin/gamechanger-preview',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      const result = await response.json()
+
+      if (response.status === 401) {
+        localStorage.removeItem(PASSWORD_KEY)
+        setPassword(null)
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || 'Could not preview GameChanger PDF.'
+        )
+      }
+
+      const preview = result as GameChangerPreviewResponse
+
+      setGameChangerPreview(preview)
+      setGameChangerTeamIndex(preview.suggestedTeamIndex)
+      setGameChangerPreviewMsg(
+        'PDF parsed successfully. Review the imported data below.'
+      )
+    } catch (err) {
+      setGameChangerPreviewMsg(
+        err instanceof Error
+          ? `Error: ${err.message}`
+          : 'Error: Could not preview GameChanger PDF.'
+      )
+    } finally {
+      setGameChangerPreviewLoading(false)
+    }
+  }
+
+  const selectGameChangerPlayer = (
+    teamIndex: number,
+    sourceKey: string,
+    playerId: string
+  ) => {
+    setGameChangerPreview(previous => {
+      if (!previous) return previous
+
+      return {
+        ...previous,
+        reviews: previous.reviews.map(review =>
+          review.teamIndex === teamIndex
+            ? selectGameChangerReviewPlayer(
+                review,
+                sourceKey,
+                playerId || null
+              )
+            : review
+        ),
+      }
+    })
+  }
+
+  const importGameChangerStats = async () => {
+    if (!statsEventId || !mappedGameChangerImport) return
+
+    setGameChangerImportSaving(true)
+    setGameChangerImportMsg(null)
+
+    try {
+      const result = await api({
+        action: 'update_player_stats_bulk',
+        eventId: statsEventId,
+        stats: mappedGameChangerImport.stats,
+      })
+
+      if (result?.error) {
+        setGameChangerImportMsg(`Error: ${result.error}`)
+        return
+      }
+
+      setGameChangerImportMsg('GameChanger stats imported successfully.')
+      setStatsReloadKey(previous => previous + 1)
+    } catch (err) {
+      setGameChangerImportMsg(
+        err instanceof Error
+          ? `Error: ${err.message}`
+          : 'Error: Could not import GameChanger stats.'
+      )
+    } finally {
+      setGameChangerImportSaving(false)
+    }
+  }
 
   const saveStats = async () => {
     if (!statsEventId) return
@@ -5380,6 +5543,332 @@ const visibleAdminTabs = isOrgAdmin
                 ))}
               </select>
             </div>
+
+            {statsEventId && (
+              <div className="mx-auto max-w-sm rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    Import GameChanger PDF
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Preview a box score before applying any stats.
+                  </p>
+                </div>
+
+                <input
+                  id="gamechanger-pdf-file"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={e => {
+                    setGameChangerFile(e.target.files?.[0] ?? null)
+                    setGameChangerPreview(null)
+                    setGameChangerTeamIndex(null)
+                    setGameChangerPreviewMsg(null)
+                  }}
+                  className="sr-only"
+                />
+
+                <label
+                  htmlFor="gamechanger-pdf-file"
+                  className="flex w-full cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+                  style={{ borderColor: brandColor }}
+                >
+                  Choose GameChanger PDF
+                </label>
+
+                <p className="text-xs text-slate-400">
+                  {gameChangerFile
+                    ? `Selected: ${gameChangerFile.name}`
+                    : 'No PDF selected'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={previewGameChangerPdf}
+                  disabled={!gameChangerFile || gameChangerPreviewLoading}
+                  className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  {gameChangerPreviewLoading
+                    ? 'Parsing PDF...'
+                    : 'Preview Import'}
+                </button>
+
+                {gameChangerPreviewMsg && (
+                  <p className="text-xs text-slate-300">
+                    {gameChangerPreviewMsg}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {gameChangerPreview && (
+              <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    Parsed Game
+                  </p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    {gameChangerPreview.parsedGame.awayTeam}
+                    {' '}
+                    {gameChangerPreview.parsedGame.awayScore ?? '—'}
+                    {' – '}
+                    {gameChangerPreview.parsedGame.homeScore ?? '—'}
+                    {' '}
+                    {gameChangerPreview.parsedGame.homeTeam}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {gameChangerPreview.parsedGame.date ?? 'Date not found'}
+                    {' · '}
+                    {gameChangerPreview.rosterCount} roster players
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-500">
+                    Select Your Team
+                  </p>
+
+                  {gameChangerPreview.reviews.map(review => {
+                    const selected =
+                      gameChangerTeamIndex === review.teamIndex
+
+                    return (
+                      <button
+                        key={review.teamIndex}
+                        type="button"
+                        onClick={() =>
+                          setGameChangerTeamIndex(review.teamIndex)
+                        }
+                        className="w-full rounded-xl border p-3 text-left transition"
+                        style={{
+                          borderColor: selected
+                            ? brandColor
+                            : 'rgba(255,255,255,0.1)',
+                          backgroundColor: selected
+                            ? `${brandColor}14`
+                            : 'rgba(255,255,255,0.03)',
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold text-white">
+                            {review.teamName}
+                          </span>
+                          {gameChangerPreview.suggestedTeamIndex ===
+                            review.teamIndex && (
+                            <span className="text-[10px] font-semibold text-slate-300">
+                              Suggested
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          {review.summary.totalRows} players
+                          {' · '}
+                          {review.summary.matched} matched
+                          {' · '}
+                          {review.summary.needsReview} need review
+                          {' · '}
+                          {review.summary.unmatched} unmatched
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {selectedGameChangerReview && gameChangerPreview && (
+              <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    Player Reconciliation
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Match each GameChanger player to the existing roster.
+                  </p>
+                  <p className="mt-2 text-xs font-semibold text-slate-300">
+                    {selectedGameChangerReview.rows.every(
+                      row => !row.include || row.selectedPlayerId !== null
+                    )
+                      ? 'All included players are assigned.'
+                      : 'Some players still need to be assigned.'}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {selectedGameChangerReview.rows.map(row => (
+                    <div
+                      key={row.sourceKey}
+                      className="rounded-xl border border-white/10 bg-black/20 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">
+                            {row.sourceJerseyNumber
+                              ? `#${row.sourceJerseyNumber} `
+                              : ''}
+                            {row.sourceName}
+                          </p>
+                          <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">
+                            {row.sourceSections}
+                            {' · '}
+                            {row.match.status === 'needs_review'
+                              ? 'needs review'
+                              : row.match.status}
+                          </p>
+                        </div>
+                      </div>
+
+                      <select
+                        value={row.selectedPlayerId ?? ''}
+                        onChange={e =>
+                          selectGameChangerPlayer(
+                            selectedGameChangerReview.teamIndex,
+                            row.sourceKey,
+                            e.target.value
+                          )
+                        }
+                        className="mt-3 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                      >
+                        <option value="">— Choose roster player —</option>
+                        {gameChangerPreview.roster.map(player => (
+                          <option key={player.id} value={player.id}>
+                            {player.id === row.suggestedPlayerId
+                              ? 'Suggested: '
+                              : ''}
+                            {player.jerseyNumber
+                              ? `#${player.jerseyNumber} `
+                              : ''}
+                            {player.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="mt-3 space-y-1 text-xs text-slate-400">
+                        {row.batting && (
+                          <p>
+                            <span className="font-semibold text-slate-300">
+                              Batting:
+                            </span>
+                            {' '}
+                            AB {row.batting.atBats}
+                            {' · '}R {row.batting.runs}
+                            {' · '}H {row.batting.hits}
+                            {' · '}RBI {row.batting.runsBattedIn}
+                            {' · '}BB {row.batting.walks}
+                            {' · '}SO {row.batting.strikeouts}
+                          </p>
+                        )}
+
+                        {row.pitching && (
+                          <p>
+                            <span className="font-semibold text-slate-300">
+                              Pitching:
+                            </span>
+                            {' '}
+                            IP {row.pitching.inningsPitched}
+                            {' · '}H {row.pitching.hitsAllowed}
+                            {' · '}R {row.pitching.runsAllowed}
+                            {' · '}ER {row.pitching.earnedRuns}
+                            {' · '}BB {row.pitching.walksAllowed}
+                            {' · '}SO {row.pitching.strikeouts}
+                            {' · '}P {row.pitching.pitchCount ?? '—'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {mappedGameChangerImport && (
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                    <div>
+                      <p className="text-sm font-bold text-white">
+                        Stats to Import
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        These are the values that match the current On Deck stats fields.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      {mappedGameChangerImport.stats.map(stat => {
+                        const player =
+                          gameChangerPreview.roster.find(
+                            rosterPlayer =>
+                              rosterPlayer.id === stat.playerId
+                          )
+
+                        return (
+                          <div
+                            key={stat.playerId}
+                            className="rounded-lg border border-white/10 p-3"
+                          >
+                            <p className="text-xs font-bold text-white">
+                              {player?.name ?? 'Unknown roster player'}
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-400">
+                              Batting: AB {stat.at_bats}
+                              {' · '}H {stat.hits}
+                              {' · '}R {stat.runs}
+                              {' · '}RBI {stat.rbi}
+                              {' · '}BB {stat.walks}
+                              {' · '}SO {stat.strikeouts}
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-400">
+                              Pitching: IP {stat.innings_pitched}
+                              {' · '}H {stat.hits_allowed}
+                              {' · '}ER {stat.earned_runs}
+                              {' · '}BB {stat.walks_allowed}
+                              {' · '}SO {stat.strikeouts_pitching}
+                              {' · '}P {stat.pitch_count}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {mappedGameChangerImport && (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={importGameChangerStats}
+                      disabled={gameChangerImportSaving}
+                      className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      {gameChangerImportSaving
+                        ? 'Importing GameChanger Stats...'
+                        : 'Import GameChanger Stats'}
+                    </button>
+
+                    {gameChangerImportMsg && (
+                      <p className="text-xs text-slate-300">
+                        {gameChangerImportMsg}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                  <p className="text-xs font-semibold text-amber-200">
+                    Additional GameChanger stats are parsed but are not
+                    currently stored by On Deck.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    These include total bases, doubles, triples, home runs,
+                    stolen bases, caught stealing, runs allowed, home runs
+                    allowed, pitch strikes, batters faced, and wild pitches.
+                    They will not be silently treated as saved stats.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {statsEventId && (
               <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 space-y-5">
