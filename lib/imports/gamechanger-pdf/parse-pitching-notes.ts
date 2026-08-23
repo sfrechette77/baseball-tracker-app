@@ -6,14 +6,19 @@ import type {
   ParseWarning,
 } from './types'
 
-type NoteCategory = 'P-S' | 'BF' | 'WP'
+const PARSED_NOTE_CATEGORIES = new Set([
+  'P-S',
+  'BF',
+  'WP',
+])
 
 type CategorySection = {
-  category: NoteCategory
+  category: string
   content: string
 }
 
-const CATEGORY_PATTERN = /(?:^|,\s*)(P-S|BF|WP):\s*/g
+const CATEGORY_PATTERN =
+  /(?:^|,\s*)(P-S|[A-Z0-9][A-Z0-9-]*):\s*/g
 
 function splitCategorySections(rawText: string): CategorySection[] {
   const text = normalizeWhitespace(rawText)
@@ -24,7 +29,7 @@ function splitCategorySections(rawText: string): CategorySection[] {
     const current = matches[index]
     const next = matches[index + 1]
 
-    const category = current[1] as NoteCategory
+    const category = current[1]
     const contentStart = (current.index ?? 0) + current[0].length
     const contentEnd = next?.index ?? text.length
 
@@ -74,6 +79,28 @@ function parseNamedCountEntry(
   }
 }
 
+function parseWildPitchEntry(
+  entry: string
+): ParsedNamedCountNote | null {
+  const explicitCount = parseNamedCountEntry(entry)
+
+  if (explicitCount) {
+    return explicitCount
+  }
+
+  const sourceName = normalizeWhitespace(entry)
+
+  if (!sourceName) {
+    return null
+  }
+
+  return {
+    sourceName,
+    normalizedName: normalizePlayerName(sourceName),
+    value: 1,
+  }
+}
+
 export function parsePitchingNotes(rawText: string): ParsedPitchingNotes {
   const pitchCounts: ParsedPitchCountNote[] = []
   const battersFaced: ParsedNamedCountNote[] = []
@@ -99,6 +126,10 @@ export function parsePitchingNotes(rawText: string): ParsedPitchingNotes {
   }
 
   for (const section of sections) {
+    if (!PARSED_NOTE_CATEGORIES.has(section.category)) {
+      continue
+    }
+
     const entries = section.content
       .split(',')
       .map((entry) => entry.trim())
@@ -122,7 +153,10 @@ export function parsePitchingNotes(rawText: string): ParsedPitchingNotes {
         continue
       }
 
-      const parsed = parseNamedCountEntry(entry)
+      const parsed =
+        section.category === 'WP'
+          ? parseWildPitchEntry(entry)
+          : parseNamedCountEntry(entry)
 
       if (!parsed) {
         warnings.push({

@@ -166,6 +166,20 @@ export async function POST(req: NextRequest) {
     return null
   }
 
+  const getTeamOrganizationId = async (): Promise<string | null> => {
+    if (!teamId) return null
+
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('organization_id')
+      .eq('id', teamId)
+      .maybeSingle()
+
+    if (teamError || !team?.organization_id) return null
+
+    return team.organization_id
+  }
+
   const verifyOrgAdminAccess = async (): Promise<string | null> => {
     if (!teamId) return 'Missing teamId'
 
@@ -342,6 +356,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: teamAccessError }, { status: 403 })
       }
 
+      const organizationId = await getTeamOrganizationId()
+      if (!organizationId) {
+        return NextResponse.json(
+          { error: 'Could not resolve team organization' },
+          { status: 500 }
+        )
+      }
+
       // Check if this is an MSBL game with an opponent team selected
         const opponentTeamId = eventType === 'game' ? (body.opponentTeamId ?? null) : null
         let leagueGameId: string | null = null
@@ -373,6 +395,7 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabase
         .from('events')
         .insert({
+          organization_id: organizationId,
           team_id: teamId,
           title,
           opponent: opponent || null,
@@ -507,9 +530,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: teamAccessError }, { status: 403 })
       }
 
+      const organizationId = await getTeamOrganizationId()
+      if (!organizationId) {
+        return NextResponse.json(
+          { error: 'Could not resolve team organization' },
+          { status: 500 }
+        )
+      }
+
       const { data, error } = await supabase
         .from('events')
         .insert({
+          organization_id: organizationId,
           team_id: teamId,
           title,
           opponent: null,
