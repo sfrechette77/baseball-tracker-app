@@ -8,6 +8,32 @@ import type {
 export async function parseGameChangerPdf(
   input: ArrayBuffer | Uint8Array
 ): Promise<ParsedBoxScore> {
+  const canvas = await import('@napi-rs/canvas')
+
+  if (typeof globalThis.DOMMatrix === 'undefined') {
+    Object.defineProperty(globalThis, 'DOMMatrix', {
+      value: canvas.DOMMatrix,
+      configurable: true,
+      writable: true,
+    })
+  }
+
+  if (typeof globalThis.ImageData === 'undefined') {
+    Object.defineProperty(globalThis, 'ImageData', {
+      value: canvas.ImageData,
+      configurable: true,
+      writable: true,
+    })
+  }
+
+  if (typeof globalThis.Path2D === 'undefined') {
+    Object.defineProperty(globalThis, 'Path2D', {
+      value: canvas.Path2D,
+      configurable: true,
+      writable: true,
+    })
+  }
+
   const pdfjs = await import(
     'pdfjs-dist/legacy/build/pdf.mjs'
   )
