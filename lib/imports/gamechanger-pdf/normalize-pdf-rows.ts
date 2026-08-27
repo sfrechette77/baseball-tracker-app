@@ -12,6 +12,25 @@ function clean(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
 
+type ScoreSide = 'left' | 'right' | 'all'
+
+function findScore(
+  row: TwoColumnPdfRow
+): {
+  match: RegExpMatchArray
+  side: ScoreSide
+} | null {
+  for (const side of ['left', 'right', 'all'] as const) {
+    const match = row[side].match(SCORE_PATTERN)
+
+    if (match) {
+      return { match, side }
+    }
+  }
+
+  return null
+}
+
 function findRowIndex(
   rows: TwoColumnPdfRow[],
   predicate: (row: TwoColumnPdfRow) => boolean
@@ -23,12 +42,17 @@ function collectTitleSide(
   rows: TwoColumnPdfRow[],
   scoreIndex: number,
   dateIndex: number,
-  side: 'left' | 'right'
+  side: 'left' | 'right',
+  scoreSide: ScoreSide
 ): string {
   return clean(
     rows
       .slice(0, dateIndex)
-      .filter((_, index) => index !== scoreIndex)
+      .filter(
+        (_, index) =>
+          index !== scoreIndex ||
+          (scoreSide !== 'all' && side !== scoreSide)
+      )
       .map(row => row[side])
       .filter(Boolean)
       .join(' ')
@@ -67,7 +91,7 @@ export function normalizeGameChangerPdfRows(
 ): string {
   const scoreIndex = findRowIndex(
     rows,
-    row => SCORE_PATTERN.test(row.all)
+    row => findScore(row) !== null
   )
 
   const dateIndex = findRowIndex(
@@ -102,24 +126,28 @@ export function normalizeGameChangerPdfRows(
     )
   }
 
-  const scoreMatch = rows[scoreIndex].all.match(SCORE_PATTERN)
+  const scoreInfo = findScore(rows[scoreIndex])
 
-  if (!scoreMatch) {
+  if (!scoreInfo) {
     throw new Error('Could not parse the GameChanger score')
   }
+
+  const scoreMatch = scoreInfo.match
 
   const awayTeam = collectTitleSide(
     rows,
     scoreIndex,
     dateIndex,
-    'left'
+    'left',
+    scoreInfo.side
   )
 
   const homeTeam = collectTitleSide(
     rows,
     scoreIndex,
     dateIndex,
-    'right'
+    'right',
+    scoreInfo.side
   )
 
   if (!awayTeam || !homeTeam) {

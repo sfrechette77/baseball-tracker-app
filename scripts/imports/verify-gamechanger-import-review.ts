@@ -182,6 +182,146 @@ assert.equal(
 )
 assert.equal(combinedReview.readyToImport, true)
 
+/*
+ * A pitching-table name may be truncated by the PDF text layer.
+ * When the batting row has the full name and the jersey number
+ * agrees, the two sections should still become one review row.
+ */
+const truncatedNameFixture = `
+Alpha Club 1 - 0 Beta Club
+Away Sunday August 23, 2026
+1 R H E
+ALPH 1 1 0 0
+BETA 0 0 0 0
+BATTING
+Alpha Club AB R H RBI BB SO
+B Frechette #0 3 0 0 1 0 1
+Totals 3 0 0 1 0 1
+Beta Club AB R H RBI BB SO
+B Hitter 1 0 0 0 0 1
+Totals 1 0 0 0 0 1
+PITCHING
+Alpha Club IP H R ER BB SO HR
+B Freche #0 2.2 3 2 2 2 4 0
+Totals 2.2 3 2 2 2 4 0
+Beta Club IP H R ER BB SO HR
+B Pitcher 1.0 1 1 1 0 0 0
+Totals 1.0 1 1 1 0 0 0
+`
+
+const truncatedNameParsed =
+  parseGameChangerBoxScoreText(
+    truncatedNameFixture
+  )
+
+const truncatedNameReview =
+  buildGameChangerImportReview(
+    truncatedNameParsed,
+    0,
+    [
+      {
+        id: 'player-frechette',
+        name: 'Beckham Frechette',
+        jerseyNumber: '0',
+      },
+    ]
+  )
+
+assert.equal(
+  truncatedNameReview.rows.length,
+  1
+)
+
+const truncatedFrechette =
+  truncatedNameReview.rows[0]
+
+assert.equal(
+  truncatedFrechette.normalizedSourceName,
+  'b frechette'
+)
+
+assert.equal(
+  truncatedFrechette.sourceSections,
+  'both'
+)
+
+assert.ok(truncatedFrechette.batting)
+assert.ok(truncatedFrechette.pitching)
+
+assert.equal(
+  truncatedFrechette.pitching.inningsPitched,
+  '2.2'
+)
+
+assert.equal(
+  truncatedFrechette.pitching.strikeouts,
+  4
+)
+
+/*
+ * Truncated-prefix matching must remain conservative.
+ * If more than one same-jersey batting row could match the
+ * truncated pitching name, do not guess which one owns it.
+ */
+const ambiguousPrefixFixture = `
+Alpha Club 1 - 0 Beta Club
+Away Sunday August 23, 2026
+1 R H E
+ALPH 1 1 0 0
+BETA 0 0 0 0
+BATTING
+Alpha Club AB R H RBI BB SO
+B Frechette #0 1 0 0 0 0 0
+B Frecheman #0 1 0 0 0 0 0
+Totals 2 0 0 0 0 0
+Beta Club AB R H RBI BB SO
+B Hitter 1 0 0 0 0 1
+Totals 1 0 0 0 0 1
+PITCHING
+Alpha Club IP H R ER BB SO HR
+B Frech #0 1.0 0 0 0 0 1 0
+Totals 1.0 0 0 0 0 1 0
+Beta Club IP H R ER BB SO HR
+B Pitcher 1.0 1 1 1 0 0 0
+Totals 1.0 1 1 1 0 0 0
+`
+
+const ambiguousPrefixParsed =
+  parseGameChangerBoxScoreText(
+    ambiguousPrefixFixture
+  )
+
+const ambiguousPrefixReview =
+  buildGameChangerImportReview(
+    ambiguousPrefixParsed,
+    0,
+    []
+  )
+
+assert.equal(
+  ambiguousPrefixReview.rows.length,
+  3
+)
+
+const ambiguousPitchingRow =
+  ambiguousPrefixReview.rows.find(
+    row =>
+      row.normalizedSourceName === 'b frech'
+  )
+
+assert.ok(ambiguousPitchingRow)
+
+assert.equal(
+  ambiguousPitchingRow.sourceSections,
+  'pitching'
+)
+
+assert.ok(ambiguousPitchingRow.pitching)
+assert.equal(
+  ambiguousPitchingRow.batting,
+  null
+)
+
 console.log(
   'GameChanger import review model verified successfully.'
 )
