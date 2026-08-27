@@ -52,6 +52,26 @@ function getJerseyNumber(
   )
 }
 
+function namesMatchByTruncatedPrefix(
+  first: string,
+  second: string
+): boolean {
+  const shorter =
+    first.length <= second.length
+      ? first
+      : second
+
+  const longer =
+    first.length > second.length
+      ? first
+      : second
+
+  return (
+    shorter.length >= 5 &&
+    longer.startsWith(shorter)
+  )
+}
+
 function countStatuses(
   rows: ReviewImportRow[],
   status: PlayerMatchStatus
@@ -205,12 +225,30 @@ export function buildGameChangerImportReview(
               getJerseyNumber(draft) === pitchingJersey
           )
 
+    const truncatedNameAndJerseyDrafts =
+      sameNameDrafts.length === 0 &&
+      pitchingJersey != null
+        ? drafts.filter(
+            (draft) =>
+              getJerseyNumber(draft) ===
+                pitchingJersey &&
+              namesMatchByTruncatedPrefix(
+                getNormalizedName(draft),
+                pitching.normalizedName
+              )
+          )
+        : []
+
     let target: DraftReviewRow | null = null
 
     if (sameNameAndJerseyDrafts.length === 1) {
       target = sameNameAndJerseyDrafts[0]
     } else if (sameNameDrafts.length === 1) {
       target = sameNameDrafts[0]
+    } else if (
+      truncatedNameAndJerseyDrafts.length === 1
+    ) {
+      target = truncatedNameAndJerseyDrafts[0]
     }
 
     if (target && !target.pitching) {

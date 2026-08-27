@@ -76,23 +76,32 @@ function parseLineScoreRow(line: string): ParsedLineScore | null {
   }
 
   const sourceTeamLabel = tokens.slice(0, firstNumericIndex).join(' ')
-  const numericValues = tokens
-    .slice(firstNumericIndex)
-    .map((token) => Number(token))
+  const valueTokens = tokens.slice(firstNumericIndex)
+
+  if (valueTokens.length < 4) {
+    return null
+  }
+
+  const inningTokens = valueTokens.slice(0, -3)
+  const totalTokens = valueTokens.slice(-3)
 
   if (
-    numericValues.length < 4 ||
-    numericValues.some((value) => !Number.isInteger(value))
+    inningTokens.some(
+      token => token !== 'X' && !/^\d+$/.test(token)
+    ) ||
+    totalTokens.some(token => !/^\d+$/.test(token))
   ) {
     return null
   }
 
   return {
     sourceTeamLabel,
-    innings: numericValues.slice(0, -3),
-    runs: numericValues.at(-3) ?? 0,
-    hits: numericValues.at(-2) ?? 0,
-    errors: numericValues.at(-1) ?? 0,
+    innings: inningTokens.map(token =>
+      token === 'X' ? null : Number(token)
+    ),
+    runs: Number(totalTokens[0]),
+    hits: Number(totalTokens[1]),
+    errors: Number(totalTokens[2]),
   }
 }
 
@@ -260,6 +269,40 @@ function parseBattingSection(
   return teams
 }
 
+function findPitcherForNote(
+  team: ParsedTeamBoxScore,
+  normalizedName: string
+) {
+  const exact = team.pitching.find(
+    row => row.normalizedName === normalizedName
+  )
+
+  if (exact) {
+    return exact
+  }
+
+  const prefixMatches = team.pitching.filter(row => {
+    const shorter =
+      row.normalizedName.length <= normalizedName.length
+        ? row.normalizedName
+        : normalizedName
+
+    const longer =
+      row.normalizedName.length > normalizedName.length
+        ? row.normalizedName
+        : normalizedName
+
+    return (
+      shorter.length >= 5 &&
+      longer.startsWith(shorter)
+    )
+  })
+
+  return prefixMatches.length === 1
+    ? prefixMatches[0]
+    : undefined
+}
+
 function applyPitchingNotes(
   teams: ParsedTeamBoxScore[],
   noteLines: string[],
@@ -284,8 +327,9 @@ function applyPitchingNotes(
     warnings.push(...parsedNotes.warnings)
 
     for (const note of parsedNotes.pitchCounts) {
-      const pitcher = team.pitching.find(
-        (row) => row.normalizedName === note.normalizedName
+      const pitcher = findPitcherForNote(
+        team,
+        note.normalizedName
       )
 
       if (!pitcher) {
@@ -303,8 +347,9 @@ function applyPitchingNotes(
     }
 
     for (const note of parsedNotes.battersFaced) {
-      const pitcher = team.pitching.find(
-        (row) => row.normalizedName === note.normalizedName
+      const pitcher = findPitcherForNote(
+        team,
+        note.normalizedName
       )
 
       if (!pitcher) {
@@ -321,8 +366,9 @@ function applyPitchingNotes(
     }
 
     for (const note of parsedNotes.wildPitches) {
-      const pitcher = team.pitching.find(
-        (row) => row.normalizedName === note.normalizedName
+      const pitcher = findPitcherForNote(
+        team,
+        note.normalizedName
       )
 
       if (!pitcher) {

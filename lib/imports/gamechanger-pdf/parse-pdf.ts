@@ -1,9 +1,8 @@
 import { buildTwoColumnPdfRows } from './pdf-layout'
-import { normalizeGameChangerPdfRows } from './normalize-pdf-rows'
-import { parseGameChangerBoxScoreText } from './parse-box-score-text'
 import type {
   ParsedBoxScore,
 } from './types'
+import { parseGameChangerPdfPageRows } from './parse-page-rows'
 
 export async function parseGameChangerPdf(
   input: ArrayBuffer | Uint8Array
@@ -55,44 +54,42 @@ export async function parseGameChangerPdf(
 
   const pdf = await pdfjs.getDocument({ data }).promise
 
-  if (pdf.numPages !== 1) {
-    throw new Error(
-      `Expected a one-page GameChanger box score, ` +
-        `but found ${pdf.numPages} pages`
+  const pageRows = []
+
+  for (
+    let pageNumber = 1;
+    pageNumber <= pdf.numPages;
+    pageNumber++
+  ) {
+    const page = await pdf.getPage(pageNumber)
+    const viewport = page.getViewport({ scale: 1 })
+    const content = await page.getTextContent()
+
+    const items = content.items
+      .filter(
+        (
+          item
+        ): item is typeof item & {
+          str: string
+          transform: number[]
+        } =>
+          'str' in item &&
+          'transform' in item &&
+          typeof item.str === 'string'
+      )
+      .map(item => ({
+        text: item.str,
+        x: item.transform[4],
+        y: item.transform[5],
+      }))
+
+    pageRows.push(
+      buildTwoColumnPdfRows({
+        items,
+        pageWidth: viewport.width,
+      })
     )
   }
 
-  const page = await pdf.getPage(1)
-  const viewport = page.getViewport({ scale: 1 })
-  const content = await page.getTextContent()
-
-  const items = content.items
-    .filter(
-      (
-        item
-      ): item is typeof item & {
-        str: string
-        transform: number[]
-      } =>
-        'str' in item &&
-        'transform' in item &&
-        typeof item.str === 'string'
-    )
-    .map(item => ({
-      text: item.str,
-      x: item.transform[4],
-      y: item.transform[5],
-    }))
-
-  const rows = buildTwoColumnPdfRows({
-    items,
-    pageWidth: viewport.width,
-  })
-
-  const normalizedText =
-    normalizeGameChangerPdfRows(rows)
-
-  return parseGameChangerBoxScoreText(
-    normalizedText
-  )
+  return parseGameChangerPdfPageRows(pageRows)
 }
