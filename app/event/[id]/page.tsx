@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { getPrimaryField, normalizeFieldRelation } from '@/lib/fieldRelation'
-import { PICKABLE_TEAMS } from '@/lib/teams'
 import { Skeleton } from '@/components/Skeleton'
 import { BottomNav } from '@/components/BottomNav'
 import { useActiveOrg } from '@/components/org-context'
@@ -20,12 +19,8 @@ function createClient() {
 const APP_TIME_ZONE = 'America/Chicago'
 const INNINGS = [1, 2, 3, 4, 5, 6, 7]
 
-// Get the short team label for box score display.
-// Falls back to the team's actual name if not in PICKABLE_TEAMS.
 function getTeamLabel(team: { id: string; name: string } | null): string {
-  if (!team) return 'Elite'
-  const pickable = PICKABLE_TEAMS.find(t => t.id === team.id)
-  return pickable?.label ?? team.name
+  return team?.name ?? 'Team'
 }
 
 type FieldRow = {

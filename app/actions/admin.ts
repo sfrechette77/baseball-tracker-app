@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 import {
   sendParentAccessApprovedEmail,
   sendTeamStaffAssignedEmail,
@@ -143,15 +142,12 @@ export async function getOrgTeams(): Promise<
     .from('teams')
     .select('id, name')
     .eq('organization_id', guard.membership.organization_id)
+    .eq('is_opponent', false)
     .order('name', { ascending: true })
 
   if (error) return { ok: false, error: error.message }
 
-  const teams = ((data ?? []) as OrgTeam[]).filter(team =>
-  ORG_TEAM_IDS.includes(team.id)
-)
-
-  return { ok: true, teams}
+  return { ok: true, teams: (data ?? []) as OrgTeam[] }
 }
 
 // ─── approveMembership ─────────────────────────────────────────────────────

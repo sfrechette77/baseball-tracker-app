@@ -19,10 +19,10 @@ self.addEventListener('push', (event) => {
     data = event.data ? event.data.json() : {}
   } catch (err) {
     // Fallback for non-JSON payloads
-    data = { title: 'Chicago Elite', body: event.data ? event.data.text() : '' }
+    data = { title: 'On Deck', body: event.data ? event.data.text() : '' }
   }
 
-  const title = data.title || 'Chicago Elite'
+  const title = data.title || 'On Deck'
   const options = {
     body: data.body || '',
     icon: '/icon-192.png',

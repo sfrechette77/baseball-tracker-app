@@ -37,7 +37,6 @@ import {
 } from '@/app/actions/admin'
 import { getDashboardPlayerCount, getDashboardThisWeek, getDashboardTeamAdminAssignments, type DashboardEvent, type DashboardTeamAdminAssignment, getDashboardTeamHealthCounts, type DashboardTeamHealthCounts } from '@/app/actions/dashboard'
 import { DashboardTab } from '@/components/admin/DashboardTab'
-import { ORG_TEAM_IDS } from '@/lib/orgTeams'
 import { useActiveOrg } from '@/components/org-context'
 import { useOrgSeasons } from '@/lib/org/useOrgSeasons'
 import { useTeamSeason } from '@/lib/org/useTeamSeason'
@@ -225,7 +224,7 @@ function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
         <div className="text-center mb-8">
           <p className="text-4xl mb-3">⚾</p>
           <h1 className="text-2xl font-extrabold text-white">Admin Access</h1>
-          <p className="text-slate-400 text-sm mt-1">Chicago Elite 11U · Moore</p>
+          <p className="text-slate-400 text-sm mt-1">Organization Administration</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
           <input type="password" placeholder="Enter password" value={input}
@@ -1208,24 +1207,16 @@ export default function AdminPage() {
     }
 
     if (teamsResult.ok) {
-       const orgDashboardTeams = teamsResult.teams.filter(team =>
-          ORG_TEAM_IDS.includes(team.id)
-        )
-
-      setDashboardTeamCount(orgDashboardTeams.length)
-      setDashboardTeams(orgDashboardTeams)
+      setDashboardTeamCount(teamsResult.teams.length)
+      setDashboardTeams(teamsResult.teams)
     } else {
       setDashboardMsg(`❌ ${teamsResult.error}`)
     }
 
     if (teamsResult.ok && teamAdminsResult.ok) {
-      const orgDashboardTeams = teamsResult.teams.filter(team =>
-        ORG_TEAM_IDS.includes(team.id)
-      )
-
       const teamsWithAdmins = new Set(teamAdminsResult.assignments.map(a => a.team_id))
       setDashboardTeamsMissingAdmins(
-        orgDashboardTeams.filter(team => !teamsWithAdmins.has(team.id))
+        teamsResult.teams.filter(team => !teamsWithAdmins.has(team.id))
       )
       setDashboardTeamAdminAssignments(teamAdminsResult.assignments)
     } else if (!teamAdminsResult.ok) {
