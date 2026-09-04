@@ -131,6 +131,7 @@ export async function sendMessage(formData: FormData): Promise<SendMessageResult
     .from('team_messages')
     .insert({
       team_id: teamId,
+      organization_id: ctx.membership.organization_id,
       author_membership_id: ctx.membership.id,
       body: body || '', // empty body is fine if there's an image
     })
@@ -247,7 +248,7 @@ export async function addReaction(messageId: string, emoji: string): Promise<Sim
   // Need to know the message's team_id to find the right membership
   const { data: message, error: msgError } = await supabase
     .from('team_messages')
-    .select('team_id')
+    .select('team_id, organization_id')
     .eq('id', messageId)
     .maybeSingle()
 
@@ -257,9 +258,14 @@ export async function addReaction(messageId: string, emoji: string): Promise<Sim
   const ctx = await getCurrentMembershipForTeam(message.team_id)
   if (!ctx.ok) return { ok: false, error: ctx.error }
 
+  if (message.organization_id !== ctx.membership.organization_id) {
+    return { ok: false, error: 'Message does not belong to your organization' }
+  }
+
   const { error } = await supabase
     .from('team_message_reactions')
     .insert({
+      organization_id: message.organization_id,
       message_id: messageId,
       membership_id: ctx.membership.id,
       emoji,
@@ -281,7 +287,7 @@ export async function removeReaction(messageId: string, emoji: string): Promise<
 
   const { data: message, error: msgError } = await supabase
     .from('team_messages')
-    .select('team_id')
+    .select('team_id, organization_id')
     .eq('id', messageId)
     .maybeSingle()
 
@@ -290,6 +296,10 @@ export async function removeReaction(messageId: string, emoji: string): Promise<
 
   const ctx = await getCurrentMembershipForTeam(message.team_id)
   if (!ctx.ok) return { ok: false, error: ctx.error }
+
+  if (message.organization_id !== ctx.membership.organization_id) {
+    return { ok: false, error: 'Message does not belong to your organization' }
+  }
 
   const { error } = await supabase
     .from('team_message_reactions')

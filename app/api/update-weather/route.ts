@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 type FieldRow = {
   id: string
+  organization_id: string
   name: string | null
   latitude: number | null
   longitude: number | null
@@ -25,10 +26,23 @@ export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   const querySecret = req.nextUrl.searchParams.get('cron_secret')
   const cronSecret = process.env.CRON_SECRET
-  
-  const isAuthorized = (authHeader === `Bearer ${cronSecret}`) || (querySecret === cronSecret)
-  if (cronSecret && !isAuthorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (!cronSecret) {
+    return NextResponse.json(
+      { error: 'CRON_SECRET is not configured' },
+      { status: 500 }
+    )
+  }
+
+  const isAuthorized =
+    authHeader === `Bearer ${cronSecret}` ||
+    querySecret === cronSecret
+
+  if (!isAuthorized) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -46,7 +60,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('fields')
-    .select('id, name, latitude, longitude')
+    .select('id, organization_id, name, latitude, longitude')
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch fields' }, { status: 500 })
@@ -86,6 +100,7 @@ export async function GET(req: NextRequest) {
       const rows = forecast.list
         .filter(item => typeof item.dt === 'number')
         .map(item => ({
+          organization_id: field.organization_id,
           field_id: field.id,
           forecast_time: new Date(item.dt * 1000).toISOString(),
           rain_probability: typeof item.pop === 'number' ? item.pop : 0,
@@ -97,6 +112,7 @@ export async function GET(req: NextRequest) {
         .from('weather_forecasts')
         .delete()
         .eq('field_id', field.id)
+        .eq('organization_id', field.organization_id)
 
       if (deleteError) {
         results.push(`Delete error for ${fieldName}: ${deleteError.message}`)

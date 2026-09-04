@@ -1007,7 +1007,7 @@ export default function AdminPage() {
   const [leaguePlayedAt, setLeaguePlayedAt] = useState('')
   const [leagueHomeScore, setLeagueHomeScore] = useState('')
   const [leagueAwayScore, setLeagueAwayScore] = useState('')
-  const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('final')
+  const [leagueStatus, setLeagueStatus] = useState<'final' | 'scheduled' | 'forfeit' | 'postponed' | 'canceled'>('scheduled')
   const [leagueSaving, setLeagueSaving] = useState(false)
   const [leagueMsg, setLeagueMsg] = useState<string | null>(null)
 
@@ -2292,7 +2292,7 @@ const submitGrantTeamAdmin = async () => {
   setLeaguePlayedAt('')
   setLeagueHomeScore('')
   setLeagueAwayScore('')
-  setLeagueStatus('final')
+  setLeagueStatus('scheduled')
   setLeagueMsg(null)
 }
 
@@ -2357,6 +2357,8 @@ const saveLeagueGame = async () => {
       }))
       setAllLeagueGames(normalized as LeagueGameAdminRow[])
     }
+
+    await reloadEvents()
   } else {
     setLeagueMsg('❌ Save failed')
   }

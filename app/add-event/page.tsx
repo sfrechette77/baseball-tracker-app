@@ -64,7 +64,43 @@ export default function AddEventPage() {
     try {
       const supabase = createClient()
 
+      const { data: selectedTeam, error: teamError } = await supabase
+        .from('teams')
+        .select('organization_id')
+        .eq('id', teamId)
+        .maybeSingle()
+
+      if (teamError) {
+        setErrorMessage(teamError.message)
+        return
+      }
+
+      if (!selectedTeam?.organization_id) {
+        setErrorMessage('Could not resolve team organization')
+        return
+      }
+
+      if (fieldId) {
+        const { data: selectedField, error: fieldError } = await supabase
+          .from('fields')
+          .select('id')
+          .eq('id', fieldId)
+          .eq('organization_id', selectedTeam.organization_id)
+          .maybeSingle()
+
+        if (fieldError) {
+          setErrorMessage(fieldError.message)
+          return
+        }
+
+        if (!selectedField) {
+          setErrorMessage('Selected field does not belong to this organization')
+          return
+        }
+      }
+
       const { error } = await supabase.from('events').insert({
+        organization_id: selectedTeam.organization_id,
         team_id: teamId,
         field_id: fieldId || null,
         event_type: eventType,

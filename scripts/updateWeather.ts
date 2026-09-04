@@ -23,6 +23,7 @@ const supabase = createClient(supabaseUrl, serviceKey)
 
 type FieldRow = {
   id: string
+  organization_id: string
   name: string | null
   latitude: number | null
   longitude: number | null
@@ -46,7 +47,7 @@ async function updateWeather() {
 
   const { data, error } = await supabase
     .from('fields')
-    .select('id, name, latitude, longitude')
+    .select('id, organization_id, name, latitude, longitude')
 
   if (error) {
     console.error('Error fetching fields:', error)
@@ -89,6 +90,7 @@ async function updateWeather() {
       const rows = forecast.list
         .filter(item => typeof item.dt === 'number')
         .map(item => ({
+          organization_id: field.organization_id,
           field_id: field.id,
           forecast_time: new Date(item.dt * 1000).toISOString(),
           rain_probability: typeof item.pop === 'number' ? item.pop : 0,
@@ -108,6 +110,7 @@ async function updateWeather() {
         .from('weather_forecasts')
         .delete()
         .eq('field_id', field.id)
+        .eq('organization_id', field.organization_id)
 
       if (deleteError) {
         console.error(`Delete error for ${fieldName}:`, deleteError)
