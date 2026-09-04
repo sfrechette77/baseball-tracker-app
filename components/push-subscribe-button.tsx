@@ -126,6 +126,11 @@ export function PushSubscribeButton() {
         }),
       })
 
+      if (!response.ok) {
+        const result = await response.json().catch(() => null)
+        throw new Error(result?.error ?? 'Failed to save push subscription')
+      }
+
       setState('subscribed')
       setMessage(`Subscribed to ${currentTeam.label} notifications`)
     } catch (err) {
@@ -153,7 +158,7 @@ export function PushSubscribeButton() {
       }
 
       // Tell server to forget this subscription for this team
-      await fetch('/api/push/subscribe', {
+      const response = await fetch('/api/push/subscribe', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,6 +166,11 @@ export function PushSubscribeButton() {
           endpoint: subscription.endpoint,
         }),
       })
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null)
+        throw new Error(result?.error ?? 'Failed to remove push subscription')
+      }
 
       // Unsubscribe from the browser (this removes ALL subscriptions on this device,
       // which is fine since we're keying by endpoint server-side)

@@ -87,13 +87,24 @@ export async function createPost(formData: FormData): Promise<CreatePostResult> 
   }
 
   const supabase = await createClient()
-  const ctx = await getCurrentMembership()
+
+  const { data: team, error: teamError } = await supabase
+    .from('teams')
+    .select('organization_id')
+    .eq('id', teamId)
+    .maybeSingle()
+
+  if (teamError) return { ok: false, error: teamError.message }
+  if (!team?.organization_id) return { ok: false, error: 'Team not found' }
+
+  const ctx = await getCurrentMembership(team.organization_id)
   if (!ctx.ok) return { ok: false, error: ctx.error }
 
   // Step 1: insert the post (RLS will reject if not admin of this team)
   const { data: inserted, error: insertError } = await supabase
     .from('team_posts')
     .insert({
+      organization_id: team.organization_id,
       team_id: teamId,
       author_membership_id: ctx.membership.id,
       body,
@@ -210,13 +221,23 @@ export async function addReaction(postId: string, emoji: string): Promise<Simple
   if (!emoji) return { ok: false, error: 'Missing emoji' }
 
   const supabase = await createClient()
-  const ctx = await getCurrentMembership()
+
+  const { data: post, error: postError } = await supabase
+    .from('team_posts')
+    .select('organization_id, team_id')
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (postError) return { ok: false, error: postError.message }
+  if (!post?.organization_id) return { ok: false, error: 'Post not found' }
+
+  const ctx = await getCurrentMembership(post.organization_id)
   if (!ctx.ok) return { ok: false, error: ctx.error }
 
-  // RLS gates this — the user must be a member who can read the post
   const { error } = await supabase
     .from('team_post_reactions')
     .insert({
+      organization_id: post.organization_id,
       post_id: postId,
       membership_id: ctx.membership.id,
       emoji,
@@ -235,7 +256,17 @@ export async function addReaction(postId: string, emoji: string): Promise<Simple
 
 export async function removeReaction(postId: string, emoji: string): Promise<SimpleResult> {
   const supabase = await createClient()
-  const ctx = await getCurrentMembership()
+
+  const { data: post, error: postError } = await supabase
+    .from('team_posts')
+    .select('organization_id, team_id')
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (postError) return { ok: false, error: postError.message }
+  if (!post?.organization_id) return { ok: false, error: 'Post not found' }
+
+  const ctx = await getCurrentMembership(post.organization_id)
   if (!ctx.ok) return { ok: false, error: ctx.error }
 
   const { error } = await supabase
