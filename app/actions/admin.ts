@@ -148,7 +148,7 @@ export async function getOrgTeams(): Promise<
   if (error) return { ok: false, error: error.message }
 
   return { ok: true, teams: (data ?? []) as OrgTeam[] }
-  }
+}
 
 // ─── approveMembership ─────────────────────────────────────────────────────
 
