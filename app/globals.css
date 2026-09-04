@@ -2,7 +2,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --brand: #dc2626; /* red default (Chicago Elite); overridden per-org at runtime */
+  --brand: #2563eb; /* neutral fallback; overridden per organization at runtime */
 }
 @theme inline {
   --color-background: var(--background);

@@ -1166,7 +1166,7 @@ export async function POST(req: NextRequest) {
         .insert({
           organization_id: organizationId,
           team_id: managedTeamId,
-          title: `Chicago Elite vs ${opponentName}`,
+          title: `${managedTeam.name} vs ${opponentName}`,
           opponent: opponentName,
           event_type: 'game',
           starts_at: playedAt,
@@ -1344,7 +1344,7 @@ if (action === 'update_league_game') {
       const { error: eventUpdateError } = await supabase
         .from('events')
         .update({
-          title: `Chicago Elite vs ${opponentName}`,
+          title: `${managedTeam.name} vs ${opponentName}`,
           opponent: opponentName,
           starts_at: playedAt,
           field_id: fieldId || null,
@@ -1369,7 +1369,7 @@ if (action === 'update_league_game') {
         .insert({
           organization_id: organizationId,
           team_id: managedTeamId,
-          title: `Chicago Elite vs ${opponentName}`,
+          title: `${managedTeam.name} vs ${opponentName}`,
           opponent: opponentName,
           event_type: 'game',
           starts_at: playedAt,
