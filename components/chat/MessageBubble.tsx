@@ -24,6 +24,7 @@ export function MessageBubble({ message, currentMembershipId, showAuthor, onChan
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
 
   const isOwn = message.author_membership_id === currentMembershipId
@@ -51,7 +52,7 @@ export function MessageBubble({ message, currentMembershipId, showAuthor, onChan
   }
 
   const timeLabel = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
+    timeZone,
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(message.created_at))

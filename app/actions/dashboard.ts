@@ -1,6 +1,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  localDateTimeInputToUtc,
+  toLocalDateTimeInput,
+} from '@/lib/timezone'
 
 export type DashboardEvent = {
   id: string
@@ -230,12 +234,50 @@ export async function getDashboardThisWeek(): Promise<
   const guard = await requireOrgAdmin()
   if (!guard.ok) return { ok: false, error: guard.error }
 
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
+  const { data: organization, error: organizationError } = await supabase
+    .from('organizations')
+    .select('timezone')
+    .eq('id', guard.membership.organization_id)
+    .maybeSingle()
 
-  const end = new Date(start)
-  end.setDate(end.getDate() + 7)
+  if (organizationError) {
+    return { ok: false, error: organizationError.message }
+  }
+
+  if (!organization?.timezone) {
+    return { ok: false, error: 'Organization timezone is not configured' }
+  }
+
+  const timeZone = organization.timezone
+
+  const localNow = toLocalDateTimeInput(
+    new Date().toISOString(),
+    timeZone
+  )
+
+  const startDate = localNow.slice(0, 10)
+
+  const [year, month, day] = startDate.split('-').map(Number)
+
+  const endDateObject = new Date(
+    Date.UTC(year, month - 1, day + 7)
+  )
+
+  const endDate = [
+    endDateObject.getUTCFullYear(),
+    String(endDateObject.getUTCMonth() + 1).padStart(2, '0'),
+    String(endDateObject.getUTCDate()).padStart(2, '0'),
+  ].join('-')
+
+  const startIso = localDateTimeInputToUtc(
+    `${startDate}T00:00`,
+    timeZone
+  )
+
+  const endIso = localDateTimeInputToUtc(
+    `${endDate}T00:00`,
+    timeZone
+  )
 
   const { data, error } = await supabase
     .from('events')
@@ -255,8 +297,8 @@ export async function getDashboardThisWeek(): Promise<
       )
     `)
     .eq('organization_id', guard.membership.organization_id)
-    .gte('starts_at', start.toISOString())
-    .lt('starts_at', end.toISOString())
+    .gte('starts_at', startIso)
+    .lt('starts_at', endIso)
     .order('starts_at', { ascending: true })
 
   if (error) return { ok: false, error: error.message }

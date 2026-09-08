@@ -16,7 +16,6 @@ function createClient() {
   return createBrowserClient(url, key)
 }
 
-const APP_TIME_ZONE = 'America/Chicago'
 const INNINGS = [1, 2, 3, 4, 5, 6, 7]
 
 function getTeamLabel(team: { id: string; name: string } | null): string {
@@ -120,9 +119,9 @@ function getDirectionsUrl(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 }
 
-function formatChicagoDateTime(date: Date) {
+function formatOrgDateTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
+    timeZone,
     weekday: 'long', month: 'long', day: 'numeric',
     year: 'numeric', hour: 'numeric', minute: '2-digit'
   }).format(date)
@@ -188,6 +187,7 @@ export default function EventPage() {
   const [playerStats, setPlayerStats] = useState<PlayerStatRow[]>([])
   const [loading, setLoading] = useState(true)
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
@@ -552,7 +552,7 @@ export default function EventPage() {
         {/* Date & Status */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Date & Time</p>
-          <p className="mt-2 text-sm font-semibold text-white">{formatChicagoDateTime(eventTime)}</p>
+          <p className="mt-2 text-sm font-semibold text-white">{formatOrgDateTime(eventTime, timeZone)}</p>
           <div className="mt-2">
             <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(event.status)}`}>
               {formatStatus(event.status)}

@@ -54,6 +54,11 @@ import {
 } from '@/lib/imports/gamechanger-pdf/map-import-to-player-stats'
 
 import {
+  localDateTimeInputToUtc,
+  toLocalDateTimeInput,
+} from '@/lib/timezone'
+
+import {
   createAthleteRosterAssignment,
   assignExistingAthleteToTeamSeason,
   getAssignableAthletes,
@@ -62,6 +67,16 @@ import {
   restorePlayerToRoster,
   type AssignableAthlete,
 } from '@/app/actions/roster'
+
+const ORGANIZATION_TIME_ZONES = [
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Phoenix', label: 'Arizona Time' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+]
 
 
 function createClient() {
@@ -183,9 +198,9 @@ type GameChangerPreviewResponse = {
   suggestedTeamIndex: number | null
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
+    timeZone,
     month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit'
   }).format(new Date(dateStr))
@@ -267,11 +282,17 @@ export default function AdminPage() {
   const [rosterStatusSavingId, setRosterStatusSavingId] =
     useState<string | null>(null)
 
-  const { membership, loading: orgLoading } = useActiveOrg()
+  const {
+    org,
+    membership,
+    loading: orgLoading,
+    updateOrg,
+  } = useActiveOrg()
+
   const isOrgAdmin = membership?.role === 'org_admin'
   const isTeamAdmin = membership?.role === 'team_admin'
+  const timeZone = org?.timezone ?? 'UTC'
 
-  const { org } = useActiveOrg()
   const [settingsPublicDescription, setSettingsPublicDescription] = useState('')
   const brandColor = org?.primary_color || '#dc2626'
 
@@ -283,6 +304,7 @@ export default function AdminPage() {
   const [settingsName, setSettingsName] = useState('')
   const [settingsLogoUrl, setSettingsLogoUrl] = useState('')
   const [settingsPrimaryColor, setSettingsPrimaryColor] = useState('#dc2626')
+  const [settingsTimezone, setSettingsTimezone] = useState('')
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
   const [settingsCopied, setSettingsCopied] = useState(false)
@@ -347,6 +369,7 @@ export default function AdminPage() {
     setSettingsName(org.name ?? '')
     setSettingsLogoUrl(org.logo_url ?? '')
     setSettingsPrimaryColor(org.primary_color ?? '#dc2626')
+    setSettingsTimezone(org.timezone ?? '')
     setSettingsPublicDescription(org.public_description ?? '')
   }, [org])
 
@@ -367,6 +390,7 @@ export default function AdminPage() {
           name: settingsName.trim(),
           logoUrl: settingsLogoUrl.trim() || null,
           primaryColor: settingsPrimaryColor.trim() || '#dc2626',
+          timezone: settingsTimezone,
           publicDescription: settingsPublicDescription,
         }),
       })
@@ -376,6 +400,8 @@ export default function AdminPage() {
       if (!response.ok) {
         throw new Error(result.error || 'Failed to save organization settings.')
       }
+
+      updateOrg(result.organization)
 
       setSettingsMsg('Organization settings saved.')
       await loadLaunchReadiness()
@@ -2214,13 +2240,6 @@ const submitGrantTeamAdmin = async () => {
     setEditedStandings(prev => ({ ...prev, [id]: { ...prev[id], [field]: Number(value) } }))
   }
 
-  // Convert ISO timestamp from DB to value compatible with <input type="datetime-local">
-  const toDatetimeLocal = (iso: string): string => {
-    const d = new Date(iso)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }
-
   const resetInlineFieldForm = () => {
     setInlineFieldOpen(false)
     setInlineFieldName('')
@@ -2288,13 +2307,15 @@ const submitGrantTeamAdmin = async () => {
 }
 
 const loadLeagueGameForEdit = (game: LeagueGameAdminRow) => {
+  if (!org?.timezone) {
+    setLeagueMsg('❌ Organization settings are still loading. Please try again.')
+    return
+  }
+
   setLeagueEditingId(game.id)
   setLeagueHomeTeamId(game.home_team_id)
   setLeagueAwayTeamId(game.away_team_id)
-  // Convert ISO timestamp to datetime-local format
-  const date = new Date(game.played_at)
-  const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-  setLeaguePlayedAt(localDateTime)
+  setLeaguePlayedAt(toLocalDateTimeInput(game.played_at, org.timezone))
   setLeagueHomeScore(game.home_score?.toString() ?? '')
   setLeagueAwayScore(game.away_score?.toString() ?? '')
   setLeagueStatus(game.status as any)
@@ -2310,6 +2331,10 @@ const saveLeagueGame = async () => {
     setLeagueMsg('❌ Home and away teams must be different')
     return
   }
+  if (orgLoading || !org?.timezone) {
+    setLeagueMsg('❌ Organization settings are still loading. Please try again.')
+    return
+  }
   setLeagueSaving(true)
   setLeagueMsg(null)
   
@@ -2319,7 +2344,7 @@ const saveLeagueGame = async () => {
     leagueGameId: leagueEditingId,
     homeTeamId: leagueHomeTeamId,
     awayTeamId: leagueAwayTeamId,
-    playedAt: new Date(leaguePlayedAt).toISOString(),
+    playedAt: localDateTimeInputToUtc(leaguePlayedAt, org.timezone),
     homeScore: leagueHomeScore ? Number(leagueHomeScore) : null,
     awayScore: leagueAwayScore ? Number(leagueAwayScore) : null,
     status: leagueStatus,
@@ -2380,6 +2405,10 @@ const deleteLeagueGame = async () => {
   }
 
   const editEvent = (ev: EventListRow) => {
+    if (orgLoading || !org?.timezone) {
+      setEventMsg('❌ Organization settings are still loading. Please try again.')
+      return
+    }
     resetInlineFieldForm()
     setEditingEventId(ev.id)
     setFormMode(ev.event_type === 'practice' ? 'practice' : 'game')
@@ -2392,7 +2421,7 @@ const deleteLeagueGame = async () => {
       opponent: ev.opponent ?? '',
       opponentTeamId: matchedTeam?.id ?? '',
       eventType: (ev.event_type as 'game' | 'tournament' | 'practice') ?? 'game',
-      startsAt: toDatetimeLocal(ev.starts_at),
+      startsAt: toLocalDateTimeInput(ev.starts_at, org.timezone),
       fieldId: ev.field_id ?? '',
       isHome: ev.is_home ?? false,
       travelMinutes: ev.travel_minutes?.toString() ?? '',
@@ -2431,9 +2460,19 @@ const deleteLeagueGame = async () => {
       setEventMsg('❌ Title and start time are required')
       return
     }
+
+    if (orgLoading || !org?.timezone) {
+      setEventMsg('❌ Organization settings are still loading. Please try again.')
+      return
+    }
+
     setEventSaving(true)
     setEventMsg(null)
-    const startsAtIso = new Date(eventForm.startsAt).toISOString()
+
+    const startsAtIso = localDateTimeInputToUtc(
+      eventForm.startsAt,
+      org.timezone
+    )
     const payload = {
       title: eventForm.title,
       opponent: formMode === 'practice' ? null : eventForm.opponent,
@@ -2965,6 +3004,32 @@ const visibleAdminTabs = isOrgAdmin
                     />
                   </div>
 
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">
+                    Organization Time Zone
+                  </label>
+
+                  <select
+                    value={settingsTimezone}
+                    onChange={e => setSettingsTimezone(e.target.value)}
+                    className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-slate-400"
+                  >
+                    {ORGANIZATION_TIME_ZONES.map(option => (
+                      <option
+                        key={option.value}
+                        value={option.value}
+                        className="bg-slate-900 text-white"
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <p className="text-[11px] text-slate-500">
+                    Game, practice, and event times are displayed in this time zone.
+                  </p>
+                </div>
+
                   <div className="space-y-2">
                     <label className="text-xs text-slate-400">Public Welcome Message</label>
                     <textarea
@@ -2994,7 +3059,11 @@ const visibleAdminTabs = isOrgAdmin
 
                   <button
                     onClick={saveOrgSettings}
-                    disabled={settingsSaving || !settingsName.trim()}
+                    disabled={
+                      settingsSaving ||
+                      !settingsName.trim() ||
+                      !settingsTimezone
+                    }
                     className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
                     style={{ backgroundColor: settingsPrimaryColor || brandColor }}
                   >
@@ -3072,7 +3141,11 @@ const visibleAdminTabs = isOrgAdmin
 
                   <button
                     onClick={saveOrgSettings}
-                    disabled={settingsSaving || !settingsName.trim()}
+                    disabled={
+                      settingsSaving ||
+                      !settingsName.trim() ||
+                      !settingsTimezone
+                    }
                     className="w-full rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50"
                     style={{ backgroundColor: settingsPrimaryColor || brandColor }}
                   >
@@ -3762,7 +3835,7 @@ const visibleAdminTabs = isOrgAdmin
             dashboardTeamsWithNoUpcomingEvents={dashboardTeamsWithNoUpcomingEvents}
             dashboardTeamsWithNoPlayers={dashboardTeamsWithNoPlayers}
             dashboardTeamsWithNoFamilies={dashboardTeamsWithNoFamilies}
-            formatDate={formatDate}
+            formatDate={(dateStr) => formatDate(dateStr, timeZone)}
             setTab={setTab}
           />
         )}
@@ -3816,7 +3889,7 @@ const visibleAdminTabs = isOrgAdmin
 
                         {teamDashboardNextEvent.starts_at && (
                           <p className="mt-1 text-sm text-slate-400">
-                            {formatDate(teamDashboardNextEvent.starts_at)}
+                            {formatDate(teamDashboardNextEvent.starts_at, timeZone)}
                           </p>
                         )}
                       </>
@@ -4447,7 +4520,7 @@ const visibleAdminTabs = isOrgAdmin
                         <p className="text-xs text-slate-400">{p.email}</p>
                         <p className="text-[10px] text-slate-500 mt-1">
                           Signed up {new Date(p.created_at).toLocaleString('en-US', {
-                            timeZone: 'America/Chicago',
+                            timeZone,
                           })}
                         </p>
                       </div>
@@ -5263,7 +5336,7 @@ const visibleAdminTabs = isOrgAdmin
                   .reverse()
                   .map(e => (
                     <option key={e.id} value={e.id}>
-                      {formatDate(e.starts_at)} — {e.opponent ? `vs ${e.opponent}` : e.title}
+                      {formatDate(e.starts_at, timeZone)} — {e.opponent ? `vs ${e.opponent}` : e.title}
                     </option>
                   ))}
               </select>
@@ -5290,7 +5363,7 @@ const visibleAdminTabs = isOrgAdmin
                       )}
                       {currentUpdatedAt && (
                         <p className="text-xs text-slate-500 mt-2">
-                          Updated {new Date(currentUpdatedAt).toLocaleString('en-US', { timeZone: 'America/Chicago' })}
+                          Updated {new Date(currentUpdatedAt).toLocaleString('en-US', { timeZone })}
                         </p>
                       )}
                     </>
@@ -5409,7 +5482,7 @@ const visibleAdminTabs = isOrgAdmin
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
-                    {formatDate(e.starts_at)} — {e.opponent ? `vs ${e.opponent}` : e.title}
+                    {formatDate(e.starts_at, timeZone)} — {e.opponent ? `vs ${e.opponent}` : e.title}
                   </option>
                 ))}
               </select>
@@ -5531,7 +5604,7 @@ const visibleAdminTabs = isOrgAdmin
                 <option value="">— Pick a game —</option>
                 {events.map(e => (
                   <option key={e.id} value={e.id}>
-                    {formatDate(e.starts_at)} {e.opponent ? `vs ${e.opponent}` : e.title}
+                    {formatDate(e.starts_at, timeZone)} {e.opponent ? `vs ${e.opponent}` : e.title}
                   </option>
                 ))}
               </select>
@@ -6323,7 +6396,7 @@ const visibleAdminTabs = isOrgAdmin
                             : ev.opponent ? `vs ${ev.opponent}` : ev.title}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {formatDate(ev.starts_at)}
+                          {formatDate(ev.starts_at, timeZone)}
                           {ev.team_score !== null && ' · final'}
                           {ev.event_type === 'tournament' && ' · 🏆'}
                         </p>
@@ -6442,7 +6515,7 @@ const visibleAdminTabs = isOrgAdmin
           {allLeagueGames.map(g => {
             const date = new Date(g.played_at)
             const dateLabel = new Intl.DateTimeFormat('en-US', {
-              timeZone: 'America/Chicago',
+              timeZone,
               month: 'numeric', day: 'numeric',
             }).format(date)
             const isFinal = g.status === 'final' && g.home_score !== null && g.away_score !== null

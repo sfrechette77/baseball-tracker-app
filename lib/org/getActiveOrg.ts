@@ -50,7 +50,8 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
         secondary_color,
         logo_url,
         public_description,
-        has_league_features
+        has_league_features,
+        timezone
       )
     `)
     .eq('user_id', user.id)
@@ -77,6 +78,7 @@ export async function getActiveOrg(): Promise<ActiveOrgResult> {
       logo_url: orgRow.logo_url,
       public_description: orgRow.public_description,
       has_league_features: orgRow.has_league_features,
+      timezone: orgRow.timezone,
     },
     membership: {
       id: m.id,

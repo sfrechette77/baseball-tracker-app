@@ -19,7 +19,6 @@ function createClient() {
   return createBrowserClient(url, key)
 }
 
-const APP_TIME_ZONE = 'America/Chicago'
 const FORECAST_MATCH_WINDOW_MS = 9 * 60 * 60 * 1000
 const FORECAST_LOOKAHEAD_MS = 5 * 24 * 60 * 60 * 1000
 
@@ -102,41 +101,46 @@ function formatAddress(field: FieldRow | null) {
     .filter(Boolean).join(', ')
 }
 
-function formatChicagoDateTime(date: Date) {
+function formatOrgDateTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
+    timeZone,
     month: 'numeric', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit'
   }).format(date)
 }
 
-function formatChicagoTime(date: Date) {
+function formatOrgTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE, hour: 'numeric', minute: '2-digit'
+    timeZone, hour: 'numeric', minute: '2-digit'
   }).format(date)
 }
 
-function formatChicagoShortDate(date: Date) {
+function formatOrgShortDate(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE, month: 'short', day: 'numeric'
+    timeZone, month: 'short', day: 'numeric'
   }).format(date)
 }
 
-function getChicagoDateParts(date: Date) {
+function getOrgDateParts(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
+    timeZone,
     year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric'
   }).formatToParts(date)
+
   const getPart = (type: string) => parts.find(p => p.type === type)?.value ?? ''
+
   return {
-    year: getPart('year'), month: getPart('month'),
-    day: getPart('day'), hour: Number(getPart('hour'))
+    year: getPart('year'),
+    month: getPart('month'),
+    day: getPart('day'),
+    hour: Number(getPart('hour'))
   }
 }
 
-function isSameChicagoDay(a: Date, b: Date) {
-  const ap = getChicagoDateParts(a)
-  const bp = getChicagoDateParts(b)
+function isSameOrgDay(a: Date, b: Date, timeZone: string) {
+  const ap = getOrgDateParts(a, timeZone)
+  const bp = getOrgDateParts(b, timeZone)
+
   return ap.year === bp.year && ap.month === bp.month && ap.day === bp.day
 }
 
@@ -246,8 +250,22 @@ const config = {
 
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
-function EventCard({ event, weather, now, featured = false, brandColor = '#dc2626' }: {
-  event: EventRow; weather?: WeatherSummary; now: Date; featured?: boolean; brandColor?: string
+function EventCard({
+  event,
+  weather,
+  now,
+  timeZone,
+  featured = false,
+  brandColor = '#dc2626'
+}: {
+  event:
+  EventRow;
+  weather?:
+  WeatherSummary;
+  now: Date;
+  timeZone: string;
+  featured?: boolean;
+  brandColor?: string
 }) {
   const eventTime = new Date(event.starts_at)
   const field = getPrimaryField(event.fields)
@@ -260,7 +278,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
   const urgency = getUrgency(eventTime, event.travel_minutes, event.arrival_buffer_minutes, now)
   const score = getScoreDisplay(event)
   const isCompleted = score !== null
-  const isGameDay = isSameChicagoDay(eventTime, new Date())
+  const isGameDay = isSameOrgDay(eventTime, new Date(), timeZone)
   const isGame = event.event_type === 'game' || event.event_type === 'tournament'
   const isPractice = event.event_type === 'practice'
   const isOff = event.display_status === 'off'
@@ -288,7 +306,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
           </p>
           <h2 className="mt-1 text-2xl font-bold text-white">Today&apos;s Game</h2>
           <p className="mt-1 text-sm text-slate-300">
-            {formatChicagoTime(eventTime)}{event.opponent ? ` vs ${event.opponent}` : ''}
+            {formatOrgTime(eventTime, timeZone)}{event.opponent ? ` vs ${event.opponent}` : ''}
           </p>
           <p className="mt-1 text-sm text-slate-400">{event.title}</p>
           {score && <p className={`mt-2 text-xl font-bold ${score.className}`}>{score.text}</p>}
@@ -307,7 +325,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
           <h2 className="mt-1 text-2xl font-bold text-white">
             {isOff ? 'Practice Canceled' : 'Practice Today'}
           </h2>
-          <p className="mt-1 text-sm text-slate-300">{formatChicagoTime(eventTime)}</p>
+          <p className="mt-1 text-sm text-slate-300">{formatOrgTime(eventTime, timeZone)}</p>
           <p className="mt-1 text-sm text-slate-400">
             {isOff && event.status_message ? event.status_message : event.title}
           </p>
@@ -315,7 +333,7 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
       ) : (
         <>
           <h2 className="text-lg font-bold text-white">{event.title}</h2>
-          <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
+          <p className="mt-1 text-sm text-slate-400">{formatOrgDateTime(eventTime, timeZone)}</p>
           {event.opponent && !isPractice && <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>}
           {score && <p className={`mt-2 text-lg font-bold ${score.className}`}>{score.text}</p>}
         </>
@@ -385,7 +403,13 @@ function EventCard({ event, weather, now, featured = false, brandColor = '#dc262
 
 // ─── Past Game Row ─────────────────────────────────────────────────────────────
 
-function PastGameRow({ event }: { event: EventRow }) {
+function PastGameRow({
+  event,
+  timeZone
+}: {
+  event: EventRow
+  timeZone: string
+}) {
   const score = getScoreDisplay(event)
   const eventTime = new Date(event.starts_at)
 
@@ -396,7 +420,7 @@ function PastGameRow({ event }: { event: EventRow }) {
           <p className="text-sm font-semibold text-white">
             {event.opponent ? `vs ${event.opponent}` : event.title}
           </p>
-          <p className="text-xs text-slate-500">{formatChicagoShortDate(eventTime)}</p>
+          <p className="text-xs text-slate-500">{formatOrgShortDate(eventTime, timeZone)}</p>
         </div>
 
         {score && (
@@ -429,6 +453,7 @@ export default function HomePage() {
   const { currentTeam } = useCurrentTeam()
   const { teamSeasonId, arrivalBufferMinutes, loading: teamSeasonLoading, notFound: teamSeasonNotFound } = useTeamSeason(currentTeam.id)
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
@@ -597,6 +622,7 @@ export default function HomePage() {
       event={featuredEvent}
       weather={weatherByEvent[featuredEvent.id]}
       now={now}
+      timeZone={timeZone}
       featured
       brandColor={brandColor}
     />
@@ -675,7 +701,7 @@ export default function HomePage() {
                 return (
                   <div key={event.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="font-bold text-white">{event.title}</p>
-                    <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
+                    <p className="mt-1 text-sm text-slate-400">{formatOrgDateTime(eventTime, timeZone)}</p>
                     {event.opponent && event.event_type !== 'practice' && (
                       <p className="mt-1 text-sm text-slate-400">vs {event.opponent}</p>
                     )}
@@ -702,9 +728,17 @@ export default function HomePage() {
         {/* Past Games */}
         {pastGames.length > 0 && (
           <section>
-            <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">Recent Games</p>
+            <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">
+              Recent Games
+            </p>
             <div className="space-y-2">
-              {pastGames.map(event => <PastGameRow key={event.id} event={event} />)}
+              {pastGames.map(event => (
+                <PastGameRow
+                  key={event.id}
+                  event={event}
+                  timeZone={timeZone}
+                />
+              ))}
             </div>
           </section>
         )}

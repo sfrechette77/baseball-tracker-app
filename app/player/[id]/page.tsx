@@ -15,8 +15,6 @@ function createClient() {
   return createBrowserClient(url, key)
 }
 
-const APP_TIME_ZONE = 'America/Chicago'
-
 type Player = {
   id: string
   name: string
@@ -85,13 +83,13 @@ function calcAvg(hits: number, atBats: number): string {
   return avg >= 1 ? '1.000' : '.' + avg.toFixed(3).split('.')[1]
 }
 
-function formatShortDate(dateStr: string) {
+function formatShortDate(dateStr: string, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE, month: 'short', day: 'numeric'
+    timeZone,
+    month: 'short',
+    day: 'numeric'
   }).format(new Date(dateStr))
 }
-
-
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -103,6 +101,7 @@ export default function PlayerPage() {
   const [stats, setStats] = useState<StatRow[]>([])
   const [loading, setLoading] = useState(true)
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
   const seasonName = player?.season_name ?? 'Season'
 
@@ -415,7 +414,7 @@ export default function PlayerPage() {
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <p className="text-[10px] text-slate-500">
-                              {s.events?.starts_at ? formatShortDate(s.events.starts_at) : ''}
+                              {s.events?.starts_at ? formatShortDate(s.events.starts_at, timeZone) : ''}
                             </p>
                             {result && (
                               <span className={`text-[10px] font-bold ${resultClass}`}>

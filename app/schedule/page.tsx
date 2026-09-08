@@ -18,8 +18,6 @@ function createClient() {
   return createBrowserClient(url, key)
 }
 
-const APP_TIME_ZONE = 'America/Chicago'
-
 type FieldRow = { name: string | null }
 
 type EventRow = {
@@ -47,9 +45,9 @@ function normalizeEvent(event: RawEventRow): EventRow {
   return { ...event, fields: normalizeFieldRelation(event.fields) }
 }
 
-function formatChicagoDateTime(date: Date) {
+function formatOrgDateTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
+    timeZone,
     weekday: 'short', month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit'
   }).format(date)
@@ -67,14 +65,18 @@ function getScoreDisplay(event: EventRow) {
   return { text: `${team}–${opp}`, className: 'text-slate-300' }
 }
 
-function getStartOfTodayChicago(): Date {
-  const now = new Date()
+function getOrgDateKey(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
-    year: 'numeric', month: 'numeric', day: 'numeric',
-  }).formatToParts(now)
-  const get = (t: string) => Number(parts.find(p => p.type === t)?.value)
-  return new Date(Date.UTC(get('year'), get('month') - 1, get('day'), 5, 0, 0))
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const get = (type: string) =>
+    parts.find(part => part.type === type)?.value ?? ''
+
+  return `${get('year')}-${get('month')}-${get('day')}`
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -94,6 +96,7 @@ export default function SchedulePage() {
     effectiveSeasonId
   )
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
 
   useEffect(() => {
@@ -129,15 +132,16 @@ export default function SchedulePage() {
   }, [teamSeasonId, teamSeasonLoading, teamSeasonNotFound, seasonsLoading])
 
   const filteredEvents = useMemo(() => {
-    const startOfToday = getStartOfTodayChicago()
+    const todayKey = getOrgDateKey(new Date(), timeZone)
 
     if (filter === 'upcoming') {
       return events
         .filter(e => e.event_type !== 'practice')
         .filter(e => {
           const hasScore = e.team_score !== null && e.opponent_score !== null
-          const isFuture = new Date(e.starts_at) >= startOfToday
-          return !hasScore && isFuture
+          const eventDateKey = getOrgDateKey(new Date(e.starts_at), timeZone)
+          const isTodayOrFuture = eventDateKey >= todayKey
+          return !hasScore && isTodayOrFuture
         })
     }
 
@@ -162,18 +166,18 @@ export default function SchedulePage() {
         if (!aFuture && bFuture) return 1
         return aTime - bTime
       })
-  }, [events, filter])
+  }, [events, filter, timeZone])
 
   const groupedEvents = useMemo(() => {
     return filteredEvents.reduce<Record<string, EventRow[]>>((groups, event) => {
       const dateKey = new Intl.DateTimeFormat('en-US', {
-        timeZone: APP_TIME_ZONE, year: 'numeric', month: 'long', day: 'numeric'
+        timeZone, year: 'numeric', month: 'long', day: 'numeric'
       }).format(new Date(event.starts_at))
       if (!groups[dateKey]) groups[dateKey] = []
       groups[dateKey].push(event)
       return groups
     }, {})
-  }, [filteredEvents])
+  }, [filteredEvents, timeZone])
 
   if (loading) {
     return (
@@ -319,7 +323,7 @@ export default function SchedulePage() {
                       ) : (
                         <p className="font-bold text-white truncate">{event.title}</p>
                       )}
-                      <p className="mt-1 text-sm text-slate-400">{formatChicagoDateTime(eventTime)}</p>
+                      <p className="mt-1 text-sm text-slate-400">{formatOrgDateTime(eventTime, timeZone)}</p>
                       {event.display_status && (
                         <p className={`mt-1 text-xs font-bold uppercase tracking-wide ${
                           event.display_status === 'on' ? 'text-green-400' :
