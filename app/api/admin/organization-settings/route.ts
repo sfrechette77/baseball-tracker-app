@@ -5,6 +5,18 @@ function isValidHexColor(value: string) {
   return /^#[0-9A-Fa-f]{6}$/.test(value)
 }
 
+function isValidTimeZone(value: string) {
+  try {
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: value,
+    }).format()
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function PATCH(req: Request) {
   const supabase = await createClient()
 
@@ -14,6 +26,8 @@ export async function PATCH(req: Request) {
   const name = body.name as string | undefined
   const logoUrl = body.logoUrl as string | null | undefined
   const primaryColor = body.primaryColor as string | undefined
+
+  const timezone = body.timezone as string | undefined
 
   const publicDescription = body.publicDescription as string | null | undefined
 
@@ -34,6 +48,13 @@ export async function PATCH(req: Request) {
   if (!primaryColor || !isValidHexColor(primaryColor)) {
     return NextResponse.json(
       { error: 'Primary color must be a valid hex color.' },
+      { status: 400 }
+    )
+  }
+
+  if (!timezone || !isValidTimeZone(timezone)) {
+    return NextResponse.json(
+      { error: 'A valid organization timezone is required.' },
       { status: 400 }
     )
   }
@@ -72,11 +93,12 @@ export async function PATCH(req: Request) {
       name: name.trim(),
       logo_url: logoUrl || null,
       primary_color: primaryColor,
+      timezone,
       public_description: publicDescription?.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', organizationId)
-    .select('id, name, slug, logo_url, primary_color, public_description')
+    .select('id, name, slug, logo_url, primary_color, public_description, timezone')
     .single()
 
   if (updateError) {

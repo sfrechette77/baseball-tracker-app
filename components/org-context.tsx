@@ -4,11 +4,15 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { createClient } from '@/lib/supabase/client'
 import type { Org, ActiveMembership } from '@/lib/org/types'
 
-type OrgContextValue = {
+type OrgContextState = {
   org: Org | null
   membership: ActiveMembership | null
   loading: boolean
   error: string | null
+}
+
+type OrgContextValue = OrgContextState & {
+  updateOrg: (updates: Partial<Org>) => void
 }
 
 const OrgContext = createContext<OrgContextValue>({
@@ -16,10 +20,11 @@ const OrgContext = createContext<OrgContextValue>({
   membership: null,
   loading: true,
   error: null,
+  updateOrg: () => {},
 })
 
 export function OrgProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<OrgContextValue>({
+  const [state, setState] = useState<OrgContextState>({
     org: null,
     membership: null,
     loading: true,
@@ -59,7 +64,8 @@ export function OrgProvider({ children }: { children: ReactNode }) {
               secondary_color,
               logo_url,
               public_description,
-              has_league_features
+              has_league_features,
+              timezone
             )
           `)
           .eq('user_id', user.id)
@@ -112,6 +118,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
             logo_url: orgRow.logo_url,
             public_description: orgRow.public_description,
             has_league_features: orgRow.has_league_features,
+            timezone: orgRow.timezone,
           },
           membership: {
             id: m.id,
@@ -139,7 +146,36 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  return <OrgContext.Provider value={state}>{children}</OrgContext.Provider>
+  const updateOrg = (updates: Partial<Org>) => {
+    setState(previous => {
+      if (!previous.org) return previous
+
+      const nextOrg = {
+        ...previous.org,
+        ...updates,
+      }
+
+      if (typeof document !== 'undefined') {
+        const brand =
+          nextOrg.primary_color && nextOrg.primary_color.trim()
+            ? nextOrg.primary_color
+            : '#dc2626'
+
+        document.documentElement.style.setProperty('--brand', brand)
+      }
+
+      return {
+        ...previous,
+        org: nextOrg,
+      }
+    })
+  }
+
+  return (
+    <OrgContext.Provider value={{ ...state, updateOrg }}>
+      {children}
+    </OrgContext.Provider>
+  )
 }
 
 export function useActiveOrg() {

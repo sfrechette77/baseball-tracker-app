@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { deletePost } from '../../app/actions/feed'
 import type { Post } from '../../app/actions/feed'
 import { ReactionBar } from './ReactionBar'
+import { useActiveOrg } from '@/components/org-context'
 
 type Props = {
   post: Post
@@ -18,6 +19,8 @@ export function PostCard({ post, currentMembershipId, isOrgAdmin, onDeleted, onR
   const [isPending, startTransition] = useTransition()
   const [imageError, setImageError] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
 
   const isAuthor = post.author_membership_id === currentMembershipId
   const canDelete = isAuthor || isOrgAdmin
@@ -37,7 +40,7 @@ export function PostCard({ post, currentMembershipId, isOrgAdmin, onDeleted, onR
   }
 
   // Format timestamp — "2h ago", "yesterday", or absolute date if older
-  const timeLabel = formatRelativeTime(post.created_at)
+  const timeLabel = formatRelativeTime(post.created_at, timeZone)
 
   return (
     <article className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -116,7 +119,7 @@ export function PostCard({ post, currentMembershipId, isOrgAdmin, onDeleted, onR
   )
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, timeZone: string): string {
   const date = new Date(iso)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
@@ -130,11 +133,18 @@ function formatRelativeTime(iso: string): string {
   if (diffDays === 1) return 'yesterday'
   if (diffDays < 7) return `${diffDays}d ago`
 
-  // Older: show date
+  const yearFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+  })
+
+  const isSameYear =
+    yearFormatter.format(date) === yearFormatter.format(now)
+
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
+    timeZone,
     month: 'short',
     day: 'numeric',
-    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+    year: isSameYear ? undefined : 'numeric',
   }).format(date)
 }

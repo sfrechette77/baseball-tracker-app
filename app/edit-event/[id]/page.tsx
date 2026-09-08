@@ -8,6 +8,10 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Skeleton } from '@/components/Skeleton'
 import { BottomNav } from '@/components/BottomNav'
 import { useActiveOrg } from '@/components/org-context'
+import {
+  localDateTimeInputToUtc,
+  toLocalDateTimeInput,
+} from '@/lib/timezone'
 
 function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -15,8 +19,6 @@ function createClient() {
   if (!url || !key) throw new Error('Missing Supabase env vars')
   return createBrowserClient(url, key)
 }
-
-const APP_TIME_ZONE = 'America/Chicago'
 
 type EventForm = {
   title: string
@@ -32,17 +34,6 @@ type EventForm = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toLocalDateTimeInput(utcString: string) {
-  const date = new Date(utcString)
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: APP_TIME_ZONE,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(date)
-  const get = (type: string) => parts.find(p => p.type === type)?.value ?? ''
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
-}
-
 function inputClass() {
   return 'w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none'
 }
@@ -53,7 +44,8 @@ export default function EditEventPage() {
   const params = useParams()
   const router = useRouter()
   const eventId = params.id as string
-  const { org } = useActiveOrg()
+  const { org, loading: orgLoading } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
 
   const [form, setForm] = useState<EventForm>({
@@ -65,6 +57,7 @@ export default function EditEventPage() {
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    if (orgLoading) return
     const load = async () => {
       const supabase = createClient()
       const { data } = await supabase
@@ -77,7 +70,9 @@ export default function EditEventPage() {
           title: data.title ?? '',
           opponent: data.opponent ?? '',
           event_type: data.event_type ?? 'game',
-          starts_at: data.starts_at ? toLocalDateTimeInput(data.starts_at) : '',
+          starts_at: data.starts_at
+            ? toLocalDateTimeInput(data.starts_at, timeZone)
+            : '',
           status: data.status ?? 'confirmed',
           notes: data.notes ?? '',
           gear_notes: data.gear_notes ?? '',
@@ -88,7 +83,7 @@ export default function EditEventPage() {
       setLoading(false)
     }
     if (eventId) load()
-  }, [eventId])
+  }, [eventId, orgLoading, timeZone])
 
   const set = (field: keyof EventForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -101,9 +96,8 @@ export default function EditEventPage() {
     try {
       const supabase = createClient()
 
-      // Convert local Chicago time back to UTC
-      const localDate = new Date(form.starts_at)
-      const utcString = localDate.toISOString()
+      // Convert the organization's local event time back to UTC.
+      const utcString = localDateTimeInputToUtc(form.starts_at, timeZone)
 
       const { error } = await supabase
         .from('events')
@@ -127,7 +121,7 @@ export default function EditEventPage() {
         setTimeout(() => router.push(`/event/${eventId}`), 1000)
       }
     } catch (err) {
-      setMsg(`❌ Unexpected error`)
+      setMsg(`❌ ${err instanceof Error ? err.message : 'Unexpected error'}`)
       console.error(err)
     } finally {
       setSaving(false)

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { useActiveOrg } from '@/components/org-context'
+import { localDateTimeInputToUtc } from '@/lib/timezone'
 
 function createClient() {
   return createBrowserClient(
@@ -24,6 +26,8 @@ type TeamRow = {
 
 export default function AddEventPage() {
   const router = useRouter()
+  const { org, loading: orgLoading } = useActiveOrg()
+  const timeZone = org?.timezone
   const [teams, setTeams] = useState<TeamRow[]>([])
   const [fields, setFields] = useState<FieldRow[]>([])
   const [teamId, setTeamId] = useState('')
@@ -58,6 +62,11 @@ export default function AddEventPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (orgLoading || !timeZone) {
+    setErrorMessage('Organization settings are still loading. Please try again.')
+    return
+  }
+
     setSaving(true)
     setErrorMessage('')
 
@@ -99,6 +108,8 @@ export default function AddEventPage() {
         }
       }
 
+      const startsAtUtc = localDateTimeInputToUtc(startsAt, timeZone)
+
       const { error } = await supabase.from('events').insert({
         organization_id: selectedTeam.organization_id,
         team_id: teamId,
@@ -106,7 +117,7 @@ export default function AddEventPage() {
         event_type: eventType,
         opponent: opponent || null,
         title,
-        starts_at: startsAt,
+        starts_at: startsAtUtc,
         status: 'confirmed',
         notes: notes || null,
         snack_family: null,

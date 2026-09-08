@@ -9,6 +9,7 @@ export type Org = {
   logo_url: string | null
   has_league_features: boolean
   public_description: string | null
+  timezone: string
 }
 
 export type MembershipRole = 'org_admin' | 'team_admin' | 'parent'

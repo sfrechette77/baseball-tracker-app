@@ -70,14 +70,6 @@ function calcPct(w: number, l: number, t: number): string {
   return ((w + t * 0.5) / total).toFixed(3).replace(/^0/, '')
 }
 
-function formatChicagoShortDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
-    month: 'short',
-    day: 'numeric',
-  }).format(date)
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────
 
 export default function TeamPage() {
@@ -115,6 +107,7 @@ function TeamPageInner() {
   const router = useRouter()
   const { currentTeam } = useCurrentTeam()
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color ?? '#dc2626'
   const { seasons, currentSeasonId, loading: seasonsLoading } = useOrgSeasons()
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null)
@@ -455,6 +448,7 @@ function TeamPageInner() {
           <ResultsView
             division={seasonDivision}
             seasonId={effectiveSeasonId}
+            timeZone={timeZone}
           />
         )}
         {view === 'roster' && (
@@ -617,9 +611,11 @@ function StandingsView({
 function ResultsView({
   division,
   seasonId,
+  timeZone,
 }: {
   division: string
   seasonId: string | null
+  timeZone: string
 }) {
   const [leagueGames, setLeagueGames] = useState<LeagueGameRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -772,11 +768,11 @@ function ResultsView({
     const awayName = game.away_team?.name ?? 'Unknown'
     const playedDate = new Date(game.played_at)
     const dateLabel = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Chicago',
+      timeZone,
       month: 'short', day: 'numeric',
     }).format(playedDate)
     const timeLabel = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Chicago',
+      timeZone,
       hour: 'numeric', minute: '2-digit',
     }).format(playedDate)
 

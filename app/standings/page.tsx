@@ -59,6 +59,7 @@ export default function StandingsPage() {
   const [loading, setLoading] = useState(true)
   const { currentTeam } = useCurrentTeam()
   const { org } = useActiveOrg()
+  const timeZone = org?.timezone ?? 'UTC'
   const brandColor = org?.primary_color || '#dc2626'
   const { seasons, currentSeasonId, loading: seasonsLoading } = useOrgSeasons()
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null)
@@ -375,11 +376,11 @@ export default function StandingsPage() {
         const awayName = game.away_team?.name ?? 'Unknown'
         const playedDate = new Date(game.played_at)
         const dateLabel = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Chicago',
+          timeZone,
           month: 'short', day: 'numeric',
         }).format(playedDate)
         const timeLabel = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Chicago',
+          timeZone,
           hour: 'numeric', minute: '2-digit',
         }).format(playedDate)
         
