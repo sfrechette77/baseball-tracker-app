@@ -89,6 +89,7 @@ export default function StatsPage() {
             .from('players')
             .select('id, name, jersey_number, position')
             .eq('team_season_id', teamSeasonId)
+            .eq('roster_status', 'active')
             .order('jersey_number', { ascending: true }),
           supabase
             .from('player_stats')
