@@ -7,6 +7,7 @@ import { Header } from './header'
 function isPublicRoute(pathname: string): boolean {
   if (pathname === '/login') return true
   if (pathname.startsWith('/auth/')) return true
+  if (pathname === '/setup') return true
 
   // Public organization landing page: /o/<slug>
   if (/^\/o\/[^/]+\/?$/.test(pathname)) return true

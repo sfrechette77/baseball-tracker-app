@@ -65,20 +65,9 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData()
 
-    const password = formData.get('password')
     const teamId = formData.get('teamId')
     const eventId = formData.get('eventId')
     const file = formData.get('file')
-
-    if (
-      typeof password !== 'string' ||
-      password !== process.env.ADMIN_PASSWORD
-    ) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     if (
       typeof teamId !== 'string' ||

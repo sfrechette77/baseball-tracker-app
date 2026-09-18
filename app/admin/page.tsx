@@ -86,7 +86,6 @@ function createClient() {
   return createBrowserClient(url, key)
 }
 
-const PASSWORD_KEY = 'admin_password'
 const INNINGS = [1, 2, 3, 4, 5, 6, 7]
 
 type EventRow = {
@@ -216,51 +215,9 @@ type TeamDashboardEvent = {
   opponent: string | null
 }
 
-// ─── Password Gate ────────────────────────────────────────────────────────────
-
-function PasswordGate({ onSuccess }: { onSuccess: (pw: string) => void }) {
-  const [input, setInput] = useState('')
-  const [error, setError] = useState(false)
-
-  const handleSubmit = async () => {
-    const res = await fetch('/api/admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: input, action: 'update_score', eventId: 'test' })
-    })
-    if (res.status === 401) { setError(true); return }
-    localStorage.setItem(PASSWORD_KEY, input)
-    onSuccess(input)
-  }
-
-  return (
-    <main className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <p className="text-4xl mb-3">⚾</p>
-          <h1 className="text-2xl font-extrabold text-white">Admin Access</h1>
-          <p className="text-slate-400 text-sm mt-1">Organization Administration</p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
-          <input type="password" placeholder="Enter password" value={input}
-            onChange={e => { setInput(e.target.value); setError(false) }}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-slate-400" />
-          {error && <p className="text-red-400 text-sm">Incorrect password</p>}
-          <button onClick={handleSubmit}
-            className="w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 transition">
-            Sign In
-          </button>
-        </div>
-      </div>
-    </main>
-  )
-}
-
 // ─── Main Admin ───────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  const [password, setPassword] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general')
   const { currentTeam } = useCurrentTeam()
@@ -1129,11 +1086,6 @@ export default function AdminPage() {
   const [inlineFieldSaving, setInlineFieldSaving] = useState(false)
   const [inlineFieldMsg, setInlineFieldMsg] = useState<string | null>(null)
 
-  useEffect(() => {
-    const saved = localStorage.getItem(PASSWORD_KEY)
-    if (saved) setPassword(saved)
-  }, [])
-
   const reloadEvents = async () => {
     const supabase = createClient()
     const [{ data: eventsForScore }, { data: allEventsData }] = await Promise.all([
@@ -1156,7 +1108,7 @@ export default function AdminPage() {
 }, [tab, rosterTeamSeasonId])
 
   useEffect(() => {
-    if (!password) return
+    if (orgLoading) return
     const load = async () => {
       const supabase = createClient()
       const [
@@ -1198,19 +1150,18 @@ export default function AdminPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password, currentTeam?.id, rosterTeamSeasonId])
+  }, [orgLoading, currentTeam?.id, rosterTeamSeasonId])
   
     useEffect(() => {
-    if (!password || tab !== 'dashboard') return
-    if (isOrgAdmin) return
+    if (orgLoading || tab !== 'dashboard' || !isTeamAdmin) return
     if (!currentTeam?.id) return
 
     loadTeamAdminDashboard()
-  }, [password, tab, isOrgAdmin, currentTeam?.id])
+  }, [orgLoading, tab, isTeamAdmin, currentTeam?.id])
 
   // Load dashboard snapshot when Dashboard tab is active
   useEffect(() => {
-    if (!password || tab !== 'dashboard') return
+    if (orgLoading || tab !== 'dashboard' || !isOrgAdmin) return
 
   const load = async () => {
     setDashboardLoading(true)
@@ -1277,7 +1228,7 @@ export default function AdminPage() {
   }
 
   load()
-}, [password, tab])
+}, [orgLoading, tab, isOrgAdmin])
 
   const loadTeamAdminDashboard = async () => {
     if (!currentTeam?.id) return
@@ -1322,7 +1273,7 @@ export default function AdminPage() {
 
   // Load pending memberships + org teams when Pending tab is active
   useEffect(() => {
-    if (!password || tab !== 'pending') return
+    if (orgLoading || tab !== 'pending' || !isOrgAdmin) return
     const load = async () => {
       setPendingLoading(true)
       setPendingMsg(null)
@@ -1341,7 +1292,7 @@ export default function AdminPage() {
       setPendingLoading(false)
     }
     load()
-  }, [password, tab])
+  }, [orgLoading, tab, isOrgAdmin])
 
   const reloadMembers = async () => {
     setMembersLoading(true)
@@ -1467,14 +1418,14 @@ export default function AdminPage() {
 
   // Load approved parents when Members tab is active
   useEffect(() => {
-    if (!password || tab !== 'members') return
+    if (orgLoading || tab !== 'members' || !isOrgAdmin) return
     setMembersMsg(null)
     reloadMembers()
-  }, [password, tab])
+  }, [orgLoading, tab, isOrgAdmin])
 
   // Load existing box scores AND is_home when score event changes
   useEffect(() => {
-    if (!selectedEventId || !password) return
+    if (!selectedEventId) return
     const load = async () => {
       const supabase = createClient()
       const [{ data: boxData }, { data: eventData }] = await Promise.all([
@@ -1492,11 +1443,11 @@ export default function AdminPage() {
       }
     }
     load()
-  }, [selectedEventId, password])
+  }, [selectedEventId])
 
   // Load existing status when status event changes
   useEffect(() => {
-    if (!statusEventId || !password) return
+    if (!statusEventId) return
     const load = async () => {
       const supabase = createClient()
       const { data } = await supabase
@@ -1514,11 +1465,11 @@ export default function AdminPage() {
       }
     }
     load()
-  }, [statusEventId, password])
+  }, [statusEventId])
 
   // Load all teams and all league games when League tab is active
   useEffect(() => {
-    if (!password) return
+    if (orgLoading || !isOrgAdmin) return
     const load = async () => {
       const supabase = createClient()
     
@@ -1546,11 +1497,11 @@ export default function AdminPage() {
     }
   }
   load()
-}, [password])
+}, [orgLoading, isOrgAdmin])
 
 // Load the selected event's season roster and existing stats when stats event changes
 useEffect(() => {
-  if (!statsEventId || !password) return
+  if (!statsEventId) return
 
   const load = async () => {
     const supabase = createClient()
@@ -1612,15 +1563,14 @@ useEffect(() => {
   }
 
   load()
-}, [statsEventId, password, statsReloadKey])
+}, [statsEventId, statsReloadKey])
 
   const api = async (body: object) => {
     const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, password, teamId: currentTeam.id })
+      body: JSON.stringify({ ...body, teamId: currentTeam.id })
     })
-    if (res.status === 401) { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }
     return res.json()
   }
 
@@ -1746,7 +1696,7 @@ useEffect(() => {
   )
 
   const previewGameChangerPdf = async () => {
-    if (!statsEventId || !gameChangerFile || !password) return
+    if (!statsEventId || !gameChangerFile) return
 
     setGameChangerPreviewLoading(true)
     setGameChangerPreviewMsg(null)
@@ -1755,7 +1705,6 @@ useEffect(() => {
 
     try {
       const formData = new FormData()
-      formData.append('password', password)
       formData.append('teamId', currentTeam.id)
       formData.append('eventId', statsEventId)
       formData.append('file', gameChangerFile)
@@ -1769,12 +1718,6 @@ useEffect(() => {
       )
 
       const result = await response.json()
-
-      if (response.status === 401) {
-        localStorage.removeItem(PASSWORD_KEY)
-        setPassword(null)
-        return
-      }
 
       if (!response.ok) {
         throw new Error(
@@ -2534,7 +2477,26 @@ const deleteLeagueGame = async () => {
     return allEvents
   })()
   
-  if (!password) return <PasswordGate onSuccess={setPassword} />
+  if (orgLoading) {
+    return (
+      <main className="min-h-screen bg-black flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-slate-700 border-t-blue-500 animate-spin" />
+      </main>
+    )
+  }
+
+  if (!membership || (!isOrgAdmin && !isTeamAdmin)) {
+    return (
+      <main className="min-h-screen bg-black flex items-center justify-center p-6 text-white">
+        <div className="max-w-sm text-center">
+          <h1 className="text-xl font-bold">Admin access required</h1>
+          <p className="mt-2 text-sm text-slate-400">
+            Your account does not have organization or team administrator access.
+          </p>
+        </div>
+      </main>
+    )
+  }
 
   const selectedEvent = events.find(e => e.id === selectedEventId)
 
@@ -2823,10 +2785,6 @@ const visibleAdminTabs = isOrgAdmin
                 </p>
             <h1 className="text-xl font-extrabold text-white">Organization Console</h1>
           </div>
-          <button onClick={() => { localStorage.removeItem(PASSWORD_KEY); setPassword(null) }}
-            className="text-xs text-slate-500 hover:text-slate-300 transition">
-            Sign out
-          </button>
         </div>
 
         {/* Tabs */}
@@ -5440,7 +5398,6 @@ const visibleAdminTabs = isOrgAdmin
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
-                                password,
                                 teamId: currentTeam.id,
                                 title: 'Test from Admin',
                                 message: 'If you see this, push is working ✅',

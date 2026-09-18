@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { PickableTeam } from '@/lib/teams'
+import { usePathname } from 'next/navigation'
 
 const STORAGE_KEY = 'selectedTeamId'
 
@@ -33,10 +34,13 @@ type TeamContextValue = {
 const TeamContext = createContext<TeamContextValue | null>(null)
 
 export function TeamProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
   const [rawTeams, setRawTeams] = useState<RawTeam[]>([])
   const [currentTeamId, setCurrentTeamIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [hasUser, setHasUser] = useState(false)
+  const [hasAnyMembership, setHasAnyMembership] =
+    useState<boolean | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +55,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         if (!user) {
           if (!cancelled) {
             setHasUser(false)
+            setHasAnyMembership(null)
             setRawTeams([])
             setCurrentTeamIdState(null)
             setLoading(false)
@@ -58,15 +63,33 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        const { data: memberships } = await supabase
+        const { data: memberships, error: membershipsError } = await supabase
           .from('memberships')
-          .select('id, organization_id')
+          .select('id, organization_id, status')
           .eq('user_id', user.id)
-          .eq('status', 'approved')
+
+        if (membershipsError) {
+          throw membershipsError
+        }
 
         if (cancelled) return
 
         if (!memberships || memberships.length === 0) {
+          setHasUser(true)
+          setHasAnyMembership(false)
+          setRawTeams([])
+          setCurrentTeamIdState(null)
+          setLoading(false)
+          return
+        }
+
+        setHasAnyMembership(true)
+
+        const approvedMemberships = memberships.filter(
+          membership => membership.status === 'approved'
+        )
+
+        if (approvedMemberships.length === 0) {
           setHasUser(true)
           setRawTeams([])
           setCurrentTeamIdState(null)
@@ -74,8 +97,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        const orgId = memberships[0].organization_id
-        const membershipIds = memberships.map((m) => m.id)
+        const orgId = approvedMemberships[0].organization_id
+        const membershipIds = approvedMemberships.map((m) => m.id)
 
         // Cross-team visibility: every approved member sees all of the org's
         // own teams (league opponents are flagged is_opponent and excluded).
@@ -160,6 +183,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (
+      loading ||
+      !hasUser ||
+      hasAnyMembership !== false ||
+      pathname === '/setup'
+    ) {
+      return
+    }
+
+    window.location.replace('/setup')
+  }, [loading, hasUser, hasAnyMembership, pathname])
+
   const setCurrentTeamId = (id: string) => {
     if (!rawTeams.some((t) => t.id === id)) return
     setCurrentTeamIdState(id)
@@ -188,6 +224,24 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         <div className="h-8 w-8 rounded-full border-2 border-slate-700 border-t-red-500 animate-spin" />
       </div>
     )
+  }
+
+  // A returning authenticated user with no memberships belongs in setup.
+  if (
+    hasUser &&
+    hasAnyMembership === false &&
+    pathname !== '/setup'
+  ) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-slate-700 border-t-blue-500 animate-spin" />
+      </div>
+    )
+  }
+
+  // Organization bootstrap happens before the user has any teams.
+  if (pathname === '/setup') {
+    return children
   }
 
   // Logged in but no team — graceful message instead of crashing a page.
