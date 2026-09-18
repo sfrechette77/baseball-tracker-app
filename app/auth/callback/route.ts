@@ -47,9 +47,29 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      // Parent signup must continue to its org-scoped completion route.
+      // All other brand-new users with no memberships enter organization setup.
+      const isOrgSignupNext =
+        /^\/o\/[^/]+\/signup(\/|$)/.test(next)
+
+      if (data.user && !isOrgSignupNext) {
+        const { data: memberships, error: membershipError } = await supabase
+          .from('memberships')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .limit(1)
+
+        if (
+          !membershipError &&
+          (!memberships || memberships.length === 0)
+        ) {
+          return NextResponse.redirect(`${publicOrigin}/setup`)
+        }
+      }
+
       return NextResponse.redirect(`${publicOrigin}${next}`)
     }
   }

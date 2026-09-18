@@ -88,13 +88,8 @@ async function sendPushToTeam(
 }
 
 export async function POST(req: NextRequest) {
-  const adminPassword = process.env.ADMIN_PASSWORD
   const body = await req.json()
-  const { password, action, teamId } = body
-
-  if (!adminPassword || password !== adminPassword) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { action, teamId } = body
 
   const authSupabase = await createServerClient()
 
