@@ -1361,6 +1361,10 @@ export type OrganizationLaunchReadiness = {
   signupLinkAvailable: boolean
   publicDescriptionConfigured: boolean
   publicLinkExists: boolean
+  teamCount: number
+  rosterReadyTeamCount: number
+  teamAdminReadyTeamCount: number
+  firstTeamMissingRosterId: string | null
 }
 
 export async function getOrganizationLaunchReadiness(): Promise<
@@ -1384,7 +1388,6 @@ export async function getOrganizationLaunchReadiness(): Promise<
     teamAdminResult,
     publicLinkResult,
   ] = await Promise.all([
-
     supabase
       .from('organizations')
       .select('slug, logo_url, primary_color, public_description')
@@ -1403,7 +1406,7 @@ export async function getOrganizationLaunchReadiness(): Promise<
       .select('id')
       .eq('organization_id', organizationId)
       .eq('is_opponent', false)
-      .limit(1),
+      .order('name'),
 
     supabase
       .from('memberships')
@@ -1414,19 +1417,19 @@ export async function getOrganizationLaunchReadiness(): Promise<
       .limit(1),
 
     supabase
-  .from('team_admins')
-  .select(`
-    membership_id,
-    memberships!inner (
-      organization_id,
-      role,
-      status
-    )
-  `)
-  .eq('memberships.organization_id', organizationId)
-  .eq('memberships.role', 'team_admin')
-  .eq('memberships.status', 'approved')
-  .limit(1),  
+      .from('team_admins')
+      .select(`
+        team_id,
+        membership_id,
+        memberships!inner (
+          organization_id,
+          role,
+          status
+        )
+      `)
+      .eq('memberships.organization_id', organizationId)
+      .eq('memberships.role', 'team_admin')
+      .eq('memberships.status', 'approved'),
 
     supabase
       .from('organization_links')
@@ -1453,18 +1456,30 @@ export async function getOrganizationLaunchReadiness(): Promise<
   }
 
   const organization = organizationResult.data
+  const permanentTeams = teamResult.data ?? []
+  const teamIds = permanentTeams.map(team => team.id)
 
-  let rosterStarted = false
+  const teamAdminTeamIds = new Set(
+    (teamAdminResult.data ?? []).map(
+      assignment => assignment.team_id
+    )
+  )
 
+  const teamAdminReadyTeamCount = teamIds.filter(
+    teamId => teamAdminTeamIds.has(teamId)
+  ).length
+
+  const rosterReadyTeamIds = new Set<string>()
   const currentSeasonId = seasonResult.data?.[0]?.id
 
-  if (currentSeasonId) {
+  if (currentSeasonId && teamIds.length > 0) {
     const { data: teamSeasons, error: teamSeasonsError } =
       await supabase
         .from('team_seasons')
-        .select('id')
+        .select('id, team_id')
         .eq('organization_id', organizationId)
         .eq('season_id', currentSeasonId)
+        .in('team_id', teamIds)
 
     if (teamSeasonsError) {
       return {
@@ -1478,14 +1493,12 @@ export async function getOrganizationLaunchReadiness(): Promise<
     )
 
     if (teamSeasonIds.length > 0) {
-      const { count, error: playersError } = await supabase
-        .from('players')
-        .select('id', {
-          count: 'exact',
-          head: true,
-        })
-        .in('team_season_id', teamSeasonIds)
-        .eq('roster_status', 'active')
+      const { data: activePlayers, error: playersError } =
+        await supabase
+          .from('players')
+          .select('team_season_id')
+          .in('team_season_id', teamSeasonIds)
+          .eq('roster_status', 'active')
 
       if (playersError) {
         return {
@@ -1494,25 +1507,59 @@ export async function getOrganizationLaunchReadiness(): Promise<
         }
       }
 
-      rosterStarted = (count ?? 0) > 0
+      const activeTeamSeasonIds = new Set(
+        (activePlayers ?? []).map(
+          player => player.team_season_id
+        )
+      )
+
+      for (const teamSeason of teamSeasons ?? []) {
+        if (activeTeamSeasonIds.has(teamSeason.id)) {
+          rosterReadyTeamIds.add(teamSeason.team_id)
+        }
+      }
     }
   }
+
+  const rosterReadyTeamCount = teamIds.filter(
+    teamId => rosterReadyTeamIds.has(teamId)
+  ).length
+
+  const firstTeamMissingRosterId =
+    teamIds.find(teamId => !rosterReadyTeamIds.has(teamId)) ??
+    null
 
   return {
     ok: true,
     readiness: {
       logoConfigured: Boolean(organization.logo_url?.trim()),
-      brandColorConfigured: Boolean(organization.primary_color?.trim()),
-      currentSeasonExists: Boolean(seasonResult.data?.length),
-      teamExists: Boolean(teamResult.data?.length),
-      rosterStarted,
-      teamAdminAssigned: Boolean(teamAdminResult.data?.length), 
+      brandColorConfigured: Boolean(
+        organization.primary_color?.trim()
+      ),
+      currentSeasonExists: Boolean(
+        seasonResult.data?.length
+      ),
+      teamExists: teamIds.length > 0,
+      rosterStarted:
+        teamIds.length > 0 &&
+        rosterReadyTeamCount === teamIds.length,
+      teamAdminAssigned:
+        teamIds.length > 0 &&
+        teamAdminReadyTeamCount === teamIds.length,
       orgAdminExists: Boolean(adminResult.data?.length),
-      signupLinkAvailable: Boolean(organization.slug?.trim()),
+      signupLinkAvailable: Boolean(
+        organization.slug?.trim()
+      ),
       publicDescriptionConfigured: Boolean(
         organization.public_description?.trim()
       ),
-      publicLinkExists: Boolean(publicLinkResult.data?.length),
+      publicLinkExists: Boolean(
+        publicLinkResult.data?.length
+      ),
+      teamCount: teamIds.length,
+      rosterReadyTeamCount,
+      teamAdminReadyTeamCount,
+      firstTeamMissingRosterId,
     },
   }
 }

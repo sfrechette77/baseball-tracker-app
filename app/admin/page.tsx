@@ -220,7 +220,10 @@ type TeamDashboardEvent = {
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('general')
-  const { currentTeam } = useCurrentTeam()
+  const {
+    currentTeam,
+    setCurrentTeamId,
+  } = useCurrentTeam()
   const {
   seasons: rosterSeasons,
   currentSeasonId,
@@ -648,67 +651,116 @@ export default function AdminPage() {
   }
 
   type LaunchReadinessItem = {
-  label: string
-  complete: boolean
-  targetTab?: Tab
-  targetSettingsSubTab?: SettingsSubTab
-  manualSetup?: boolean
-}
+    label: string
+    description: string
+    complete: boolean
+    targetTab?: Tab
+    targetSettingsSubTab?: SettingsSubTab
+    targetTeamId?: string
+    manualSetup?: boolean
+  }
 
   const launchReadinessItems: LaunchReadinessItem[] =
     launchReadiness
       ? [
           {
             label: 'Organization logo',
+            description: launchReadiness.logoConfigured
+              ? 'Logo is configured.'
+              : 'Add the logo families will see throughout the organization.',
             complete: launchReadiness.logoConfigured,
             targetTab: 'settings',
             targetSettingsSubTab: 'branding',
           },
           {
             label: 'Brand color',
+            description: launchReadiness.brandColorConfigured
+              ? 'Brand color is configured.'
+              : 'Choose the primary color used across organization pages.',
             complete: launchReadiness.brandColorConfigured,
             targetTab: 'settings',
             targetSettingsSubTab: 'branding',
           },
           {
             label: 'Current season',
+            description: launchReadiness.currentSeasonExists
+              ? 'A current season is active.'
+              : 'Start the season teams and rosters should use.',
             complete: launchReadiness.currentSeasonExists,
             targetTab: 'settings',
             targetSettingsSubTab: 'season',
           },
           {
-            label: 'At least one team',
+            label: 'Organization teams',
+            description: launchReadiness.teamExists
+              ? `${launchReadiness.teamCount} organization ${
+                  launchReadiness.teamCount === 1 ? 'team' : 'teams'
+                } configured.`
+              : 'At least one organization team is required.',
             complete: launchReadiness.teamExists,
             manualSetup: true,
           },
           {
-            label: 'Roster started',
+            label: 'Roster coverage',
+            description:
+              !launchReadiness.currentSeasonExists
+                ? 'Start a current season before building rosters.'
+                : launchReadiness.teamCount > 0
+                  ? `${launchReadiness.rosterReadyTeamCount} of ${launchReadiness.teamCount} teams have active players in the current season.`
+                  : 'Create an organization team before building rosters.',
             complete: launchReadiness.rosterStarted,
-            targetTab: 'roster',
+            targetTab: launchReadiness.currentSeasonExists
+              ? 'roster'
+              : 'settings',
+            targetSettingsSubTab:
+              launchReadiness.currentSeasonExists
+                ? undefined
+                : 'season',
+            targetTeamId:
+              launchReadiness.currentSeasonExists
+                ? launchReadiness.firstTeamMissingRosterId ??
+                  undefined
+                : undefined,
           },
           {
-            label: 'Team admin assigned',
+            label: 'Staff coverage',
+            description:
+              launchReadiness.teamCount > 0
+                ? `${launchReadiness.teamAdminReadyTeamCount} of ${launchReadiness.teamCount} teams have an assigned team admin.`
+                : 'Create an organization team before assigning staff.',
             complete: launchReadiness.teamAdminAssigned,
             targetTab: 'members',
           },
           {
             label: 'Approved org admin',
+            description: launchReadiness.orgAdminExists
+              ? 'An approved organization administrator is active.'
+              : 'The organization needs an approved administrator.',
             complete: launchReadiness.orgAdminExists,
           },
           {
             label: 'Signup link',
+            description: launchReadiness.signupLinkAvailable
+              ? 'The organization signup address is available.'
+              : 'Configure the public organization address families will use.',
             complete: launchReadiness.signupLinkAvailable,
             targetTab: 'settings',
             targetSettingsSubTab: 'access',
           },
           {
             label: 'Public welcome message',
+            description: launchReadiness.publicDescriptionConfigured
+              ? 'The public organization welcome message is configured.'
+              : 'Add a short welcome message for the public organization page.',
             complete: launchReadiness.publicDescriptionConfigured,
             targetTab: 'settings',
             targetSettingsSubTab: 'general',
           },
           {
             label: 'Public resource link',
+            description: launchReadiness.publicLinkExists
+              ? 'At least one public resource link is available.'
+              : 'Add a useful public link such as tryouts or training.',
             complete: launchReadiness.publicLinkExists,
             targetTab: 'settings',
             targetSettingsSubTab: 'links',
@@ -732,6 +784,10 @@ export default function AdminPage() {
   const openLaunchSetup = (
     item: LaunchReadinessItem
   ) => {
+    if (item.targetTeamId) {
+      setCurrentTeamId(item.targetTeamId)
+    }
+
     if (item.targetSettingsSubTab) {
       setSettingsSubTab(item.targetSettingsSubTab)
     }
@@ -1976,6 +2032,7 @@ const savePromoteMember = async () => {
   }
 
   await reloadMembers()
+  await loadLaunchReadiness()
   setMembersMsg('✅ Team admin assigned')
   cancelPromoteMember()
 }
@@ -2036,6 +2093,7 @@ const removeTeamAdminTeam = async (memberId: string, teamId: string) => {
 
   if (membersResult.ok) setMembersList(membersResult.members)
   if (teamsResult.ok) setOrgTeams(teamsResult.teams)
+  await loadLaunchReadiness()
 }
 
 const toggleGrantAdminTeam = (teamId: string) => {
@@ -2067,6 +2125,7 @@ const submitGrantTeamAdmin = async () => {
   setGrantAdminStaffTitle('')
   setMembersMsg('✅ Team admin assigned')
   await reloadMembers()
+  await loadLaunchReadiness()
 }
 
   const toggleApproveTeam = (teamId: string) => {
@@ -2604,6 +2663,7 @@ const deleteLeagueGame = async () => {
     setNewAthletePosition('')
     setRosterMsg('Player added to the current-season roster.')
     await loadManagedRoster()
+    await loadLaunchReadiness()
   } else {
     setRosterMsg(`Error: ${result.error}`)
   }
@@ -2646,6 +2706,7 @@ const submitExistingAthlete = async () => {
     setExistingAthletePosition('')
     setRosterMsg('Existing athlete added to the current-season roster.')
     await loadManagedRoster()
+    await loadLaunchReadiness()
   } else {
     setRosterMsg(`Error: ${result.error}`)
   }
@@ -2719,6 +2780,7 @@ const saveRosterEdit = async () => {
     if (result.ok) {
       setRosterMsg(`${player.name} was removed from the active roster.`)
       await loadManagedRoster()
+      await loadLaunchReadiness()
     } else {
       setRosterMsg(`Error: ${result.error}`)
     }
@@ -2737,6 +2799,7 @@ const saveRosterEdit = async () => {
     if (result.ok) {
       setRosterMsg(`${player.name} was restored to the active roster.`)
       await loadManagedRoster()
+      await loadLaunchReadiness()
     } else {
       setRosterMsg(`Error: ${result.error}`)
     }
@@ -2887,15 +2950,33 @@ const visibleAdminTabs = isOrgAdmin
                   </div>
 
                   {!launchReadinessLoading && launchReadiness && (
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+                    <>
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${launchReadinessPercent}%`,
+                            backgroundColor: brandColor,
+                          }}
+                        />
+                      </div>
+
                       <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${launchReadinessPercent}%`,
-                          backgroundColor: brandColor,
-                        }}
-                      />
-                    </div>
+                        className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+                          launchReadinessPercent === 100
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                            : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                        }`}
+                      >
+                        {launchReadinessPercent === 100
+                          ? 'Ready to launch — core organization setup is complete.'
+                          : `${launchReadinessItems.length - completedLaunchItems} setup ${
+                              launchReadinessItems.length - completedLaunchItems === 1
+                                ? 'item remains'
+                                : 'items remain'
+                            } before launch.`}
+                      </div>
+                    </>
                   )}
 
                   {launchReadinessLoading && (
@@ -2910,14 +2991,18 @@ const visibleAdminTabs = isOrgAdmin
                           className="flex items-center justify-between gap-3 rounded-lg bg-slate-900/70 px-3 py-2"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm text-slate-200">
+                            <p className="text-sm font-medium text-slate-200">
                               {item.label}
                             </p>
 
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {item.description}
+                            </p>
+
                             {!item.complete && item.manualSetup && (
-                              <p className="mt-0.5 text-[10px] text-slate-500">
-                                Team creation is currently handled during
-                                organization provisioning.
+                              <p className="mt-1 text-[10px] text-amber-400">
+                                Team creation is handled during organization
+                                provisioning.
                               </p>
                             )}
                           </div>
