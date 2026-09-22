@@ -1,9 +1,11 @@
 'use server'
 
+import { createHash, randomBytes } from 'node:crypto'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import {
   sendParentAccessApprovedEmail,
+  sendStaffInvitationEmail,
   sendTeamStaffAssignedEmail,
 } from '@/lib/email/access'
 
@@ -50,6 +52,17 @@ export type OrganizationField = {
 }
 
 export type SimpleResult = { ok: true } | { ok: false; error: string }
+
+export type StaffInvitationResult =
+  | {
+      ok: true
+      invitationId: string
+      emailSkipped: boolean
+    }
+  | {
+      ok: false
+      error: string
+    }
 
 export type SaveOrganizationFieldResult =
   | { ok: true; field: { id: string; name: string } }
@@ -964,6 +977,297 @@ export async function makeMemberTeamAdmin(
   return { ok: true }
 }
 
+export async function createStaffInvitation(
+  email: string,
+  teamIds: string[],
+  staffTitleInput?: string | null
+): Promise<StaffInvitationResult> {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (
+    !normalizedEmail ||
+    normalizedEmail.length > 320 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+  ) {
+    return {
+      ok: false,
+      error: 'Enter a valid email address',
+    }
+  }
+
+  const uniqueTeamIds = Array.from(new Set(teamIds))
+
+  if (uniqueTeamIds.length === 0) {
+    return {
+      ok: false,
+      error: 'Pick at least one team',
+    }
+  }
+
+  const staffTitle = staffTitleInput?.trim() || null
+
+  if (staffTitle && staffTitle.length > 80) {
+    return {
+      ok: false,
+      error: 'Staff title must be 80 characters or fewer',
+    }
+  }
+
+  const supabase = await createClient()
+  const guard = await requireOrgAdmin()
+
+  if (!guard.ok) {
+    return {
+      ok: false,
+      error: guard.error,
+    }
+  }
+
+  const organizationId = guard.membership.organization_id
+
+  const [
+    { data: organization, error: organizationError },
+    { data: teams, error: teamsError },
+    { data: existingInvitation, error: existingInvitationError },
+  ] = await Promise.all([
+    supabase
+      .from('organizations')
+      .select('name, slug, primary_color, logo_url')
+      .eq('id', organizationId)
+      .maybeSingle(),
+
+    supabase
+      .from('teams')
+      .select('id, name')
+      .eq('organization_id', organizationId)
+      .eq('is_opponent', false)
+      .in('id', uniqueTeamIds)
+      .order('name'),
+
+    supabase
+      .from('staff_invitations')
+      .select('id, send_count')
+      .eq('organization_id', organizationId)
+      .eq('email', normalizedEmail)
+      .is('accepted_at', null)
+      .is('revoked_at', null)
+      .maybeSingle(),
+  ])
+
+  if (organizationError) {
+    return {
+      ok: false,
+      error: organizationError.message,
+    }
+  }
+
+  if (!organization) {
+    return {
+      ok: false,
+      error: 'Organization not found',
+    }
+  }
+
+  if (teamsError) {
+    return {
+      ok: false,
+      error: teamsError.message,
+    }
+  }
+
+  if (!teams || teams.length !== uniqueTeamIds.length) {
+    return {
+      ok: false,
+      error: 'One or more teams do not belong to your organization',
+    }
+  }
+
+  if (existingInvitationError) {
+    return {
+      ok: false,
+      error: existingInvitationError.message,
+    }
+  }
+
+  const token = randomBytes(32).toString('base64url')
+  const tokenHash = createHash('sha256')
+    .update(token)
+    .digest('hex')
+
+  const now = new Date()
+  const nowIso = now.toISOString()
+  const expiresAt = new Date(
+    now.getTime() + 7 * 24 * 60 * 60 * 1000
+  ).toISOString()
+
+  const sendAttempt =
+    (existingInvitation?.send_count ?? 0) + 1
+
+  let invitationId: string
+
+  if (existingInvitation) {
+    const { data: updatedInvitation, error: updateError } =
+      await supabase
+        .from('staff_invitations')
+        .update({
+          token_hash: tokenHash,
+          staff_title: staffTitle,
+          invited_by: guard.user.id,
+          expires_at: expiresAt,
+          send_count: sendAttempt,
+          updated_at: nowIso,
+        })
+        .eq('id', existingInvitation.id)
+        .eq('organization_id', organizationId)
+        .is('accepted_at', null)
+        .is('revoked_at', null)
+        .select('id')
+        .maybeSingle()
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: updateError.message,
+      }
+    }
+
+    if (!updatedInvitation) {
+      return {
+        ok: false,
+        error: 'The invitation changed before it could be updated. Try again.',
+      }
+    }
+
+    invitationId = updatedInvitation.id
+  } else {
+    const { data: insertedInvitation, error: insertError } =
+      await supabase
+        .from('staff_invitations')
+        .insert({
+          organization_id: organizationId,
+          email: normalizedEmail,
+          token_hash: tokenHash,
+          staff_title: staffTitle,
+          invited_by: guard.user.id,
+          expires_at: expiresAt,
+          send_count: sendAttempt,
+        })
+        .select('id')
+        .single()
+
+    if (insertError) {
+      return {
+        ok: false,
+        error: insertError.message,
+      }
+    }
+
+    invitationId = insertedInvitation.id
+  }
+
+  const {
+    data: existingTeamAssignments,
+    error: existingTeamsError,
+  } = await supabase
+    .from('staff_invitation_teams')
+    .select('team_id')
+    .eq('invitation_id', invitationId)
+
+  if (existingTeamsError) {
+    return {
+      ok: false,
+      error: existingTeamsError.message,
+    }
+  }
+
+  const { error: teamUpsertError } = await supabase
+    .from('staff_invitation_teams')
+    .upsert(
+      uniqueTeamIds.map(teamId => ({
+        invitation_id: invitationId,
+        team_id: teamId,
+      })),
+      {
+        onConflict: 'invitation_id,team_id',
+      }
+    )
+
+  if (teamUpsertError) {
+    return {
+      ok: false,
+      error: teamUpsertError.message,
+    }
+  }
+
+  const selectedTeamIdSet = new Set(uniqueTeamIds)
+
+  const staleTeamIds = (existingTeamAssignments ?? [])
+    .map(row => row.team_id)
+    .filter(teamId => !selectedTeamIdSet.has(teamId))
+
+  if (staleTeamIds.length > 0) {
+    const { error: staleDeleteError } = await supabase
+      .from('staff_invitation_teams')
+      .delete()
+      .eq('invitation_id', invitationId)
+      .in('team_id', staleTeamIds)
+
+    if (staleDeleteError) {
+      return {
+        ok: false,
+        error: staleDeleteError.message,
+      }
+    }
+  }
+
+  const emailResult = await sendStaffInvitationEmail({
+    invitationId,
+    sendAttempt,
+    token,
+    to: normalizedEmail,
+    organization: {
+      name: organization.name,
+      slug: organization.slug,
+      primaryColor: organization.primary_color,
+      logoUrl: organization.logo_url,
+    },
+    teamNames: teams.map(team => team.name),
+    staffTitle,
+  })
+
+  if (!emailResult.ok) {
+    return {
+      ok: false,
+      error: `Invitation saved, but the email could not be sent: ${emailResult.error}`,
+    }
+  }
+
+  if (!emailResult.skipped) {
+    const { error: sentUpdateError } = await supabase
+      .from('staff_invitations')
+      .update({
+        last_sent_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invitationId)
+      .eq('organization_id', organizationId)
+
+    if (sentUpdateError) {
+      console.error(
+        'Staff invitation sent timestamp update failed:',
+        sentUpdateError
+      )
+    }
+  }
+
+  revalidatePath('/admin')
+
+  return {
+    ok: true,
+    invitationId,
+    emailSkipped: emailResult.skipped,
+  }
+}
 
 export async function grantTeamAdminByEmail(
   email: string,

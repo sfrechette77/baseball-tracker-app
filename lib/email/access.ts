@@ -34,6 +34,16 @@ type TeamStaffAssignedEmailInput = {
   staffTitle: string | null
 }
 
+type StaffInvitationEmailInput = {
+  invitationId: string
+  sendAttempt: number
+  token: string
+  to: string
+  organization: OrganizationEmailBrand
+  teamNames: string[]
+  staffTitle: string | null
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -323,6 +333,73 @@ export async function sendTeamStaffAssignedEmail(
       `,
       buttonLabel: 'Sign in to On Deck',
       buttonUrl: signInUrl,
+    }),
+  })
+}
+
+export async function sendStaffInvitationEmail(
+  input: StaffInvitationEmailInput
+): Promise<SendTransactionalEmailResult> {
+  const mode = getEmailDeliveryMode()
+
+  if (mode === 'disabled') {
+    return {
+      ok: true,
+      skipped: true,
+      mode,
+      recipient: null,
+    }
+  }
+
+  const appBaseUrl = getAppBaseUrl()
+
+  if (!appBaseUrl) {
+    return missingAppUrlResult(mode)
+  }
+
+  const invitationUrl =
+    `${appBaseUrl}/staff-invite?token=${encodeURIComponent(input.token)}`
+
+  const teamList = formatList(input.teamNames)
+  const staffTitle =
+    input.staffTitle?.trim() || 'Coach / Team Staff'
+
+  return sendTransactionalEmail({
+    to: input.to,
+    subject: `You're invited to ${input.organization.name} team staff`,
+    idempotencyKey: createIdempotencyKey(
+      'team-staff-invitation',
+      [
+        input.invitationId,
+        String(input.sendAttempt),
+      ]
+    ),
+    text: [
+      `You've been invited to join the ${input.organization.name} team staff in On Deck.`,
+      `Role: ${staffTitle}`,
+      `Teams: ${teamList}`,
+      '',
+      `Accept invitation: ${invitationUrl}`,
+    ].join('\n'),
+    html: buildEmailShell({
+      organization: input.organization,
+      previewText: `You've been invited to join the ${input.organization.name} team staff.`,
+      heading: 'You’re invited to team staff',
+      bodyHtml: `
+        <p style="margin:0 0 16px;">
+          You’ve been invited to join the
+          <strong>${escapeHtml(input.organization.name)}</strong>
+          team staff in On Deck.
+        </p>
+        <p style="margin:0 0 8px;">
+          <strong>Role:</strong> ${escapeHtml(staffTitle)}
+        </p>
+        <p style="margin:0;">
+          <strong>Teams:</strong> ${escapeHtml(teamList)}
+        </p>
+      `,
+      buttonLabel: 'Accept invitation',
+      buttonUrl: invitationUrl,
     }),
   })
 }
