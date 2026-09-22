@@ -3,7 +3,12 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that don't require auth
-const PUBLIC_ROUTES = ['/login', '/auth/callback', '/signup']
+const PUBLIC_ROUTES = [
+  '/login',
+  '/auth/callback',
+  '/signup',
+  '/staff-invite',
+]
 
 // Routes you might want public later (about, marketing, etc.)
 // Add to PUBLIC_ROUTES array above

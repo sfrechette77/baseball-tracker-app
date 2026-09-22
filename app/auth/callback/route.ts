@@ -55,7 +55,14 @@ export async function GET(request: Request) {
       const isOrgSignupNext =
         /^\/o\/[^/]+\/signup(\/|$)/.test(next)
 
-      if (data.user && !isOrgSignupNext) {
+      const isStaffInvitationNext =
+        /^\/staff-invite(?:\?|$)/.test(next)
+
+      if (
+        data.user &&
+        !isOrgSignupNext &&
+        !isStaffInvitationNext
+      ) {
         const { data: memberships, error: membershipError } = await supabase
           .from('memberships')
           .select('id')

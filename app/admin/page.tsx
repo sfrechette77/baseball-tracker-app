@@ -15,6 +15,7 @@ import {
   updateMemberTeamAdminTitle,
   removeMemberTeamAdmin,
   grantTeamAdminByEmail,
+  createStaffInvitation,
   startNewSeason,
   getCurrentSeasonTeamSetup,
   updateSeasonTeamSetup,
@@ -2107,11 +2108,43 @@ const submitGrantTeamAdmin = async () => {
   setGrantAdminSaving(true)
   setMembersMsg(null)
 
+  const teamIds = Array.from(grantAdminTeamIds)
+
   const result = await grantTeamAdminByEmail(
     grantAdminEmail,
-    Array.from(grantAdminTeamIds),
+    teamIds,
     grantAdminStaffTitle
   )
+
+  if (
+    !result.ok &&
+    result.error === 'That user needs to sign up first.'
+  ) {
+    const invitationResult = await createStaffInvitation(
+      grantAdminEmail,
+      teamIds,
+      grantAdminStaffTitle
+    )
+
+    setGrantAdminSaving(false)
+
+    if (!invitationResult.ok) {
+      setMembersMsg(`❌ ${invitationResult.error}`)
+      return
+    }
+
+    setGrantAdminEmail('')
+    setGrantAdminTeamIds(new Set())
+    setGrantAdminStaffTitle('')
+
+    setMembersMsg(
+      invitationResult.emailSkipped
+        ? '✅ Staff invitation saved. Email delivery is currently disabled.'
+        : '✅ Staff invitation sent'
+    )
+
+    return
+  }
 
   setGrantAdminSaving(false)
 
@@ -4725,10 +4758,10 @@ const visibleAdminTabs = isOrgAdmin
                     Members Admin Tool
                   </p>
                   <h2 className="mt-1 text-lg font-extrabold text-white">
-                    Grant Team Admin by Email
+                    Add or Invite Team Staff
                   </h2>
                   <p className="text-xs text-slate-400 mt-1">
-                    Add team admin access for an existing signed-up user without changing the member list actions below.
+                    Assign access immediately for existing users, or send an invitation when they have not signed up yet.
                   </p>
                 </div>
                 <span
@@ -4743,7 +4776,7 @@ const visibleAdminTabs = isOrgAdmin
                 type="email"
                 value={grantAdminEmail}
                 onChange={e => setGrantAdminEmail(e.target.value)}
-                placeholder="parent@example.com"
+                placeholder="coach@example.com"
                 className="w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"
               />
 
@@ -4790,7 +4823,7 @@ const visibleAdminTabs = isOrgAdmin
                 className="w-full rounded-xl py-2 text-sm font-bold text-white transition disabled:opacity-50"
                 style={{ backgroundColor: settingsPrimaryColor }}
               >
-                {grantAdminSaving ? 'Adding…' : 'Add Team Admin'}
+                {grantAdminSaving ? 'Working…' : 'Add or Invite Staff'}
               </button>
             </div>
             {membersMsg && <p className="text-sm text-center mb-4">{membersMsg}</p>}
