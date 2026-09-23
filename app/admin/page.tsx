@@ -1580,7 +1580,7 @@ useEffect(() => {
     const [{ data: playersData }, { data: statsData }] = await Promise.all([
       supabase
         .from('players')
-        .select('id, name, jersey_number')
+        .select('id, name, jersey_number, roster_status')
         .eq('team_season_id', eventData.team_season_id)
         .order('jersey_number', { ascending: true }),
       supabase
@@ -1589,10 +1589,40 @@ useEffect(() => {
         .eq('event_id', statsEventId),
     ])
 
-    const eventPlayers = (playersData ?? []) as Player[]
+    const statRows = (statsData ?? []) as unknown as StatRow[]
+
+    const playersWithRecordedStats = new Set(
+      statRows
+        .filter(row =>
+          row.batting_order_position !== null ||
+          row.at_bats > 0 ||
+          row.hits > 0 ||
+          row.rbi > 0 ||
+          row.runs > 0 ||
+          row.walks > 0 ||
+          row.strikeouts > 0 ||
+          row.pitch_count > 0 ||
+          row.innings_pitched > 0 ||
+          row.strikeouts_pitching > 0 ||
+          row.walks_allowed > 0 ||
+          row.hits_allowed > 0 ||
+          row.earned_runs > 0
+        )
+        .map(row => row.player_id)
+    )
+
+    const eventPlayers = (
+      (playersData ?? []) as Array<
+        Player & { roster_status: 'active' | 'inactive' }
+      >
+    ).filter(
+      player =>
+        player.roster_status === 'active' ||
+        playersWithRecordedStats.has(player.id)
+    )
+
     setPlayers(eventPlayers)
 
-    const statRows = (statsData ?? []) as unknown as StatRow[]
     const map: Record<string, StatRow> = {}
 
     for (const p of eventPlayers) {

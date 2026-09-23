@@ -148,7 +148,16 @@ export default function SchedulePage() {
     if (filter === 'past') {
       return events
         .filter(e => e.event_type !== 'practice')
-        .filter(e => e.team_score !== null && e.opponent_score !== null)
+        .filter(e => {
+          const hasScore =
+            e.team_score !== null && e.opponent_score !== null
+          const eventDateKey =
+            getOrgDateKey(new Date(e.starts_at), timeZone)
+          const isBeforeToday = eventDateKey < todayKey
+          const isToday = eventDateKey === todayKey
+
+          return isBeforeToday || (isToday && hasScore)
+        })
         .slice()
         .reverse()
     }
@@ -219,7 +228,7 @@ export default function SchedulePage() {
 
   const emptyMessage = {
     upcoming: 'No upcoming games scheduled.',
-    past: 'No completed games yet.',
+    past: 'No past games yet.',
     practices: 'No practices scheduled.',
   }[filter]
 
